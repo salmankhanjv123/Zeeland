@@ -2,8 +2,8 @@ from rest_framework import viewsets, status
 from rest_framework.generics import ListAPIView
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from .serializers import BookingSerializer, BookingForPaymentsSerializer
-from .models import Booking
+from .serializers import BookingSerializer, BookingForPaymentsSerializer, TokenSerializer
+from .models import Booking, Token
 
 
 class BookingViewSet(viewsets.ModelViewSet):
@@ -46,3 +46,17 @@ def latest_booking_id(request, project):
     booking_id_str = str(project) + \
         '-' + str(booking_id).zfill(3)
     return Response({'booking_id': booking_id_str}, status=status.HTTP_200_OK)
+
+
+class TokenViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint that allows Token to be viewed or edited.
+    """
+    serializer_class = TokenSerializer
+
+    def get_queryset(self):
+        queryset = Token.objects.all().select_related('customer', 'plot')
+        project_id = self.request.query_params.get('project')
+        if project_id:
+            queryset = queryset.filter(project_id=project_id)
+        return queryset

@@ -34,3 +34,16 @@ class Booking(models.Model):
 
     class Meta:
         db_table = 'booking'
+
+
+class Token(models.Model):
+    project = models.ForeignKey(Projects, on_delete=models.PROTECT)
+    user = models.ForeignKey(User, on_delete=models.PROTECT)
+    plot = models.ForeignKey(Plots, on_delete=models.PROTECT)
+    customer = models.ForeignKey(Customers, on_delete=models.PROTECT)
+    date = models.DateField()
+    created_at = models.DateTimeField(auto_now=True)
+    updated_at = models.DateTimeField(auto_now_add=True)
+    expire_date = models.DateField()
+    amount = models.FloatField()
+    remarks = models.TextField(null=True)

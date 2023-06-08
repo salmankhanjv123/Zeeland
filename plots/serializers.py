@@ -7,8 +7,7 @@ class PlotsSerializer(serializers.ModelSerializer):
     plot_size = serializers.SerializerMethodField(read_only=True)
 
     def get_plot_size(self, instance):
-        size_type_name = instance.get_size_type_display()
-        return f"{instance.size} {size_type_name}"
+        return instance.get_plot_size()
 
     def get_category_name(self, instance):
         category_name = instance.get_type_display()

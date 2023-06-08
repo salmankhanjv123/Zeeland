@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Booking
+from .models import Booking, Token
 from plots.models import Plots
 
 
@@ -29,10 +29,9 @@ class BookingSerializer(serializers.ModelSerializer):
 
     def get_plot_info(self, instance):
         plot_number = instance.plot.plot_number
-        plot_size = instance.plot.size
-        size_type = instance.plot.get_size_type_display()
+        plot_size = instance.plot.get_plot_size()
         plot_type = instance.plot.get_type_display()
-        return f"{plot_number} || {plot_type} || {plot_size} {size_type}"
+        return f"{plot_number} || {plot_type} || {plot_size}"
 
     class Meta:
         model = Booking
@@ -72,3 +71,21 @@ class BookingForPaymentsSerializer(serializers.ModelSerializer):
     class Meta:
         model = Booking
         fields = ['id', 'booking_details']
+
+
+class TokenSerializer(serializers.ModelSerializer):
+    customer_name = serializers.SerializerMethodField(read_only=True)
+    plot_info = serializers.SerializerMethodField(read_only=True)
+
+    def get_customer_name(self, instance):
+        return instance.customer.name
+
+    def get_plot_info(self, instance):
+        plot_number = instance.plot.plot_number
+        plot_size = instance.plot.get_plot_size()
+        plot_type = instance.plot.get_type_display()
+        return f"{plot_number} || {plot_type} || {plot_size}"
+
+    class Meta:
+        model = Token
+        fields = '__all__'
