@@ -1,4 +1,5 @@
-from django.db.models import Q
+from django.db.models import Q, Sum
+import datetime
 from rest_framework import viewsets
 from .serializers import IncomingFundSerializer, OutgoingFundSerializer, ExpenseTypeSerializer, JournalVoucherSerializer
 from .models import IncomingFund, OutgoingFund, ExpenseType, JournalVoucher
@@ -72,21 +73,27 @@ class DuePaymentsView(APIView):
         today = date.today()
         overdue_bookings = Booking.objects.filter(
             due_date__lt=today, total_remaining_amount__gt=0)
-        overdue_customers = overdue_bookings.values('customer').distinct()
-
+        current_month = datetime.date.today().replace(day=1)
         due_payments = []
         for booking in overdue_bookings:
-            customer = Customers.objects.get(pk=booking.customer_id)
-            due_payments.append({
-                'booking_id': booking.booking_id,
-                'customer_name': customer.name,
-                'customer_contact': customer.contact,
-                'due_date': booking.due_date,
-                'total_remaining_amount': booking.total_remaining_amount,
-            })
+            # Check if there are any payments for the booking in the current month
+            has_payment = IncomingFund.objects.filter(
+                booking=booking, installement_month=current_month).exists()
+
+            if not has_payment:
+                customer = Customers.objects.get(pk=booking.customer_id)
+                due_payments.append({
+                    'booking_id': booking.booking_id,
+                    'customer_name': customer.name,
+                    'customer_contact': customer.contact,
+                    'due_date': booking.due_date,
+                    'total_remaining_amount': booking.total_remaining_amount,
+                })
+            else:
+                # If there is a payment, exclude the booking from the overdue_bookings queryset
+                overdue_bookings = overdue_bookings.exclude(pk=booking.pk)
 
         return Response({'due_payments': due_payments})
-
 
 # class DuePaymentsView(APIView):
 #     def get(self, request):
