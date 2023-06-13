@@ -17,6 +17,7 @@ class Plots(models.Model):
     square_fts = models.FloatField(default=0)
     rate = models.FloatField()
     pic = models.ImageField(upload_to='media/plots', blank=True, null=True)
+    status = models.CharField(max_length=10, default='active')
 
     def __str__(self):
         return self.plot_number

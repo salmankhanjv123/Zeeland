@@ -1,3 +1,4 @@
+from django.db.models import Max
 from django.db.models import Q, Sum
 import datetime
 from rest_framework import viewsets
@@ -70,58 +71,54 @@ class ExpenseTypeViewSet(viewsets.ModelViewSet):
 
 class DuePaymentsView(APIView):
     def get(self, request):
-        today = date.today()
-        overdue_bookings = Booking.objects.filter(
-            due_date__lt=today, total_remaining_amount__gt=0)
+        project = request.query_params.get('project')
+        today = date.today().day
         current_month = datetime.date.today().replace(day=1)
-        due_payments = []
-        for booking in overdue_bookings:
-            # Check if there are any payments for the booking in the current month
-            has_payment = IncomingFund.objects.filter(
-                booking=booking, installement_month=current_month).exists()
+        active_bookings = Booking.objects.filter(status="active")
+        if project:
+            active_bookings = active_bookings.filter(project_id=project)
+        defaulter_bookings = []
 
-            if not has_payment:
-                customer = Customers.objects.get(pk=booking.customer_id)
-                due_payments.append({
-                    'booking_id': booking.booking_id,
-                    'customer_name': customer.name,
-                    'customer_contact': customer.contact,
-                    'due_date': booking.due_date,
-                    'total_remaining_amount': booking.total_remaining_amount,
-                })
+        for booking in active_bookings:
+            latest_payment = IncomingFund.objects.filter(
+                booking=booking).aggregate(latest_date=Max('date'))
+
+            if latest_payment['latest_date']:
+                latest_payment_obj = IncomingFund.objects.filter(
+                    booking=booking, date=latest_payment['latest_date']).first()
+
+                if latest_payment_obj.installement_month != current_month and latest_payment_obj.booking.installment_date < today:
+                    # Calculate the difference in months
+                    month_diff = (current_month.year - latest_payment_obj.installement_month.year) * 12 + \
+                        (current_month.month -
+                         latest_payment_obj.installement_month.month)
+
+                    # Append the booking object along with the month difference
+                    defaulter_bookings.append({
+                        'booking': booking,
+                        'month_difference': month_diff
+                    })
             else:
-                # If there is a payment, exclude the booking from the overdue_bookings queryset
-                overdue_bookings = overdue_bookings.exclude(pk=booking.pk)
+                # If no payments found, add the booking to defaulter_bookings
+                month_diff = (current_month.year - booking.booking_date.year) * 12 + \
+                    (current_month.month - booking.booking_date.month)
+
+                defaulter_bookings.append({
+                    'booking': booking,
+                    'month_difference': month_diff
+                })
+        due_payments = []
+        for defaulter_booking in defaulter_bookings:
+            booking = defaulter_booking['booking']
+            month_diff = defaulter_booking['month_difference']
+            customer = Customers.objects.get(pk=booking.customer_id)
+            due_payments.append({
+                'booking_id': booking.booking_id,
+                'customer_name': customer.name,
+                'customer_contact': customer.contact,
+                'due_date': booking.installment_date,
+                'total_remaining_amount': booking.remaining,
+                'month_difference': month_diff
+            })
 
         return Response({'due_payments': due_payments})
-
-# class DuePaymentsView(APIView):
-#     def get(self, request):
-#         today = date.today()
-#         overdue_bookings = Booking.objects.filter(due_date__lt=today, total_remaining_amount__gt=0)
-#         overdue_customers = overdue_bookings.values('customer').distinct()
-
-#         due_payments = []
-#         for booking in overdue_bookings:
-#             customer = Customers.objects.get(pk=booking.customer_id)
-
-#             # Retrieve the installments that are due for specific months
-#             due_installments = IncomingFund.objects.filter(
-#                 booking=booking,
-#                 installement_month__lt=today.month,
-#                 amount__gt=0
-#             )
-
-#             # Append the details of due installments to the list
-#             for installment in due_installments:
-#                 due_payments.append({
-#                     'booking_id': booking.booking_id,
-#                     'customer_name': customer.name,
-#                     'customer_email': customer.email,
-#                     'customer_phone': customer.phone,
-#                     'due_date': booking.due_date,
-#                     'installment_month': installment.installement_month,
-#                     'installment_amount': installment.amount,
-#                 })
-
-#         return Response({'due_payments': due_payments})

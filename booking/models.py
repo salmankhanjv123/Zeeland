@@ -26,7 +26,6 @@ class Booking(models.Model):
     advance = models.FloatField()
     remaining = models.FloatField()
     total_receiving_amount = models.FloatField()
-    total_remaining_amount = models.FloatField()
     status = models.CharField(max_length=10, default='active')
 
     def __str__(self):

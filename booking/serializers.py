@@ -36,12 +36,11 @@ class BookingSerializer(serializers.ModelSerializer):
     class Meta:
         model = Booking
         fields = '__all__'
-        read_only_fields = ['total_remaining_amount', 'total_receiving_amount']
+        read_only_fields = ['total_receiving_amount']
 
     def create(self, validated_data):
         project = validated_data.get('project')
         advance_amount = validated_data.get('advance')
-        remaining_amount = validated_data.get('remaining')
         try:
             latest_booking = Booking.objects.filter(
                 project=project).latest('created_at')
@@ -53,12 +52,26 @@ class BookingSerializer(serializers.ModelSerializer):
         booking_id_str = str(project.id) + \
             '-' + str(latest_booking_number).zfill(3)
         validated_data['booking_id'] = booking_id_str
-
         validated_data['total_receiving_amount'] = advance_amount
-        validated_data['total_remaining_amount'] = remaining_amount
 
+        plot = validated_data['plot']
+        plot.status = "sold"
+        plot.save()
         booking = Booking.objects.create(**validated_data)
         return booking
+
+    def update(self, instance, validated_data):
+        booking_status = validated_data.get('status', instance.status)
+        for key, value in validated_data.items():
+            setattr(instance, key, value)
+        if booking_status == 'resale':
+            plot = instance.plot
+            plot.status = 'active'
+            plot.save()
+
+        instance.status = booking_status
+        instance.save()
+        return instance
 
 
 class BookingForPaymentsSerializer(serializers.ModelSerializer):

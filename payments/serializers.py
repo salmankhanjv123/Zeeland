@@ -30,6 +30,30 @@ class IncomingFundSerializer(serializers.ModelSerializer):
         plot_number = instance.booking.plot.plot_number
         return f"{booking_id} || {customer_name} || {plot_number}"
 
+    def create(self, validated_data):
+        booking = validated_data['booking']
+        amount = validated_data['amount']
+
+        booking.total_receiving_amount += amount
+        booking.remaining -= amount
+        booking.save()
+        return IncomingFund.objects.create(**validated_data)
+
+    def update(self, instance, validated_data):
+        booking = instance.booking
+        amount = validated_data.get('amount', instance.amount)
+
+        if amount != instance.amount:
+            booking.total_receiving_amount -= instance.amount
+            booking.remaining += instance.amount
+            booking.total_receiving_amount += amount
+            booking.remaining -= amount
+            booking.save()
+
+        instance.amount = amount
+        instance.save()
+        return instance
+
     class Meta:
         model = IncomingFund
         fields = '__all__'
