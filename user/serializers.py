@@ -35,7 +35,7 @@ class UserProjectsSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ('id', 'username', 'projects_list')
+        fields = ('id', 'username', 'is_superuser', 'projects_list')
 
     def update(self, instance, validated_data):
         projects_data = validated_data.pop('projects_list', None)
@@ -72,6 +72,15 @@ class AssignGroupSerializer(serializers.ModelSerializer):
 class AssignPermissionSerializer(serializers.ModelSerializer):
     user_permissions = serializers.PrimaryKeyRelatedField(
         queryset=Permission.objects.all(), many=True)
+
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'user_permissions']
+        extra_kwargs = {'username': {'read_only': True}}
+
+
+class ListPermissionSerializer(serializers.ModelSerializer):
+    user_permissions = PermissionSerializer(many=True, read_only=True)
 
     class Meta:
         model = User

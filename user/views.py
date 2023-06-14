@@ -2,7 +2,7 @@
 from django.contrib.auth.models import User, Group, Permission
 from rest_framework import generics, viewsets
 from projects.models import Projects
-from .serializers import UserSerializer, ProjectsSerializer, UserProjectsSerializer, GroupSerializer, PermissionSerializer, AssignGroupSerializer, AssignPermissionSerializer
+from .serializers import UserSerializer, ProjectsSerializer, UserProjectsSerializer, GroupSerializer, PermissionSerializer, AssignGroupSerializer, ListPermissionSerializer, AssignPermissionSerializer
 
 
 class UserViewSet(viewsets.ModelViewSet):
@@ -67,4 +67,14 @@ class UserAssignGroupView(generics.RetrieveUpdateAPIView):
 
 class UserAssignPermissionView(generics.RetrieveUpdateAPIView):
     queryset = User.objects.all()
-    serializer_class = AssignPermissionSerializer
+
+    def get_serializer_class(self):
+        if self.request.method == 'PUT' or self.request.method == 'PATCH':
+            return AssignPermissionSerializer
+        else:
+            return ListPermissionSerializer
+
+
+class UsersListPermissionView(generics.ListAPIView):
+    queryset = User.objects.all()
+    serializer_class = ListPermissionSerializer

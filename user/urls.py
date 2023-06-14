@@ -1,5 +1,5 @@
 from django.urls import path, include
-from .views import UserProjectsList, ProjectsList, UserViewSet, UserProjectsUpdate, UserProjectsDetail, GroupListCreateAPIView, GroupRetrieveUpdateDestroyAPIView, PermissionListCreateAPIView, PermissionRetrieveUpdateDestroyAPIView, UserAssignGroupView, UserAssignPermissionView
+from .views import UserProjectsList, ProjectsList, UserViewSet, UserProjectsUpdate, UserProjectsDetail, GroupListCreateAPIView, GroupRetrieveUpdateDestroyAPIView, PermissionListCreateAPIView, PermissionRetrieveUpdateDestroyAPIView, UserAssignGroupView, UserAssignPermissionView, UsersListPermissionView
 from rest_framework import routers
 router = routers.DefaultRouter()
 router.register(r'users', UserViewSet)
@@ -24,4 +24,5 @@ urlpatterns = [
          UserAssignGroupView.as_view(), name='user-assign-group'),
     path('users/<int:pk>/assign-permission/',
          UserAssignPermissionView.as_view(), name='user-assign-permission'),
+    path('users/all/permission/', UsersListPermissionView.as_view()),
 ]
