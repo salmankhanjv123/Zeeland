@@ -1,8 +1,8 @@
 # views.py
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group, Permission
 from rest_framework import generics, viewsets
 from projects.models import Projects
-from .serializers import UserSerializer, ProjectsSerializer, UserProjectsSerializer
+from .serializers import UserSerializer, ProjectsSerializer, UserProjectsSerializer, GroupSerializer, PermissionSerializer, AssignGroupSerializer, AssignPermissionSerializer
 
 
 class UserViewSet(viewsets.ModelViewSet):
@@ -29,3 +29,42 @@ class UserProjectsDetail(generics.RetrieveAPIView):
 class UserProjectsUpdate(generics.UpdateAPIView):
     queryset = User.objects.all().prefetch_related('projects_list')
     serializer_class = UserProjectsSerializer
+
+
+class GroupListCreateAPIView(generics.ListCreateAPIView):
+    queryset = Group.objects.all()
+    serializer_class = GroupSerializer
+
+
+class GroupRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = Group.objects.all()
+    serializer_class = GroupSerializer
+
+
+class PermissionListCreateAPIView(generics.ListCreateAPIView):
+    queryset = Permission.objects.all()
+    serializer_class = PermissionSerializer
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        content_type = self.request.query_params.get('content_type')
+
+        if content_type:
+            queryset = queryset.filter(content_type=content_type)
+
+        return queryset
+
+
+class PermissionRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateAPIView):
+    queryset = Permission.objects.all()
+    serializer_class = PermissionSerializer
+
+
+class UserAssignGroupView(generics.RetrieveUpdateAPIView):
+    queryset = User.objects.all()
+    serializer_class = AssignGroupSerializer
+
+
+class UserAssignPermissionView(generics.RetrieveUpdateAPIView):
+    queryset = User.objects.all()
+    serializer_class = AssignPermissionSerializer

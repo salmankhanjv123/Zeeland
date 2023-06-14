@@ -1,6 +1,6 @@
 # serializers.py
 from rest_framework import serializers
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group, Permission
 from projects.models import Projects
 from django.contrib.auth.hashers import make_password
 
@@ -44,3 +44,36 @@ class UserProjectsSerializer(serializers.ModelSerializer):
                 id=data['id']) for data in projects_data]
             instance.projects_list.set(projects)
         return super().update(instance, validated_data)
+
+
+class GroupSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Group
+        fields = '__all__'
+        extra_kwargs = {'name': {'required': False}}
+
+
+class PermissionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Permission
+        fields = '__all__'
+
+
+class AssignGroupSerializer(serializers.ModelSerializer):
+    groups = serializers.PrimaryKeyRelatedField(
+        queryset=Group.objects.all(), many=True)
+
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'groups']
+        extra_kwargs = {'username': {'read_only': True}}
+
+
+class AssignPermissionSerializer(serializers.ModelSerializer):
+    user_permissions = serializers.PrimaryKeyRelatedField(
+        queryset=Permission.objects.all(), many=True)
+
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'user_permissions']
+        extra_kwargs = {'username': {'read_only': True}}
