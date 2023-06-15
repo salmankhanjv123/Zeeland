@@ -75,18 +75,19 @@ class DuePaymentsView(APIView):
         today = date.today().day
         current_month = datetime.date.today().replace(day=1)
         active_bookings = Booking.objects.filter(status="active")
+
         if project:
             active_bookings = active_bookings.filter(project_id=project)
         defaulter_bookings = []
 
         for booking in active_bookings:
             latest_payment = IncomingFund.objects.filter(
-                booking=booking).aggregate(latest_date=Max('date'))
-
-            if latest_payment['latest_date']:
+                booking=booking).aggregate(latest_installement_month=Max('installement_month'))
+            latest = IncomingFund.objects.filter(
+                booking=booking)
+            if latest_payment['latest_installement_month']:
                 latest_payment_obj = IncomingFund.objects.filter(
-                    booking=booking, date=latest_payment['latest_date']).first()
-
+                    booking=booking, installement_month=latest_payment['latest_installement_month']).first()
                 if latest_payment_obj.installement_month != current_month and latest_payment_obj.booking.installment_date < today:
                     # Calculate the difference in months
                     month_diff = (current_month.year - latest_payment_obj.installement_month.year) * 12 + \

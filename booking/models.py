@@ -9,7 +9,8 @@ from django.contrib.auth.models import User
 class Booking(models.Model):
     project = models.ForeignKey(Projects, on_delete=models.PROTECT)
     user = models.ForeignKey(User, on_delete=models.PROTECT)
-    plot = models.ForeignKey(Plots, on_delete=models.PROTECT)
+    plot = models.ForeignKey(
+        Plots, related_name="booking_details", on_delete=models.PROTECT)
     customer = models.ForeignKey(Customers, on_delete=models.PROTECT)
     booking_id = models.CharField(max_length=10)
     reference = models.CharField(max_length=30, null=True)

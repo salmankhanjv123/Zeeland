@@ -1,6 +1,9 @@
 from rest_framework import viewsets
-from .serializers import PlotsSerializer
+from rest_framework.generics import ListAPIView
+from .serializers import PlotsSerializer, ResalePlotsSerializer
 from .models import Plots
+from booking.models import Booking
+from django.db.models import Count, Prefetch
 
 
 class PlotsViewSet(viewsets.ModelViewSet):
@@ -19,3 +22,12 @@ class PlotsViewSet(viewsets.ModelViewSet):
         if project_id:
             queryset = queryset.filter(project_id=project_id)
         return queryset
+
+
+class ResalePlotListView(ListAPIView):
+    serializer_class = ResalePlotsSerializer
+    queryset = Plots.objects.annotate(booking_count=Count('booking_details')).filter(
+        booking_count__gt=1).prefetch_related(
+            Prefetch('booking_details',
+                     queryset=Booking.objects.select_related('customer'))
+    )
