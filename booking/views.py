@@ -27,8 +27,7 @@ class BookingForPaymentsListView(ListAPIView):
     serializer_class = BookingForPaymentsSerializer
 
     def get_queryset(self):
-        queryset = Booking.objects.all().select_related('customer', 'plot').values(
-            'id', 'booking_id', 'customer__name', 'plot__plot_number', 'project_id')
+        queryset = Booking.objects.all().select_related('customer', 'plot')
         project_id = self.request.query_params.get('project')
         if project_id:
             queryset = queryset.filter(project_id=project_id)

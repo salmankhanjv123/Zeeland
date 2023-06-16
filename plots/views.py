@@ -26,8 +26,15 @@ class PlotsViewSet(viewsets.ModelViewSet):
 
 class ResalePlotListView(ListAPIView):
     serializer_class = ResalePlotsSerializer
-    queryset = Plots.objects.annotate(booking_count=Count('booking_details')).filter(
-        booking_count__gt=1).prefetch_related(
-            Prefetch('booking_details',
-                     queryset=Booking.objects.select_related('customer'))
-    )
+
+    def get_queryset(self):
+        queryset = Plots.objects.annotate(booking_count=Count('booking_details')).filter(
+            booking_count__gt=1).prefetch_related(
+                Prefetch('booking_details',
+                         queryset=Booking.objects.select_related('customer'))
+        )
+
+        project_id = self.request.query_params.get('project_id')
+        if project_id:
+            queryset = queryset.filter(project_id=project_id)
+        return queryset

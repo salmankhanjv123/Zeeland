@@ -79,7 +79,8 @@ class BookingForPaymentsSerializer(serializers.ModelSerializer):
     booking_details = serializers.SerializerMethodField(read_only=True)
 
     def get_booking_details(self, instance):
-        return f"{instance['booking_id']} || {instance['customer__name']} ||  {instance['plot__plot_number']}"
+
+        return f"{instance.booking_id} || {instance.customer.name} ||  {instance.plot.plot_number} -- {instance.plot.get_plot_size()}"
 
     class Meta:
         model = Booking

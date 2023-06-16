@@ -1,4 +1,6 @@
 from rest_framework import serializers
+from booking.models import Booking
+from customer.models import Customers
 from .models import ExpenseType, IncomingFund, OutgoingFund, JournalVoucher
 import datetime
 
@@ -20,15 +22,33 @@ class MonthField(serializers.Field):
         return value
 
 
+class BookingSerializer(serializers.ModelSerializer):
+    plot_info = serializers.SerializerMethodField(read_only=True)
+
+    def get_plot_info(self, instance):
+        plot_number = instance.plot.plot_number
+        plot_size = instance.plot.get_plot_size()
+        plot_type = instance.plot.get_type_display()
+        return f"{plot_number} || {plot_type} || {plot_size}"
+
+    class Meta:
+        model = Booking
+        fields = ['plot_info', 'total_amount',
+                  'remaining', 'total_receiving_amount']
+        read_only_fields = fields
+
+
+class CustomersSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Customers
+        fields = ['name', 'father_name', 'contact', 'cnic']
+
+
 class IncomingFundSerializer(serializers.ModelSerializer):
     installement_month = MonthField()
-    booking_info = serializers.SerializerMethodField(read_only=True)
-
-    def get_booking_info(self, instance):
-        booking_id = instance.booking.booking_id
-        customer_name = instance.booking.customer.name
-        plot_number = instance.booking.plot.plot_number
-        return f"{booking_id} || {customer_name} || {plot_number}"
+    booking_info = BookingSerializer(source='booking', read_only=True)
+    customer = CustomersSerializer(source='booking.customer', read_only=True)
 
     def create(self, validated_data):
         booking = validated_data['booking']
