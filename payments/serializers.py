@@ -120,6 +120,15 @@ class JournalVoucherSerializer(serializers.ModelSerializer):
 
 
 class PaymentReminderSerializer(serializers.ModelSerializer):
+    plot_info = serializers.SerializerMethodField(read_only=True)
+    customer_info = CustomersSerializer(
+        source='booking.customer', read_only=True)
+
+    def get_plot_info(self, instance):
+        plot_number = instance.booking.plot.plot_number
+        plot_size = instance.booking.plot.get_plot_size()
+        plot_type = instance.booking.plot.get_type_display()
+        return f"{plot_number} || {plot_type} || {plot_size}"
 
     class Meta:
         model = PaymentReminder
