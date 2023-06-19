@@ -2,8 +2,8 @@ from django.db.models import Max
 from django.db.models import Q, Sum
 import datetime
 from rest_framework import viewsets
-from .serializers import IncomingFundSerializer, OutgoingFundSerializer, ExpenseTypeSerializer, JournalVoucherSerializer
-from .models import IncomingFund, OutgoingFund, ExpenseType, JournalVoucher
+from .serializers import IncomingFundSerializer, OutgoingFundSerializer, ExpenseTypeSerializer, JournalVoucherSerializer, PaymentReminderSerializer, ExpensePersonSerializer
+from .models import IncomingFund, OutgoingFund, ExpenseType, JournalVoucher, PaymentReminder, ExpensePerson
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from datetime import date
@@ -34,7 +34,7 @@ class OutgoingFundViewSet(viewsets.ModelViewSet):
     serializer_class = OutgoingFundSerializer
 
     def get_queryset(self):
-        queryset = OutgoingFund.objects.all()
+        queryset = OutgoingFund.objects.all().select_related('person', 'expense_type')
         project_id = self.request.query_params.get('project')
         if project_id:
             queryset = queryset.filter(project_id=project_id)
@@ -63,6 +63,34 @@ class ExpenseTypeViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = ExpenseType.objects.all()
+        project_id = self.request.query_params.get('project')
+        if project_id:
+            queryset = queryset.filter(project_id=project_id)
+        return queryset
+
+
+class ExpensePersonViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint that allows ExpensePerson to be viewed or edited.
+    """
+    serializer_class = ExpensePersonSerializer
+
+    def get_queryset(self):
+        queryset = ExpensePerson.objects.all()
+        project_id = self.request.query_params.get('project')
+        if project_id:
+            queryset = queryset.filter(project_id=project_id)
+        return queryset
+
+
+class PaymentReminderViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint that allows payments reminders to be viewed or edited.
+    """
+    serializer_class = PaymentReminderSerializer
+
+    def get_queryset(self):
+        queryset = PaymentReminder.objects.all()
         project_id = self.request.query_params.get('project')
         if project_id:
             queryset = queryset.filter(project_id=project_id)
@@ -114,6 +142,7 @@ class DuePaymentsView(APIView):
             month_diff = defaulter_booking['month_difference']
             customer = Customers.objects.get(pk=booking.customer_id)
             due_payments.append({
+                'id': booking.id,
                 'booking_id': booking.booking_id,
                 'customer_name': customer.name,
                 'customer_contact': customer.contact,

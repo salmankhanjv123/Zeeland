@@ -1,5 +1,5 @@
 from django.urls import path, include
-from .views import IncomingFundViewSet, OutgoingFundViewSet, ExpenseTypeViewSet, JournalVoucherViewSet, DuePaymentsView
+from .views import IncomingFundViewSet, OutgoingFundViewSet, ExpenseTypeViewSet, JournalVoucherViewSet, DuePaymentsView, PaymentReminderViewSet, ExpensePersonViewSet
 from rest_framework import routers
 
 
@@ -9,6 +9,10 @@ router.register(r'expenses', OutgoingFundViewSet, basename='expenses')
 router.register(r'journal-voucher', JournalVoucherViewSet,
                 basename='journal-voucher')
 router.register(r'expense-type', ExpenseTypeViewSet, basename='expense-type')
+router.register(r'payments-reminder', PaymentReminderViewSet,
+                basename='payments-reminder')
+router.register(r'expense-persons', ExpensePersonViewSet,
+                basename='expense-persons')
 
 
 urlpatterns = [

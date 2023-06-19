@@ -42,8 +42,18 @@ class ExpenseType(models.Model):
         return self.name
 
 
+class ExpensePerson(models.Model):
+    project = models.ForeignKey(Projects, on_delete=models.PROTECT)
+    name = models.CharField(max_length=30)
+    balance = models.FloatField(default=0)
+
+    class Meta:
+        db_table = 'expense_persons'
+
+
 class OutgoingFund(models.Model):
     project = models.ForeignKey(Projects, on_delete=models.PROTECT)
+    person = models.ForeignKey(ExpensePerson, on_delete=models.PROTECT)
     expense_type = models.ForeignKey(ExpenseType, on_delete=models.PROTECT)
     date = models.DateField()
     amount = models.FloatField()
@@ -62,3 +72,13 @@ class JournalVoucher(models.Model):
 
     class Meta:
         db_table = 'journal_voucher'
+
+
+class PaymentReminder(models.Model):
+    project = models.ForeignKey(Projects, on_delete=models.PROTECT)
+    booking = models.ForeignKey(Booking, on_delete=models.PROTECT)
+    remarks = models.TextField(blank=True, null=True)
+    reminder_date = models.DateField()
+
+    class Meta:
+        db_table = 'payments_reminder'

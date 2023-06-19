@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from booking.models import Booking
 from customer.models import Customers
-from .models import ExpenseType, IncomingFund, OutgoingFund, JournalVoucher
+from .models import ExpenseType, IncomingFund, OutgoingFund, JournalVoucher, PaymentReminder, ExpensePerson
 import datetime
 
 
@@ -82,10 +82,28 @@ class IncomingFundSerializer(serializers.ModelSerializer):
 class OutgoingFundSerializer(serializers.ModelSerializer):
     expense_type_name = serializers.CharField(
         source="expense_type.name", read_only=True)
+    person_name = serializers.CharField(
+        source="person.name", read_only=True)
 
     class Meta:
         model = OutgoingFund
         fields = '__all__'
+
+    def create(self, validated_data):
+        amount = validated_data.get('amount', 0)
+        person = validated_data.get('person')
+        person.balance -= amount
+        person.save()
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        amount = validated_data.get('amount')
+        if amount is not None:
+            difference = amount - instance.amount
+            person = instance.person
+            person.balance -= difference
+            person.save()
+        return super().update(instance, validated_data)
 
 
 class ExpenseTypeSerializer(serializers.ModelSerializer):
@@ -99,3 +117,25 @@ class JournalVoucherSerializer(serializers.ModelSerializer):
     class Meta:
         model = JournalVoucher
         fields = '__all__'
+
+
+class PaymentReminderSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = PaymentReminder
+        fields = '__all__'
+
+
+class ExpensePersonSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = ExpensePerson
+        fields = '__all__'
+
+    def update(self, instance, validated_data):
+        added_balance = validated_data.pop('balance', 0)
+        for key, value in validated_data.items():
+            setattr(instance, key, value)
+        instance.balance += added_balance
+        instance.save()
+        return instance
