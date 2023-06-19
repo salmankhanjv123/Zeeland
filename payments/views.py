@@ -97,6 +97,13 @@ class PaymentReminderViewSet(viewsets.ModelViewSet):
         return queryset
 
 
+def get_plot_info(instance):
+    plot_number = instance.plot.plot_number
+    plot_size = instance.plot.get_plot_size()
+    plot_type = instance.plot.get_type_display()
+    return f"{plot_number} || {plot_type} || {plot_size}"
+
+
 class DuePaymentsView(APIView):
     def get(self, request):
         project = request.query_params.get('project')
@@ -141,9 +148,11 @@ class DuePaymentsView(APIView):
             booking = defaulter_booking['booking']
             month_diff = defaulter_booking['month_difference']
             customer = Customers.objects.get(pk=booking.customer_id)
+            plot_info = get_plot_info(booking)
             due_payments.append({
                 'id': booking.id,
                 'booking_id': booking.booking_id,
+                'plot_info': plot_info,
                 'customer_name': customer.name,
                 'customer_contact': customer.contact,
                 'due_date': booking.installment_date,
