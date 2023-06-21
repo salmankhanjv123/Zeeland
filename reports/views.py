@@ -9,6 +9,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.db.models import Count, Sum, functions
 from datetime import date, datetime, timedelta
+import calendar
 
 
 class IncomingFundReportView(generics.ListAPIView):
@@ -144,20 +145,21 @@ class TotalAmountView(APIView):
 
 class MonthlyIncomingFundGraphView(APIView):
     def get(self, request):
+        project_id = request.GET.get('project_id')
         current_date = datetime.now().date()
         start_date = current_date.replace(day=1)
         end_date = start_date + timedelta(days=32)
         end_date = end_date.replace(day=1)
 
         incoming_funds_by_day = IncomingFund.objects \
-            .filter(date__gte=start_date, date__lt=end_date) \
+            .filter(date__gte=start_date, date__lt=end_date, project=project_id) \
             .annotate(day=functions.TruncDay('date')) \
             .values('day') \
             .annotate(total_amount=Sum('amount')) \
             .order_by('day')
 
         outgoing_funds_by_day = OutgoingFund.objects \
-            .filter(date__gte=start_date, date__lt=end_date) \
+            .filter(date__gte=start_date, date__lt=end_date, project=project_id) \
             .annotate(day=functions.TruncDay('date')) \
             .values('day') \
             .annotate(total_amount=Sum('amount')) \
@@ -204,19 +206,20 @@ class MonthlyIncomingFundGraphView(APIView):
 
 class AnnualIncomingFundGraphView(APIView):
     def get(self, request):
+        project_id = request.GET.get('project_id')
         current_year = datetime.now().year
         start_date = datetime(current_year, 1, 1)
         end_date = datetime(current_year + 1, 1, 1)
 
         incoming_funds_by_month = IncomingFund.objects \
-            .filter(date__gte=start_date, date__lt=end_date) \
+            .filter(date__gte=start_date, date__lt=end_date, project=project_id) \
             .annotate(month=functions.TruncMonth('date')) \
             .values('month') \
             .annotate(total_amount=Sum('amount')) \
             .order_by('month')
 
         outgoing_funds_by_month = OutgoingFund.objects \
-            .filter(date__gte=start_date, date__lt=end_date) \
+            .filter(date__gte=start_date, date__lt=end_date, project=project_id) \
             .annotate(month=functions.TruncMonth('date')) \
             .values('month') \
             .annotate(total_amount=Sum('amount')) \
@@ -255,5 +258,10 @@ class AnnualIncomingFundGraphView(APIView):
             'incoming_funds': sorted_incoming_report_data,
             'outgoing_funds': sorted_outgoing_report_data
         }
+        # Return the result with month names
+        result_with_month_names = {
+            'incoming_funds': [{'month': calendar.month_abbr[int(data['month'].split('-')[1])], 'total_amount': data['total_amount']} for data in sorted_incoming_report_data],
+            'outgoing_funds': [{'month': calendar.month_abbr[int(data['month'].split('-')[1])], 'total_amount': data['total_amount']} for data in sorted_outgoing_report_data]
+        }
 
-        return Response(result)
+        return Response(result_with_month_names)
