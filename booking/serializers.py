@@ -1,6 +1,8 @@
 from rest_framework import serializers
 from .models import Booking, Token
 from plots.models import Plots
+from payments.models import IncomingFund
+from django.db.models import Sum
 
 
 class PlotsSerializer(serializers.ModelSerializer):
@@ -62,14 +64,24 @@ class BookingSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         booking_status = validated_data.get('status', instance.status)
+        total_amount = validated_data.get(
+            'total_amount', instance.total_amount)
+        advance_amount = validated_data.get('advance', instance.advance)
+
+        payments = IncomingFund.objects.filter(
+            booking=instance.id).aggregate(Sum('amount'))['amount__sum'] or 0
+
         for key, value in validated_data.items():
             setattr(instance, key, value)
+
         if booking_status == 'resale':
             plot = instance.plot
             plot.status = 'active'
             plot.save()
 
         instance.status = booking_status
+        instance.total_receiving_amount = payments + advance_amount
+        instance.remaining = total_amount-(payments + advance_amount)
         instance.save()
         return instance
 

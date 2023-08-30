@@ -64,13 +64,12 @@ class IncomingFundSerializer(serializers.ModelSerializer):
         amount = validated_data.get('amount', instance.amount)
 
         if amount != instance.amount:
-            booking.total_receiving_amount -= instance.amount
-            booking.remaining += instance.amount
-            booking.total_receiving_amount += amount
-            booking.remaining -= amount
+            booking.total_receiving_amount += amount-instance.amount
+            booking.remaining -= amount - instance.amount
             booking.save()
 
-        instance.amount = amount
+        for key, value in validated_data.items():
+            setattr(instance, key, value)
         instance.save()
         return instance
 

@@ -26,6 +26,14 @@ class IncomingFundViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(project_id=project_id)
         return queryset
 
+    def perform_destroy(self, instance):
+        amount = instance.amount
+        booking = instance.booking
+        booking.remaining += amount
+        booking.total_receiving_amount -= amount
+        booking.save()
+        return super().perform_destroy(instance)
+
 
 class OutgoingFundViewSet(viewsets.ModelViewSet):
     """
