@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    "debug_toolbar",
     'rest_framework',
     'rest_framework_simplejwt',
     "corsheaders",
@@ -58,6 +59,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    "debug_toolbar.middleware.DebugToolbarMiddleware",
 ]
 
 ROOT_URLCONF = 'Zeeland.urls'
@@ -90,7 +92,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.mysql',
         'NAME': 'zeland',
         'USER': 'root',
-        'PASSWORD': 'ALLAH',
+        'PASSWORD': '12345',
         'HOST': 'localhost',
         'PORT': '3306',
     }
@@ -161,3 +163,6 @@ SIMPLE_JWT = {
     "UPDATE_LAST_LOGIN": False,
 }
 # CORS_ALLOWED_ORIGINS = []
+INTERNAL_IPS = [
+    "127.0.0.1",
+]
