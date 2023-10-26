@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Booking, Token
+from .models import Booking, Token,PlotResale
 from plots.models import Plots
 from payments.models import IncomingFund
 from django.db.models import Sum
@@ -114,4 +114,16 @@ class TokenSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Token
+        fields = '__all__'
+
+
+
+class PlotResaleSerializer(serializers.ModelSerializer):
+    plot=serializers.CharField(source="booking.plot.plot_number",read_only=True)
+    customer=serializers.CharField(source="booking.customer.name",read_only=True)
+    total_amount=serializers.FloatField(source="booking.total_amount",read_only=True)
+    amount_received=serializers.FloatField(source="booking.total_receiving_amount",read_only=True)
+    remaining=serializers.FloatField(source="booking.remaining",read_only=True)
+    class Meta:
+        model = PlotResale
         fields = '__all__'
