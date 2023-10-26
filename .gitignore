@@ -1,6 +1,6 @@
 /venv
 /__pycache__
-/configuration/settings.py
+/Zeeland/settings.py
 /media
 *.log
 *.pot
