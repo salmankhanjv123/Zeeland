@@ -68,8 +68,11 @@ class PlotResaleViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         queryset = PlotResale.objects.all().select_related("plot","booking__customer")
         project_id = self.request.query_params.get('project')
+        plot_id = self.request.query_params.get('plot_id')
         if project_id:
             queryset = queryset.filter(booking__project=project_id)
+        if plot_id:
+            queryset=queryset.filter(plot_id=plot_id)
         return queryset
     
     def create(self, request, *args, **kwargs):
