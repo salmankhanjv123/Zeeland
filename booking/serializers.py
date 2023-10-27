@@ -119,11 +119,20 @@ class TokenSerializer(serializers.ModelSerializer):
 
 
 class PlotResaleSerializer(serializers.ModelSerializer):
-    plot=serializers.CharField(source="booking.plot.plot_number",read_only=True)
     customer=serializers.CharField(source="booking.customer.name",read_only=True)
     total_amount=serializers.FloatField(source="booking.total_amount",read_only=True)
     amount_received=serializers.FloatField(source="booking.total_receiving_amount",read_only=True)
     remaining=serializers.FloatField(source="booking.remaining",read_only=True)
+
+    plot_info = serializers.SerializerMethodField(read_only=True)
+
+
+    def get_plot_info(self, instance):
+        plot_number = instance.plot.plot_number
+        plot_size = instance.plot.get_plot_size()
+        plot_type = instance.plot.get_type_display()
+        return f"{plot_number} || {plot_type} || {plot_size}"
+    
     class Meta:
         model = PlotResale
         fields = '__all__'

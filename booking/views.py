@@ -66,21 +66,19 @@ class PlotResaleViewSet(viewsets.ModelViewSet):
     serializer_class = PlotResaleSerializer
 
     def get_queryset(self):
-        queryset = PlotResale.objects.all().select_related("booking__plot","booking__customer")
+        queryset = PlotResale.objects.all().select_related("plot","booking__customer")
         project_id = self.request.query_params.get('project')
         if project_id:
-            queryset = queryset.filter(old_project=project_id)
+            queryset = queryset.filter(booking__project=project_id)
         return queryset
     
     def create(self, request, *args, **kwargs):
         booking_id = request.data.get("booking")
-        current_project=request.data.get("current_project")
         if booking_id:
             try:
                 booking = Booking.objects.get(pk=booking_id)
                 booking.status = "resale"
                 booking.plot.status="active"
-                booking.plot.project_id=current_project
                 booking.plot.save()
                 booking.save()
             except Booking.DoesNotExist:

@@ -51,8 +51,7 @@ class Token(models.Model):
 
 class PlotResale(models.Model):
     booking=models.ForeignKey(Booking,on_delete=models.PROTECT)
-    old_project=models.ForeignKey(Projects,related_name="resale_plots",on_delete=models.PROTECT)
-    current_project=models.ForeignKey(Projects,on_delete=models.PROTECT)
+    plot=models.ForeignKey(Plots,related_name="resale_plots",on_delete=models.PROTECT)
     amount_paid=models.FloatField()
     project_amount_paid=models.FloatField()
     customer_amount_paid=models.FloatField()
