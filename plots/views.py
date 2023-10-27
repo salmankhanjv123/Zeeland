@@ -16,9 +16,14 @@ class PlotsViewSet(viewsets.ModelViewSet):
         queryset = Plots.objects.all()
         project_id = self.request.query_params.get('project')
         plot_status = self.request.query_params.get('status')
+
         # active,sold,
         if plot_status:
-            queryset = queryset.filter(status=plot_status)
+            if plot_status=="resale":
+                    queryset = queryset.annotate(resale_count=Count('resale_plots')).filter(
+                    resale_count__gte=1)
+            else:
+                queryset = queryset.filter(status=plot_status)
         if project_id:
             queryset = queryset.filter(project_id=project_id)
         return queryset
