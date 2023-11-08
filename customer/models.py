@@ -17,3 +17,18 @@ class Customers(models.Model):
 
     class Meta:
         db_table = 'customers'
+
+
+class CustomerMessages(models.Model):
+    customer=models.ForeignKey(Customers,on_delete=models.PROTECT)
+    date=models.DateField()
+    created_at=models.DateTimeField(auto_now_add=True)
+    updated_at=models.DateTimeField(auto_now=True)
+    notes=models.TextField(blank=True,null=True)
+
+class CustomerMessagesDocuments(models.Model):
+    message=models.ForeignKey(CustomerMessages,related_name="files",on_delete=models.CASCADE)
+    file=models.FileField(upload_to='media/customer_messages')
+    description=models.TextField()
+    created_at=models.DateTimeField(auto_now_add=True)
+    updated_at=models.DateTimeField(auto_now=True)
