@@ -164,7 +164,7 @@ class DuePaymentsView(APIView):
                 'customer_name': customer.name,
                 'customer_contact': customer.contact,
                 'due_date': booking.installment_date,
-                'total_remaining_amount': booking.remaining,
+                'total_remaining_amount': month_diff*booking.installment_per_month,
                 'month_difference': month_diff
             })
 

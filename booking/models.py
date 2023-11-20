@@ -55,3 +55,4 @@ class PlotResale(models.Model):
     amount_paid=models.FloatField()
     project_amount_paid=models.FloatField()
     customer_amount_paid=models.FloatField()
+    remarks=models.TextField(blank=True,null=True)
