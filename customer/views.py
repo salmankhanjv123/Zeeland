@@ -20,7 +20,6 @@ class CustomersViewSet(viewsets.ModelViewSet):
 
 
 class CustomerMessagesListCreateView(generics.ListCreateAPIView):
-    queryset = CustomerMessages.objects.all()
     serializer_class = CustomerMessagesSerializer
 
     def get_queryset(self):
@@ -31,7 +30,8 @@ class CustomerMessagesListCreateView(generics.ListCreateAPIView):
             query_filters&=Q(customer__project_id=project_id)
         if customer_id:
             query_filters&=Q(customer_id=customer_id)
-        return super().get_queryset()
+        queryset = CustomerMessages.objects.filter(query_filters)
+        return queryset
 
 class CustomerMessagesDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = CustomerMessages.objects.all()
