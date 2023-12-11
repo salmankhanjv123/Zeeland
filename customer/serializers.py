@@ -26,7 +26,7 @@ class CustomerMessagesSerializer(serializers.ModelSerializer):
     def get_customer(self, obj):
         plot_id = obj.plot.id
         try:
-            booking = Booking.objects.get(plot_id=plot_id, status='active')
+            booking = Booking.objects.filter(plot_id=plot_id, status='active').order_by('created_at').first()
             return booking.customer.name  # Adjust the attribute based on your actual model structure
         except Booking.DoesNotExist:
             return None
