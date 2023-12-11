@@ -31,5 +31,6 @@ class CustomerMessagesDocuments(models.Model):
     message=models.ForeignKey(CustomerMessages,related_name="files",on_delete=models.CASCADE)
     file=models.FileField(upload_to='media/customer_messages')
     description=models.TextField()
+    type=models.CharField(max_length=20)
     created_at=models.DateTimeField(auto_now_add=True)
     updated_at=models.DateTimeField(auto_now=True)

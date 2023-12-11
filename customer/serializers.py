@@ -27,7 +27,6 @@ class CustomerMessagesSerializer(serializers.ModelSerializer):
         plot_id = obj.plot.id
         try:
             booking = Booking.objects.get(plot_id=plot_id, status='active')
-            print(booking)
             return booking.customer.name  # Adjust the attribute based on your actual model structure
         except Booking.DoesNotExist:
             return None
@@ -54,6 +53,7 @@ class CustomerMessagesSerializer(serializers.ModelSerializer):
             if file_id:
                 file = CustomerMessagesDocuments.objects.get(id=file_id, message=instance)
                 file.description = file_data.get('description', file.description)
+                file.type= file_data.get('type', file.type)
                 if 'file' in file_data:
                     file.file = file_data.get('file', file.file)
                 file.save()
