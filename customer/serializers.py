@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from .models import Customers,CustomerMessages, CustomerMessagesDocuments
-
+from booking.models import Booking
 
 class CustomersSerializer(serializers.ModelSerializer):
     
@@ -21,6 +21,16 @@ class CustomerMessagesDocumentsSerializer(serializers.ModelSerializer):
 
 class CustomerMessagesSerializer(serializers.ModelSerializer):
     files = CustomerMessagesDocumentsSerializer(many=True)
+    customer = serializers.SerializerMethodField(read_only=True)
+
+    def get_customer(self, obj):
+        plot_id = obj.plot.id
+        try:
+            booking = Booking.objects.get(plot_id=plot_id, status='active')
+            print(booking)
+            return booking.customer.name  # Adjust the attribute based on your actual model structure
+        except Booking.DoesNotExist:
+            return None
 
     class Meta:
         model = CustomerMessages

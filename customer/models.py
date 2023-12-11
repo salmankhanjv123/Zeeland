@@ -1,5 +1,6 @@
 from django.db import models
 from projects.models import Projects
+from plots.models import Plots
 # Create your models here.
 
 
@@ -20,7 +21,7 @@ class Customers(models.Model):
 
 
 class CustomerMessages(models.Model):
-    customer=models.ForeignKey(Customers,on_delete=models.PROTECT)
+    plot=models.ForeignKey(Plots,on_delete=models.PROTECT)
     date=models.DateField()
     created_at=models.DateTimeField(auto_now_add=True)
     updated_at=models.DateTimeField(auto_now=True)
