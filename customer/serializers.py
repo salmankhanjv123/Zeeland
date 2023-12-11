@@ -21,18 +21,7 @@ class CustomerMessagesDocumentsSerializer(serializers.ModelSerializer):
 
 class CustomerMessagesSerializer(serializers.ModelSerializer):
     files = CustomerMessagesDocumentsSerializer(many=True)
-    customer = serializers.SerializerMethodField(read_only=True)
-
-    def get_customer(self, obj):
-        plot_id = obj.plot.id
-        try:
-            booking = Booking.objects.filter(plot_id=plot_id, status='active').order_by('created_at').first()
-            if booking:
-                return booking.customer.name  
-            else:
-                return None
-        except Booking.DoesNotExist:
-            return None
+    customer = serializers.CharField(source='customer_name', read_only=True)
 
     class Meta:
         model = CustomerMessages

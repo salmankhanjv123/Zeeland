@@ -1,9 +1,9 @@
 from rest_framework import viewsets
 from rest_framework import generics
-from django.db.models import Q
-from .serializers import CustomersSerializer,CustomerMessagesSerializer, CustomerMessagesDocumentsSerializer
-from .models import Customers,CustomerMessages, CustomerMessagesDocuments
-
+from django.db.models import Q,Prefetch, OuterRef, Subquery
+from .serializers import CustomersSerializer,CustomerMessagesSerializer
+from .models import Customers,CustomerMessages
+from booking.models import Booking
 
 class CustomersViewSet(viewsets.ModelViewSet):
     """
@@ -30,7 +30,14 @@ class CustomerMessagesListCreateView(generics.ListCreateAPIView):
             query_filters&=Q(plot__project_id=project_id)
         if plot_id:
             query_filters&=Q(plot_id=plot_id)
-        queryset = CustomerMessages.objects.filter(query_filters)
+        booking_subquery = Booking.objects.filter(
+            plot=OuterRef('plot'),
+        ).select_related('customer').order_by('pk').values('customer__name')[:1]
+
+        queryset = CustomerMessages.objects.filter(query_filters).annotate(
+            customer_name=Subquery(booking_subquery)
+        ).prefetch_related('files')
+
         return queryset
 
 class CustomerMessagesDetailView(generics.RetrieveUpdateDestroyAPIView):
