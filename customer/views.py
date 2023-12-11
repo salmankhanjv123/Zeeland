@@ -27,7 +27,7 @@ class CustomerMessagesListCreateView(generics.ListCreateAPIView):
         plot_id = self.request.query_params.get('plot_id')
         query_filters=Q()
         if project_id:
-            query_filters&=Q(customer__project_id=project_id)
+            query_filters&=Q(plot__project_id=project_id)
         if plot_id:
             query_filters&=Q(plot_id=plot_id)
         queryset = CustomerMessages.objects.filter(query_filters)
