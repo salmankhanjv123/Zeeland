@@ -31,6 +31,7 @@ class CustomerMessagesListCreateView(generics.ListCreateAPIView):
         if plot_id:
             query_filters&=Q(plot_id=plot_id)
         booking_subquery = Booking.objects.filter(
+            status="active",
             plot=OuterRef('plot'),
         ).select_related('customer').order_by('pk').values('customer__name')[:1]
 
