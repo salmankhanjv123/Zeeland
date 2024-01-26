@@ -43,6 +43,7 @@ class BookingSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         project = validated_data.get('project')
         advance_amount = validated_data.get('advance')
+        total_amount=validated_data.get("total_amount")
         try:
             latest_booking = Booking.objects.filter(
                 project=project).latest('created_at')
@@ -59,7 +60,10 @@ class BookingSerializer(serializers.ModelSerializer):
         plot = validated_data['plot']
         plot.status = "sold"
         plot.save()
+        existing_resale_exists = Booking.objects.filter(plot=plot, status="resale").exists()
         booking = Booking.objects.create(**validated_data)
+        if existing_resale_exists:
+            PlotResale.objects.create(booking=booking,plot=plot,entry_type="booking",new_plot_price=total_amount)
         return booking
 
     def update(self, instance, validated_data):
