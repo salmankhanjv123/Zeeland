@@ -28,14 +28,17 @@ class PlotsViewSet(viewsets.ModelViewSet):
         if project_id:
             queryset = queryset.filter(project_id=project_id)
         return queryset
-    # def list(self, request, *args, **kwargs):
-    #     queryset = self.filter_queryset(self.get_queryset())
-    #     sorted_queryset = sorted(
-    #         queryset,
-    #         key=lambda x: (len(x.plot_number), int(''.join(filter(str.isdigit, x.plot_number))))
-    #     )
-    #     serializer = self.get_serializer(sorted_queryset, many=True)
-    #     return Response(serializer.data)
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        sorted_queryset = sorted(
+            queryset,
+            key=lambda x: (
+            len(x.plot_number),
+            int(''.join(filter(str.isdigit, x.plot_number))) if any(char.isdigit() for char in x.plot_number) else 0
+        )
+        )
+        serializer = self.get_serializer(sorted_queryset, many=True)
+        return Response(serializer.data)
 
 
 class ResalePlotListView(ListAPIView):
