@@ -18,10 +18,15 @@ class Booking(models.Model):
     booking_date = models.DateField()
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    
+    booking_type = models.CharField(max_length=20)
+    follow_up_date = models.DateField(blank=True,null=True)
+
     installment_plan = models.IntegerField()
-    due_date = models.DateField()
+    due_date = models.DateField(blank=True,null=True)
     installment_date = models.IntegerField()
     installment_per_month = models.FloatField()
+    
     remarks = models.TextField(null=True)
     total_amount = models.FloatField()
     advance = models.FloatField()
