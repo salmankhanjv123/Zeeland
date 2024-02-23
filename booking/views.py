@@ -15,7 +15,10 @@ class BookingViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         queryset = Booking.objects.all().select_related('customer', 'plot')
         project_id = self.request.query_params.get('project')
-        status=self.request.query_params.get('status')   
+        status=self.request.query_params.get('status') 
+        booking_type=self.request.query_params.get('booking_type')   
+        if booking_type:
+            queryset=queryset.filter(booking_type=booking_type)
         if status:
             queryset=queryset.filter(status=status)
         if project_id:
