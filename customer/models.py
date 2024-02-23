@@ -26,7 +26,8 @@ class CustomerMessages(models.Model):
     created_at=models.DateTimeField(auto_now_add=True)
     updated_at=models.DateTimeField(auto_now=True)
     notes=models.TextField(blank=True,null=True)
-
+    follow_up=models.DateField(blank=True,null=True)
+    follow_up_message=models.TextField(blank=True,null=True)
 class CustomerMessagesDocuments(models.Model):
     message=models.ForeignKey(CustomerMessages,related_name="files",on_delete=models.CASCADE)
     file=models.FileField(upload_to='media/customer_messages')

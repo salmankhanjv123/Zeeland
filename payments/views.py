@@ -117,7 +117,7 @@ class DuePaymentsView(APIView):
         project = request.query_params.get('project')
         today = date.today().day
         current_month = datetime.date.today().replace(day=1)
-        active_bookings = Booking.objects.filter(status="active")
+        active_bookings = Booking.objects.filter(status="active",booking_type="installement_payment")
 
         if project:
             active_bookings = active_bookings.filter(project_id=project)
