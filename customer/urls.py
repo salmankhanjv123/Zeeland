@@ -1,10 +1,11 @@
 from django.urls import path, include
-from .views import CustomersViewSet,CustomerMessagesListCreateView,CustomerMessagesDetailView
+from .views import CustomersViewSet,CustomerMessagesListCreateView,CustomerMessagesDetailView,CustomerMessagesReminderViewSet
 from rest_framework import routers
 
 
 router = routers.DefaultRouter()
 router.register(r'customers', CustomersViewSet, basename='customers')
+router.register(r'customer-messages-reminder', CustomerMessagesReminderViewSet, basename='customers')
 
 
 urlpatterns = [

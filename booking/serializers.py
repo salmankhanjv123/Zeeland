@@ -3,7 +3,7 @@ from .models import Booking, Token,PlotResale
 from plots.models import Plots
 from payments.models import IncomingFund
 from django.db.models import Sum
-
+import datetime
 
 class PlotsSerializer(serializers.ModelSerializer):
     category_name = serializers.SerializerMethodField(read_only=True)
@@ -44,6 +44,8 @@ class BookingSerializer(serializers.ModelSerializer):
         project = validated_data.get('project')
         advance_amount = validated_data.get('advance')
         total_amount=validated_data.get("total_amount")
+        booking_date=validated_data.get("booking_date")
+        installement_month=datetime.datetime(booking_date.year, booking_date.month, 1).date()
         try:
             latest_booking = Booking.objects.filter(
                 project=project).latest('created_at')
@@ -62,6 +64,8 @@ class BookingSerializer(serializers.ModelSerializer):
         plot.save()
         existing_resale_exists = Booking.objects.filter(plot=plot, status="resale").exists()
         booking = Booking.objects.create(**validated_data)
+        if booking:
+            IncomingFund.objects.create(project=project,booking=booking,date=booking_date,installement_month=installement_month,amount=advance_amount,remarks="advance",advance_payment=True)
         if existing_resale_exists:
             PlotResale.objects.create(booking=booking,plot=plot,entry_type="booking",new_plot_price=total_amount)
         return booking
@@ -71,7 +75,10 @@ class BookingSerializer(serializers.ModelSerializer):
         total_amount = validated_data.get(
             'total_amount', instance.total_amount)
         advance_amount = validated_data.get('advance', instance.advance)
-
+        advance_payment_obj = IncomingFund.objects.filter(booking=instance, advance_payment=True).first()
+        if advance_payment_obj:
+            advance_payment_obj.amount = advance_amount
+            advance_payment_obj.save()
         payments = IncomingFund.objects.filter(
             booking=instance.id).aggregate(Sum('amount'))['amount__sum'] or 0
 
@@ -84,9 +91,11 @@ class BookingSerializer(serializers.ModelSerializer):
             plot.save()
 
         instance.status = booking_status
-        instance.total_receiving_amount = payments + advance_amount
-        instance.remaining = total_amount-(payments + advance_amount)
+        instance.total_receiving_amount = payments 
+        instance.remaining = total_amount-payments 
         instance.save()
+
+
         return instance
 
 

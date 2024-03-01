@@ -1,6 +1,7 @@
 from django.db import models
 from projects.models import Projects
 from plots.models import Plots
+from django.contrib.auth.models import User
 # Create your models here.
 
 
@@ -21,6 +22,7 @@ class Customers(models.Model):
 
 
 class CustomerMessages(models.Model):
+    user = models.ForeignKey(User, on_delete=models.PROTECT)
     plot=models.ForeignKey(Plots,on_delete=models.PROTECT)
     date=models.DateField()
     created_at=models.DateTimeField(auto_now_add=True)
@@ -28,6 +30,7 @@ class CustomerMessages(models.Model):
     notes=models.TextField(blank=True,null=True)
     follow_up=models.DateField(blank=True,null=True)
     follow_up_message=models.TextField(blank=True,null=True)
+
 class CustomerMessagesDocuments(models.Model):
     message=models.ForeignKey(CustomerMessages,related_name="files",on_delete=models.CASCADE)
     file=models.FileField(upload_to='media/customer_messages')
@@ -35,3 +38,10 @@ class CustomerMessagesDocuments(models.Model):
     type=models.CharField(max_length=20)
     created_at=models.DateTimeField(auto_now_add=True)
     updated_at=models.DateTimeField(auto_now=True)
+
+class CustomerMessagesReminder(models.Model):
+    message=models.ForeignKey(CustomerMessages,related_name="reminders",on_delete=models.CASCADE)
+    date=models.DateField()
+    follow_up_message=models.TextField(blank=True,null=True)
+    status=models.CharField(max_length=20,default="pending")    
+ 

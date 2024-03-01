@@ -55,7 +55,7 @@ class Token(models.Model):
 
 
 class PlotResale(models.Model):
-    booking=models.ForeignKey(Booking,on_delete=models.PROTECT)
+    booking=models.ForeignKey(Booking,on_delete=models.CASCADE)
     plot=models.ForeignKey(Plots,related_name="resale_plots",on_delete=models.PROTECT)
     entry_type=models.CharField(max_length=10,default="resale")
     old_plot_price=models.FloatField(default=0)

@@ -4,7 +4,7 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from .serializers import BookingSerializer, BookingForPaymentsSerializer, TokenSerializer,PlotResaleSerializer
 from .models import Booking, Token,PlotResale
-
+from django.db.models import Q
 
 class BookingViewSet(viewsets.ModelViewSet):
     """
@@ -13,16 +13,24 @@ class BookingViewSet(viewsets.ModelViewSet):
     serializer_class = BookingSerializer
 
     def get_queryset(self):
-        queryset = Booking.objects.all().select_related('customer', 'plot')
         project_id = self.request.query_params.get('project')
+        plot_id = self.request.query_params.get('plot_id')
+        customer_id = self.request.query_params.get('customer_id')
         status=self.request.query_params.get('status') 
         booking_type=self.request.query_params.get('booking_type')   
+
+        query_filters=Q()
         if booking_type:
-            queryset=queryset.filter(booking_type=booking_type)
+            query_filters &= Q(booking_type=booking_type)
         if status:
-            queryset=queryset.filter(status=status)
+            query_filters &= Q(status=status)
         if project_id:
-            queryset = queryset.filter(project_id=project_id)
+            query_filters &= Q(project_id=project_id)
+        if plot_id:
+            query_filters &= Q(plot_id=plot_id)
+        if customer_id:
+            query_filters &= Q(customer_id=customer_id)
+        queryset = Booking.objects.filter(query_filters).select_related('customer', 'plot')
         return queryset
 
 
@@ -33,10 +41,11 @@ class BookingForPaymentsListView(ListAPIView):
     serializer_class = BookingForPaymentsSerializer
 
     def get_queryset(self):
-        queryset = Booking.objects.all().select_related('customer', 'plot')
         project_id = self.request.query_params.get('project')
+        query_filters=Q()
         if project_id:
-            queryset = queryset.filter(project_id=project_id)
+            query_filters &= Q(project_id=project_id)
+        queryset = Booking.objects.filter(query_filters).select_related('customer', 'plot')
         return queryset
 
 

@@ -27,6 +27,7 @@ class IncomingFund(models.Model):
     installement_month = MonthField()
     amount = models.FloatField()
     remarks = models.TextField(blank=True, null=True)
+    advance_payment=models.BooleanField(default=False)
 
     class Meta:
         db_table = 'incoming_funds'
@@ -46,7 +47,9 @@ class ExpensePerson(models.Model):
     project = models.ForeignKey(Projects, on_delete=models.PROTECT)
     name = models.CharField(max_length=30)
     balance = models.FloatField(default=0)
-
+    date = models.DateField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
     class Meta:
         db_table = 'expense_persons'
 
