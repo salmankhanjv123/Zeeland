@@ -22,7 +22,7 @@ class Customers(models.Model):
 
 
 class CustomerMessages(models.Model):
-    user = models.ForeignKey(User, on_delete=models.PROTECT)
+    user = models.ForeignKey(User, on_delete=models.PROTECT,blank=True,null=True)
     plot=models.ForeignKey(Plots,on_delete=models.PROTECT)
     date=models.DateField()
     created_at=models.DateTimeField(auto_now_add=True)
