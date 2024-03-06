@@ -19,3 +19,14 @@ class Projects(models.Model):
 
     class Meta:
         db_table = 'projects'
+
+
+class ProjectsBalanceSheet(models.Model):
+    user = models.ForeignKey(User, on_delete=models.PROTECT)
+    project = models.ForeignKey(Projects, on_delete=models.PROTECT)
+    amount=models.FloatField(default=0)
+    detail=models.CharField(max_length=100)
+    date = models.DateField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
