@@ -5,7 +5,7 @@ from rest_framework import routers
 
 router = routers.DefaultRouter()
 router.register(r'customers', CustomersViewSet, basename='customers')
-router.register(r'customer-messages-reminder', CustomerMessagesReminderViewSet, basename='customers')
+router.register(r'customer-messages-reminder', CustomerMessagesReminderViewSet, basename='customer-messages-reminder')
 
 
 urlpatterns = [
