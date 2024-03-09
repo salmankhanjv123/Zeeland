@@ -44,7 +44,6 @@ class ProjectsBalanceBulkUpdateCreateAPIView(APIView):
             for item in serializer.validated_data:
                 item_id=item["id"]
                 item["user"]=item["user"].id
-                item["project"]=item["project"].id
                 # Check if the item has an ID, if yes, update the existing object
                 if item_id is not None:
                     instance = ProjectsBalanceSheet.objects.get(pk=item['id'])
