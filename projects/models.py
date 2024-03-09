@@ -23,10 +23,14 @@ class Projects(models.Model):
 
 class ProjectsBalanceSheet(models.Model):
     user = models.ForeignKey(User, on_delete=models.PROTECT)
-    project = models.ForeignKey(Projects, on_delete=models.PROTECT)
-    amount=models.FloatField(default=0)
     detail=models.CharField(max_length=100)
     date = models.DateField()
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
+
+
+class BalanceSheetDetail(models.Model):
+    balance_sheet=models.ForeignKey(ProjectsBalanceSheet,related_name="payments_detail",on_delete=models.CASCADE)
+    project = models.ForeignKey(Projects, on_delete=models.PROTECT)
+    amount=models.FloatField(default=0)
+
