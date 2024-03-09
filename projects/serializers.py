@@ -10,6 +10,7 @@ class ProjectsSerializer(serializers.ModelSerializer):
         fields = '__all__'  # or specify specific fields
 
 class BalanceSheetDetailSerializer(serializers.ModelSerializer):
+    project_name=serializers.CharField(source="project.name",read_only=True)
     
     class Meta:
         model = BalanceSheetDetail
@@ -22,7 +23,6 @@ class BalanceSheetDetailSerializer(serializers.ModelSerializer):
         return validated_data
 
 class ProjectsBalanceSheetSerializer(serializers.ModelSerializer):
-    project_name=serializers.CharField(source="project.name",read_only=True)
     payments_detail=BalanceSheetDetailSerializer(many=True)
 
     

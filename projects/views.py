@@ -25,7 +25,7 @@ class ProjectsBalanceSheetViewSet(viewsets.ModelViewSet):
 
 
     def get_queryset(self):
-        queryset = ProjectsBalanceSheet.objects.all().select_related("project")
+        queryset = ProjectsBalanceSheet.objects.all()
         date = self.request.query_params.get('date')
         if date:
             queryset = queryset.filter(date=date)
