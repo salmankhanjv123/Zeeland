@@ -38,8 +38,7 @@ class ProjectsBalanceBulkUpdateCreateAPIView(APIView):
     def post(self, request, format=None):
         data = request.data
         serializer = ProjectsBalanceSheetSerializer(data=data, many=True)
-
-
+        serializer.is_valid(raise_exception=True)
         processed_data = []
         for item in serializer.validated_data:
             item_id=item["id"]
@@ -58,5 +57,4 @@ class ProjectsBalanceBulkUpdateCreateAPIView(APIView):
                 serializer_new.save()
                 processed_data.append(serializer_new.data)
 
-        return Response(processed_data, status=status.HTTP_200_OK)
-
+            return Response(processed_data, status=status.HTTP_200_OK)
