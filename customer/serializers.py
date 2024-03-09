@@ -9,6 +9,18 @@ class CustomersSerializer(serializers.ModelSerializer):
         fields = '__all__'  # or specify specific fields
 
 class CustomerMessagesReminderSerializer(serializers.ModelSerializer):
+    customer_name=serializers.CharField(source="message.booking.customer.name",read_only=True)
+    plot_info = serializers.SerializerMethodField(read_only=True)
+
+    def get_plot_info(self, instance):
+        booking = instance.message.booking
+        if booking:
+            plot = booking.plot
+            plot_number = plot.plot_number
+            plot_size = plot.get_plot_size()
+            plot_type = plot.get_type_display()
+            return f"{plot_number} || {plot_type} || {plot_size}"
+        return None
     
     class Meta:
         model = CustomerMessagesReminder
