@@ -24,6 +24,7 @@ class Customers(models.Model):
 class CustomerMessages(models.Model):
     user = models.ForeignKey(User, on_delete=models.PROTECT,blank=True,null=True)
     plot=models.ForeignKey(Plots,on_delete=models.PROTECT)
+    booking = models.ForeignKey("booking.Booking", on_delete=models.PROTECT,blank=True,null=True)
     date=models.DateField()
     created_at=models.DateTimeField(auto_now_add=True)
     updated_at=models.DateTimeField(auto_now=True)

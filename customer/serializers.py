@@ -46,8 +46,8 @@ class CustomerMessagesSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         files_data = validated_data.pop('files')
-        instance.date = validated_data.get('date', instance.date)
-        instance.notes = validated_data.get('notes', instance.notes)
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
         instance.save()
 
         for file_data in files_data:
