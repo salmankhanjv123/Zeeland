@@ -40,7 +40,8 @@ class ProjectsBalanceSheetSerializer(serializers.ModelSerializer):
         payments_detail_data = validated_data.pop('payments_detail', [])
         projects_balance_sheet = ProjectsBalanceSheet.objects.create(**validated_data)
         for payment_data in payments_detail_data:
-            BalanceSheetDetail.objects.create(balance_sheet=projects_balance_sheet, **payment_data)
+            project_id=payment_data.pop('project').id
+            BalanceSheetDetail.objects.create(balance_sheet=projects_balance_sheet,project=project_id, **payment_data)
         return projects_balance_sheet
 
     def update(self, instance, validated_data):
