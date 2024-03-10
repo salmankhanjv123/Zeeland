@@ -40,8 +40,7 @@ class ProjectsBalanceSheetSerializer(serializers.ModelSerializer):
         payments_detail_data = validated_data.pop('payments_detail', [])
         projects_balance_sheet = ProjectsBalanceSheet.objects.create(**validated_data)
         for payment_data in payments_detail_data:
-            project_id=payment_data.pop('project').id
-            # BalanceSheetDetail.objects.create(balance_sheet=projects_balance_sheet,project=project_id, **payment_data)
+            BalanceSheetDetail.objects.create(balance_sheet=projects_balance_sheet, **payment_data)
         return projects_balance_sheet
 
     def update(self, instance, validated_data):
@@ -51,12 +50,10 @@ class ProjectsBalanceSheetSerializer(serializers.ModelSerializer):
         existing_payments_detail_ids = [payment.id for payment in existing_payments_detail]
         for payment_data in payments_detail_data:
             payment_id = payment_data.get('id')
-            project_id=payment_data.pop('project').id
             if payment_id:
-                payment = existing_payments_detail.get(id=payment_id)
-                BalanceSheetDetail.objects.filter(id=payment_id).update(project=project_id,**payment_data)
+                BalanceSheetDetail.objects.filter(id=payment_id).update(**payment_data)
                 existing_payments_detail_ids.remove(payment_id)
             else:
-                BalanceSheetDetail.objects.create(balance_sheet=instance,project=project_id, **payment_data)
+                BalanceSheetDetail.objects.create(balance_sheet=instance, **payment_data)
         BalanceSheetDetail.objects.filter(id__in=existing_payments_detail_ids).delete()
         return instance
