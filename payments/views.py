@@ -22,10 +22,13 @@ class IncomingFundViewSet(viewsets.ModelViewSet):
         plot_id = self.request.query_params.get('plot_id')
         customer_id = self.request.query_params.get('customer_id')
         booking_id = self.request.query_params.get('booking_id')
+        booking_type = self.request.query_params.get('booking_type')
 
         query_filters=Q()
         if project_id:
             query_filters &= Q(project_id=project_id)
+        if booking_type:
+            query_filters &= Q(booking__booking_type=booking_type)
         if booking_id:
             query_filters &= Q(booking_id=booking_id)
         if plot_id:
