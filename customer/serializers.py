@@ -41,6 +41,15 @@ class CustomerMessagesSerializer(serializers.ModelSerializer):
     files = CustomerMessagesDocumentsSerializer(many=True)
     username=serializers.CharField(source='user.username', read_only=True)
     booking_details = serializers.SerializerMethodField(read_only=True)
+    plot_info = serializers.SerializerMethodField(read_only=True)
+
+    def get_plot_info(self, instance):
+        plot = instance.plot
+        plot_number = plot.plot_number
+        plot_size = plot.get_plot_size()
+        plot_type = plot.get_type_display()
+        return f"{plot_number} || {plot_type} || {plot_size}"
+
 
     def get_booking_details(self, instance):
         if instance.booking:
