@@ -34,7 +34,7 @@ class CustomerMessagesReminderViewSet(viewsets.ModelViewSet):
         if status:
             query_filters &= Q(status=status)
         if date:
-            query_filters &= Q(date_lte=date)
+            query_filters &= Q(date__lte=date)
 
         queryset = CustomerMessagesReminder.objects.filter(query_filters).select_related("message__booking__plot","message__booking__customer")
         return queryset
