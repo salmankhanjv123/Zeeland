@@ -39,8 +39,12 @@ class CustomerMessagesDocumentsSerializer(serializers.ModelSerializer):
 
 class CustomerMessagesSerializer(serializers.ModelSerializer):
     files = CustomerMessagesDocumentsSerializer(many=True)
-    customer = serializers.CharField(source='customer_name', read_only=True)
     username=serializers.CharField(source='user.username', read_only=True)
+    booking_details = serializers.SerializerMethodField(read_only=True)
+
+    def get_booking_details(self, instance):
+
+        return f"{instance.booking.booking_id} || {instance.booking.customer.name} ||  {instance.booking.plot.plot_number} -- {instance.booking.plot.get_plot_size()}"
 
     class Meta:
         model = CustomerMessages

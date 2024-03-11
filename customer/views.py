@@ -54,14 +54,8 @@ class CustomerMessagesListCreateView(generics.ListCreateAPIView):
             query_filters&=Q(user_id=user_id)
         if plot_id:
             query_filters&=Q(plot_id=plot_id)
-        booking_subquery = Booking.objects.filter(
-            status="active",
-            plot=OuterRef('plot'),
-        ).select_related('customer').order_by('pk').values('customer__name')[:1]
 
-        queryset = CustomerMessages.objects.filter(query_filters).annotate(
-            customer_name=Subquery(booking_subquery)
-        ).prefetch_related('files')
+        queryset = CustomerMessages.objects.filter(query_filters).select_related("booking__customer","booking__plot","user").prefetch_related('files')
 
         return queryset
 
