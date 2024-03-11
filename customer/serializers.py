@@ -43,9 +43,10 @@ class CustomerMessagesSerializer(serializers.ModelSerializer):
     booking_details = serializers.SerializerMethodField(read_only=True)
 
     def get_booking_details(self, instance):
-
-        return f"{instance.booking.booking_id} || {instance.booking.customer.name} ||  {instance.booking.plot.plot_number} -- {instance.booking.plot.get_plot_size()}"
-
+        if instance.booking:
+            return f"{instance.booking.booking_id} || {instance.booking.customer.name} ||  {instance.booking.plot.plot_number} -- {instance.booking.plot.get_plot_size()}"
+        else:
+            return "Booking details not available."
     class Meta:
         model = CustomerMessages
         fields = '__all__'
