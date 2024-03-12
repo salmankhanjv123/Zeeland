@@ -71,7 +71,7 @@ class CustomerMessagesSerializer(serializers.ModelSerializer):
         return customer_message
 
     def update(self, instance, validated_data):
-        files_data = validated_data.pop('files')
+        files_data = validated_data.pop('files',[])
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
