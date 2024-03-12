@@ -21,16 +21,19 @@ class Projects(models.Model):
         db_table = 'projects'
 
 
-class ProjectsBalanceSheet(models.Model):
+class BalanceSheet(models.Model):
     user = models.ForeignKey(User, on_delete=models.PROTECT)
-    detail=models.CharField(max_length=100)
     date = models.DateField()
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+class BalanceSheetDetails(models.Model):
+    balance_sheet=models.ForeignKey(BalanceSheet,related_name="details",on_delete=models.CASCADE)
+    detail=models.CharField(max_length=100)
 
-class BalanceSheetDetail(models.Model):
-    balance_sheet=models.ForeignKey(ProjectsBalanceSheet,related_name="payments_detail",on_delete=models.CASCADE)
+
+class BalanceSheetAmountDetails(models.Model):
+    detail=models.ForeignKey(BalanceSheetDetails,related_name="amount_details",on_delete=models.CASCADE)
     project = models.ForeignKey(Projects, on_delete=models.PROTECT)
     amount=models.FloatField(default=0)
 
