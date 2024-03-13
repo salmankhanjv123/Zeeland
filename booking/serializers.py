@@ -85,7 +85,7 @@ class BookingSerializer(serializers.ModelSerializer):
         for key, value in validated_data.items():
             setattr(instance, key, value)
 
-        if booking_status == 'resale':
+        if booking_status == 'resale' or booking_status == 'close':
             plot = instance.plot
             plot.status = 'active'
             plot.save()
