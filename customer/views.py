@@ -44,16 +44,16 @@ class CustomerMessagesListCreateView(generics.ListCreateAPIView):
 
     def get_queryset(self):
         project_id = self.request.query_params.get('project')
-        plot_id = self.request.query_params.get('plot_id')
+        booking_id = self.request.query_params.get('booking_id')
         user_id= self.request.query_params.get('user_id')
 
         query_filters=Q()
         if project_id:
-            query_filters&=Q(plot__project_id=project_id)
+            query_filters&=Q(booking__project_id=project_id)
         if user_id:
             query_filters&=Q(user_id=user_id)
-        if plot_id:
-            query_filters&=Q(plot_id=plot_id)
+        if booking_id:
+            query_filters&=Q(booking_id=booking_id)
 
         queryset = CustomerMessages.objects.filter(query_filters).select_related("booking__customer","booking__plot","user").prefetch_related('files')
 
