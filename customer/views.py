@@ -54,7 +54,8 @@ class CustomerMessagesListCreateView(generics.ListCreateAPIView):
             query_filters&=Q(user_id=user_id)
         if booking_id:
             query_filters&=Q(booking_id=booking_id)
-
+        # Add filter for booking not null
+        query_filters &= Q(booking__isnull=False)
         queryset = CustomerMessages.objects.filter(query_filters).select_related("booking__customer","booking__plot","user").prefetch_related('files')
 
         return queryset
