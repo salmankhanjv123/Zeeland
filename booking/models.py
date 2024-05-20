@@ -12,7 +12,7 @@ class Booking(models.Model):
     plot = models.ForeignKey(
         Plots, related_name="booking_details", on_delete=models.PROTECT)
     customer = models.ForeignKey(Customers, on_delete=models.PROTECT)
-    dealer = models.ForeignKey(Dealers, on_delete=models.PROTECT,blank=True,null=True)
+    dealer = models.ForeignKey(Dealers, on_delete=models.PROTECT,related_name="bookings",blank=True,null=True)
     booking_id = models.CharField(max_length=10)
     reference = models.CharField(max_length=30, null=True)
     reference_contact = models.CharField(max_length=20, null=True)

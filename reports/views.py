@@ -7,7 +7,7 @@ from booking.models import Booking, Token
 from .serializers import IncomingFundReportSerializer, OutgoingFundReportSerializer, JournalVoucherReportSerializer
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from django.db.models import Count, Sum, functions
+from django.db.models import Count, Sum, functions,Q
 from datetime import date, datetime, timedelta
 import calendar
 
@@ -265,3 +265,28 @@ class AnnualIncomingFundGraphView(APIView):
         }
 
         return Response(result_with_month_names)
+
+
+
+class DealerLedgerView(APIView):
+    def get(self, request):
+        project_id = self.request.query_params.get("project_id")
+        dealer_id = self.request.query_params.get("dealer_id")
+        start_date = self.request.query_params.get("start_date")
+        end_date = self.request.query_params.get("end_date")
+
+        query_filters = Q()
+        if project_id:
+            query_filters &= Q(project_id=project_id)
+        if dealer_id:
+            query_filters &= Q(dealer_id=dealer_id)
+        if start_date and end_date:
+            query_filters &= Q(date__gte=start_date) & Q(date__lte=end_date)
+
+        # Calculate total incoming amount
+        booking_data = Booking.objects.filter(
+            query_filters
+        ).values("id","booking_date","booking_id","dealer__name","dealer_per_marla_comission","dealer_comission_percentage","dealer_comission_amount")
+
+
+        return Response(booking_data)
