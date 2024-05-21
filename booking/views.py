@@ -15,10 +15,13 @@ class BookingViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         project_id = self.request.query_params.get('project')
         plot_id = self.request.query_params.get('plot_id')
+        plot_type = self.request.query_params.get('plot_type')
         customer_id = self.request.query_params.get('customer_id')
         status=self.request.query_params.get('status') 
         booking_type=self.request.query_params.get('booking_type')   
-
+        start_date = self.request.query_params.get("start_date")
+        end_date = self.request.query_params.get("end_date")
+        
         query_filters=Q()
         if booking_type:
             query_filters &= Q(booking_type=booking_type)
@@ -28,8 +31,12 @@ class BookingViewSet(viewsets.ModelViewSet):
             query_filters &= Q(project_id=project_id)
         if plot_id:
             query_filters &= Q(plot_id=plot_id)
+        if plot_type:
+            query_filters &= Q(plot__type=plot_type)
         if customer_id:
             query_filters &= Q(customer_id=customer_id)
+        if start_date and end_date:
+            query_filters &= Q(date__gte=start_date) & Q(date__lte=end_date)
         queryset = Booking.objects.filter(query_filters).select_related('customer', 'plot').prefetch_related("files")
         return queryset
 
