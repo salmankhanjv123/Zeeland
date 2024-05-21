@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Booking, Token,PlotResale
+from .models import Booking,BookingDocuments, Token,PlotResale
 from plots.models import Plots
 from payments.models import IncomingFund
 from django.db.models import Sum
@@ -22,9 +22,21 @@ class PlotsSerializer(serializers.ModelSerializer):
         fields = '__all__'  # or specify specific fields
 
 
+class BookingDocumentsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BookingDocuments
+        exclude = ["booking"]
+
+    def to_internal_value(self, data):
+        validated_data = super().to_internal_value(data)
+        validated_data["id"] = data.get("id")
+        return validated_data
+
+
 class BookingSerializer(serializers.ModelSerializer):
     customer_name = serializers.SerializerMethodField(read_only=True)
     plot_info = serializers.SerializerMethodField(read_only=True)
+    files = BookingDocumentsSerializer(many=True, required=False)
 
     def get_customer_name(self, instance):
         return instance.customer.name
@@ -41,6 +53,7 @@ class BookingSerializer(serializers.ModelSerializer):
         read_only_fields = ['total_receiving_amount']
 
     def create(self, validated_data):
+        files_data = validated_data.pop("files", [])
         project = validated_data.get('project')
         advance_amount = validated_data.get('advance')
         total_amount=validated_data.get("total_amount")
@@ -68,9 +81,12 @@ class BookingSerializer(serializers.ModelSerializer):
             IncomingFund.objects.create(project=project,booking=booking,date=booking_date,installement_month=installement_month,amount=advance_amount,remarks="advance",advance_payment=True)
         if existing_resale_exists:
             PlotResale.objects.create(booking=booking,plot=plot,entry_type="booking",new_plot_price=total_amount)
+        for file_data in files_data:
+            BookingDocuments.objects.create(booking=booking, **file_data)
         return booking
 
     def update(self, instance, validated_data):
+        files_data = validated_data.pop("files", [])
         booking_status = validated_data.get('status', instance.status)
         total_amount = validated_data.get(
             'total_amount', instance.total_amount)
@@ -95,6 +111,17 @@ class BookingSerializer(serializers.ModelSerializer):
         instance.remaining = total_amount-payments 
         instance.save()
 
+        for file_data in files_data:
+            file_id = file_data.get("id", None)
+            if file_id:
+                file = BookingDocuments.objects.get(id=file_id, booking=instance)
+                file.description = file_data.get("description", file.description)
+                file.type = file_data.get("type", file.type)
+                if "file" in file_data:
+                    file.file = file_data.get("file", file.file)
+                file.save()
+            else:
+                BookingDocuments.objects.create(booking=instance, **file_data)
 
         return instance
 

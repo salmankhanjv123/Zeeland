@@ -30,7 +30,7 @@ class BookingViewSet(viewsets.ModelViewSet):
             query_filters &= Q(plot_id=plot_id)
         if customer_id:
             query_filters &= Q(customer_id=customer_id)
-        queryset = Booking.objects.filter(query_filters).select_related('customer', 'plot')
+        queryset = Booking.objects.filter(query_filters).select_related('customer', 'plot').prefetch_related("files")
         return queryset
 
 
