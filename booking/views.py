@@ -37,7 +37,7 @@ class BookingViewSet(viewsets.ModelViewSet):
             query_filters &= Q(customer_id=customer_id)
         if start_date and end_date:
             query_filters &= Q(date__gte=start_date) & Q(date__lte=end_date)
-        queryset = Booking.objects.filter(query_filters).select_related('customer', 'plot').prefetch_related("files")
+        queryset = Booking.objects.filter(query_filters).select_related('customer','dealer', 'plot').prefetch_related("files")
         return queryset
 
 
