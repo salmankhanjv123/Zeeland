@@ -1,8 +1,24 @@
 from rest_framework import serializers
 from booking.models import Booking
 from customer.models import Customers
-from .models import ExpenseType, IncomingFund, OutgoingFund, JournalVoucher, PaymentReminder, ExpensePerson
+from .models import (
+    ExpenseType,
+    IncomingFund,
+    IncomingFundDocuments,
+    OutgoingFund,
+    OutgoingFundDocuments,
+    JournalVoucher,
+    PaymentReminder,
+    ExpensePerson,
+    Bank,
+)
 import datetime
+
+
+class BankSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Bank
+        fields = "__all__"
 
 
 class MonthField(serializers.Field):
@@ -12,8 +28,7 @@ class MonthField(serializers.Field):
             year, month = data.split("-")
             return datetime.datetime(int(year), int(month), 1).date()
         except (ValueError, AttributeError):
-            raise serializers.ValidationError(
-                "Invalid month format. Use 'YYYY-MM'.")
+            raise serializers.ValidationError("Invalid month format. Use 'YYYY-MM'.")
 
     def to_representation(self, value):
         # Convert the datetime object to a month string in the format 'YYYY-MM'
@@ -33,8 +48,7 @@ class BookingSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Booking
-        fields = ['plot_info', 'total_amount',
-                  'remaining', 'total_receiving_amount']
+        fields = ["plot_info", "total_amount", "remaining", "total_receiving_amount"]
         read_only_fields = fields
 
 
@@ -42,86 +56,147 @@ class CustomersSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Customers
-        fields = ['name', 'father_name', 'contact', 'cnic']
+        fields = ["name", "father_name", "contact", "cnic"]
+
+
+class IncomingFundDocumentsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = IncomingFundDocuments
+        exclude = ["incoming_fund"]
+
+    def to_internal_value(self, data):
+        validated_data = super().to_internal_value(data)
+        validated_data["id"] = data.get("id")
+        return validated_data
+
 
 
 class IncomingFundSerializer(serializers.ModelSerializer):
     installement_month = MonthField()
-    booking_info = BookingSerializer(source='booking', read_only=True)
-    customer = CustomersSerializer(source='booking.customer', read_only=True)
+    booking_info = BookingSerializer(source="booking", read_only=True)
+    customer = CustomersSerializer(source="booking.customer", read_only=True)
+    files = IncomingFundDocumentsSerializer(many=True, required=False)
 
     def create(self, validated_data):
-        booking = validated_data['booking']
-        amount = validated_data['amount']
+        files_data = validated_data.pop("files", [])
+        booking = validated_data["booking"]
+        amount = validated_data["amount"]
 
         booking.total_receiving_amount += amount
         booking.remaining -= amount
         booking.save()
-        return IncomingFund.objects.create(**validated_data)
+        incoming_fund=IncomingFund.objects.create(**validated_data)
+        for file_data in files_data:
+            IncomingFundDocuments.objects.create(incoming_fund=incoming_fund, **file_data)
+        return incoming_fund
 
     def update(self, instance, validated_data):
+        files_data = validated_data.pop("files", [])
         booking = instance.booking
-        amount = validated_data.get('amount', instance.amount)
+        amount = validated_data.get("amount", instance.amount)
 
         if amount != instance.amount:
-            booking.total_receiving_amount += amount-instance.amount
+            booking.total_receiving_amount += amount - instance.amount
             booking.remaining -= amount - instance.amount
             booking.save()
 
         for key, value in validated_data.items():
             setattr(instance, key, value)
         instance.save()
+
+        for file_data in files_data:
+            file_id = file_data.get("id", None)
+            if file_id:
+                file = IncomingFundDocuments.objects.get(id=file_id, incoming_fund=instance)
+                file.description = file_data.get("description", file.description)
+                file.type = file_data.get("type", file.type)
+                if "file" in file_data:
+                    file.file = file_data.get("file", file.file)
+                file.save()
+            else:
+                IncomingFundDocuments.objects.create(incoming_fund=instance, **file_data)
         return instance
 
     class Meta:
         model = IncomingFund
-        fields = '__all__'
+        fields = "__all__"
+
+
+class OutgoingFundDocumentsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = OutgoingFundDocuments
+        exclude = ["outgoing_fund"]
+
+    def to_internal_value(self, data):
+        validated_data = super().to_internal_value(data)
+        validated_data["id"] = data.get("id")
+        return validated_data
 
 
 class OutgoingFundSerializer(serializers.ModelSerializer):
     expense_type_name = serializers.CharField(
-        source="expense_type.name", read_only=True)
-    person_name = serializers.CharField(
-        source="person.name", read_only=True)
-
+        source="expense_type.name", read_only=True
+    )
+    person_name = serializers.CharField(source="person.name", read_only=True)
+    files = OutgoingFundDocumentsSerializer(many=True, required=False)
     class Meta:
         model = OutgoingFund
-        fields = '__all__'
+        fields = "__all__"
 
     def create(self, validated_data):
-        amount = validated_data.get('amount', 0)
-        person = validated_data.get('person')
+        files_data = validated_data.pop("files", [])
+        amount = validated_data.get("amount", 0)
+        person = validated_data.get("person")
         person.balance -= amount
         person.save()
-        return super().create(validated_data)
+        outgoing_fund=OutgoingFund.objects.create(**validated_data)
+        for file_data in files_data:
+            OutgoingFund.objects.create(outgoing_fund=outgoing_fund, **file_data)
+        return outgoing_fund
 
     def update(self, instance, validated_data):
-        amount = validated_data.get('amount')
+        files_data = validated_data.pop("files", [])
+        amount = validated_data.get("amount")
         if amount is not None:
             difference = amount - instance.amount
             person = instance.person
             person.balance -= difference
             person.save()
-        return super().update(instance, validated_data)
+        
+        for key, value in validated_data.items():
+            setattr(instance, key, value)
+        instance.save()
+
+        for file_data in files_data:
+            file_id = file_data.get("id", None)
+            if file_id:
+                file = OutgoingFundDocuments.objects.get(id=file_id, outgoing_fund=instance)
+                file.description = file_data.get("description", file.description)
+                file.type = file_data.get("type", file.type)
+                if "file" in file_data:
+                    file.file = file_data.get("file", file.file)
+                file.save()
+            else:
+                OutgoingFundDocuments.objects.create(outgoing_fund=instance, **file_data)
+        return instance
 
 
 class ExpenseTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = ExpenseType
-        fields = '__all__'
+        fields = "__all__"
 
 
 class JournalVoucherSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = JournalVoucher
-        fields = '__all__'
+        fields = "__all__"
 
 
 class PaymentReminderSerializer(serializers.ModelSerializer):
     plot_info = serializers.SerializerMethodField(read_only=True)
-    customer_info = CustomersSerializer(
-        source='booking.customer', read_only=True)
+    customer_info = CustomersSerializer(source="booking.customer", read_only=True)
 
     def get_plot_info(self, instance):
         plot_number = instance.booking.plot.plot_number
@@ -131,17 +206,17 @@ class PaymentReminderSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = PaymentReminder
-        fields = '__all__'
+        fields = "__all__"
 
 
 class ExpensePersonSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ExpensePerson
-        fields = '__all__'
+        fields = "__all__"
 
     def update(self, instance, validated_data):
-        added_balance = validated_data.pop('balance', 0)
+        added_balance = validated_data.pop("balance", 0)
         for key, value in validated_data.items():
             setattr(instance, key, value)
         instance.balance += added_balance

@@ -3,6 +3,11 @@ from projects.models import Projects
 from booking.models import Booking
 
 
+
+
+class Bank(models.Model):
+    name=models.CharField(max_length=30)
+
 class MonthField(models.DateField):
     def to_python(self, value):
         if isinstance(value, str):
@@ -28,10 +33,21 @@ class IncomingFund(models.Model):
     amount = models.FloatField()
     remarks = models.TextField(blank=True, null=True)
     advance_payment=models.BooleanField(default=False)
+    payment_type=models.CharField(max_length=20)
+    bank=models.ForeignKey(Bank, on_delete=models.PROTECT)
+    
 
     class Meta:
         db_table = 'incoming_funds'
 
+
+class IncomingFundDocuments(models.Model):
+    incoming_fund = models.ForeignKey(IncomingFund, related_name="files", on_delete=models.CASCADE)
+    file = models.FileField(upload_to="media/dealer_files")
+    description = models.TextField()
+    type = models.CharField(max_length=20)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
 class ExpenseType(models.Model):
     name = models.CharField(max_length=50)
@@ -61,10 +77,19 @@ class OutgoingFund(models.Model):
     date = models.DateField()
     amount = models.FloatField()
     remarks = models.TextField(blank=True, null=True)
-
+    payment_type=models.CharField(max_length=20)
+    bank=models.ForeignKey(Bank, on_delete=models.PROTECT)
     class Meta:
         db_table = 'outgoing_funds'
 
+
+class OutgoingFundDocuments(models.Model):
+    outgoing_fund = models.ForeignKey(OutgoingFund, related_name="files", on_delete=models.CASCADE)
+    file = models.FileField(upload_to="media/dealer_files")
+    description = models.TextField()
+    type = models.CharField(max_length=20)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
 class JournalVoucher(models.Model):
     project = models.ForeignKey(Projects, on_delete=models.PROTECT)
