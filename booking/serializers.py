@@ -2,6 +2,8 @@ from rest_framework import serializers
 from .models import Booking,BookingDocuments, Token,PlotResale
 from plots.models import Plots
 from payments.models import IncomingFund
+from customer.serializers import CustomersSerializer
+from plots.serializers import PlotsSerializer
 from django.db.models import Sum
 import datetime
 
@@ -10,8 +12,8 @@ class PlotsSerializer(serializers.ModelSerializer):
     plot_size = serializers.SerializerMethodField(read_only=True)
 
     def get_plot_size(self, instance):
-        size_type_name = instance.get_size_type_display()
-        return f"{instance.size} {size_type_name}"
+        # Update this method according to your requirement
+        return instance.get_plot_size()
 
     def get_category_name(self, instance):
         category_name = instance.get_type_display()
@@ -33,20 +35,14 @@ class BookingDocumentsSerializer(serializers.ModelSerializer):
         return validated_data
 
 
+
 class BookingSerializer(serializers.ModelSerializer):
-    customer_name = serializers.SerializerMethodField(read_only=True)
+    customer_info = CustomersSerializer(source="customer",read_only=True)
     dealer_name=serializers.CharField(source="dealer.name",read_only=True)
-    plot_info = serializers.SerializerMethodField(read_only=True)
+    plot_info = PlotsSerializer(source="plot",read_only=True)
     files = BookingDocumentsSerializer(many=True, required=False)
 
-    def get_customer_name(self, instance):
-        return instance.customer.name
 
-    def get_plot_info(self, instance):
-        plot_number = instance.plot.plot_number
-        plot_size = instance.plot.get_plot_size()
-        plot_type = instance.plot.get_type_display()
-        return f"{plot_number} || {plot_type} || {plot_size}"
 
     class Meta:
         model = Booking
