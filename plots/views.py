@@ -17,6 +17,7 @@ class PlotsViewSet(viewsets.ModelViewSet):
         queryset = Plots.objects.all()
         project_id = self.request.query_params.get('project')
         plot_status = self.request.query_params.get('status')
+        plot_type=self.request.query_params.get('plot_type')
 
         # active,sold,
         if plot_status:
@@ -27,6 +28,8 @@ class PlotsViewSet(viewsets.ModelViewSet):
                 queryset = queryset.filter(status=plot_status)
         if project_id:
             queryset = queryset.filter(project_id=project_id)
+        if plot_type:
+            queryset = queryset.filter(type=plot_type)
         return queryset
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
