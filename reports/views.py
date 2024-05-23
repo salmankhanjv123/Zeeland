@@ -281,7 +281,7 @@ class DealerLedgerView(APIView):
         if dealer_id:
             query_filters &= Q(dealer_id=dealer_id)
         if start_date and end_date:
-            query_filters &= Q(date__gte=start_date) & Q(date__lte=end_date)
+            query_filters &= Q(booking_date__gte=start_date) & Q(booking_date__lte=end_date)
 
         # Calculate total incoming amount
         booking_data = Booking.objects.filter(
