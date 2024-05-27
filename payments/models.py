@@ -43,7 +43,7 @@ class IncomingFund(models.Model):
 
 class IncomingFundDocuments(models.Model):
     incoming_fund = models.ForeignKey(IncomingFund, related_name="files", on_delete=models.CASCADE)
-    file = models.FileField(upload_to="media/dealer_files")
+    file = models.FileField(upload_to="media/payments_files")
     description = models.TextField()
     type = models.CharField(max_length=20)
     created_at = models.DateTimeField(auto_now_add=True)

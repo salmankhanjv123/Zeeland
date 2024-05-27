@@ -14,7 +14,7 @@ class PlotsViewSet(viewsets.ModelViewSet):
     serializer_class = PlotsSerializer
 
     def get_queryset(self):
-        queryset = Plots.objects.all()
+        queryset = Plots.objects.all().prefetch_related("files")
         project_id = self.request.query_params.get('project')
         plot_status = self.request.query_params.get('status')
         plot_type=self.request.query_params.get('plot_type')
