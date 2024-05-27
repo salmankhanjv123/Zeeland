@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from .models import (
     Customers,
+    CustomersDocuments,
     CustomerMessages,
     CustomerMessagesDocuments,
     CustomerMessagesReminder,
@@ -10,11 +11,50 @@ from .models import (
 from booking.models import Booking
 
 
+
+
+class CustomersDocumentsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CustomersDocuments
+        exclude = ["customer"]
+
+    def to_internal_value(self, data):
+        validated_data = super().to_internal_value(data)
+        validated_data["id"] = data.get("id")
+        return validated_data
+
 class CustomersSerializer(serializers.ModelSerializer):
+    files = CustomersDocumentsSerializer(many=True, required=False)
 
     class Meta:
         model = Customers
         fields = "__all__"  # or specify specific fields
+    def create(self, validated_data):
+        files_data = validated_data.pop("files", [])
+        customer = Customers.objects.create(**validated_data)
+        for file_data in files_data:
+            CustomersDocuments.objects.create(customer=customer, **file_data)
+        return customer
+
+    def update(self, instance, validated_data):
+        files_data = validated_data.pop("files", [])
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+
+        for file_data in files_data:
+            file_id = file_data.get("id", None)
+            if file_id:
+                file = CustomersDocuments.objects.get(id=file_id, customer=instance)
+                file.description = file_data.get("description", file.description)
+                file.type = file_data.get("type", file.type)
+                if "file" in file_data:
+                    file.file = file_data.get("file", file.file)
+                file.save()
+            else:
+                CustomersDocuments.objects.create(customer=instance, **file_data)
+
+        return instance
 
 
 class CustomerMessagesReminderSerializer(serializers.ModelSerializer):

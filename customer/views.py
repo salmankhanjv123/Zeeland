@@ -19,7 +19,7 @@ class CustomersViewSet(viewsets.ModelViewSet):
     serializer_class = CustomersSerializer
 
     def get_queryset(self):
-        queryset = Customers.objects.all()
+        queryset = Customers.objects.all().prefetch_related("files")
         project_id = self.request.query_params.get("project")
         if project_id:
             queryset = queryset.filter(project_id=project_id)

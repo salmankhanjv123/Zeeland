@@ -286,7 +286,7 @@ class DealerLedgerView(APIView):
         # Calculate total incoming amount
         booking_data = Booking.objects.filter(
             query_filters
-        ).values("id","booking_date","booking_id","dealer__name","dealer_per_marla_comission","dealer_comission_percentage","dealer_comission_amount")
+        ).values("id","booking_date","booking_id","dealer__name","dealer__contact","dealer__address","dealer_per_marla_comission","dealer_comission_percentage","dealer_comission_amount")
 
 
         return Response(booking_data)

@@ -12,10 +12,8 @@ class Booking(models.Model):
     plot = models.ForeignKey(
         Plots, related_name="booking_details", on_delete=models.PROTECT)
     customer = models.ForeignKey(Customers, on_delete=models.PROTECT)
-    dealer = models.ForeignKey(Dealers, on_delete=models.PROTECT,related_name="bookings",blank=True,null=True)
+   
     booking_id = models.CharField(max_length=10)
-    reference = models.CharField(max_length=30, null=True)
-    reference_contact = models.CharField(max_length=20, null=True)
     booking_date = models.DateField()
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -34,6 +32,8 @@ class Booking(models.Model):
     remaining = models.FloatField()
     total_receiving_amount = models.FloatField()
 
+    dealer = models.ForeignKey(Dealers, on_delete=models.PROTECT,related_name="bookings",blank=True,null=True)
+    comission_type=models.CharField(max_length=20,default="percentage")
     dealer_per_marla_comission=models.FloatField(default=0)
     dealer_comission_percentage=models.FloatField(default=0)
     dealer_comission_amount=models.FloatField(default=0)
