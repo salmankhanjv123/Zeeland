@@ -33,7 +33,7 @@ class Booking(models.Model):
     total_receiving_amount = models.FloatField()
 
     dealer = models.ForeignKey(Dealers, on_delete=models.PROTECT,related_name="bookings",blank=True,null=True)
-    comission_type=models.CharField(max_length=20,default="percentage")
+    comission_type=models.CharField(max_length=20,default="percentage",blank=True,null=True)
     dealer_per_marla_comission=models.FloatField(default=0)
     dealer_comission_percentage=models.FloatField(default=0)
     dealer_comission_amount=models.FloatField(default=0)
