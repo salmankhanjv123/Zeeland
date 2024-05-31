@@ -7,6 +7,10 @@ from booking.models import Booking
 
 class Bank(models.Model):
     name=models.CharField(max_length=30)
+    account_type=models.CharField(max_length=30)
+    detail_type=models.CharField(max_length=30)
+    description=models.TextField(blank=True,null=True)
+    balance=models.FloatField(default=0)
 
 class MonthField(models.DateField):
     def to_python(self, value):
