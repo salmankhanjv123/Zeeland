@@ -107,7 +107,7 @@ class OutgoingFundViewSet(viewsets.ModelViewSet):
     serializer_class = OutgoingFundSerializer
 
     def get_queryset(self):
-        queryset = OutgoingFund.objects.all().select_related("person", "expense_type")
+        queryset = OutgoingFund.objects.all().select_related("person", "expense_type","bank")
         project_id = self.request.query_params.get("project")
         if project_id:
             queryset = queryset.filter(project_id=project_id)

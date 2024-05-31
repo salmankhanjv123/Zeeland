@@ -140,6 +140,8 @@ class OutgoingFundSerializer(serializers.ModelSerializer):
         source="expense_type.name", read_only=True
     )
     person_name = serializers.CharField(source="person.name", read_only=True)
+    bank_name=serializers.CharField(source="bank.name",read_only=True)
+    account_type=serializers.CharField(source="bank.account_type",read_only=True)
     files = OutgoingFundDocumentsSerializer(many=True, required=False)
     class Meta:
         model = OutgoingFund
