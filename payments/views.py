@@ -77,8 +77,8 @@ class IncomingFundViewSet(viewsets.ModelViewSet):
         if start_date and end_date:
             query_filters &= Q(date__gte=start_date) & Q(date__lte=end_date)
         queryset = IncomingFund.objects.filter(query_filters).select_related(
-            "booking", "booking__customer", "booking__plot"
-        )
+            "booking", "booking__customer", "booking__plot","bank"
+        ).prefetch_related("files")
         return queryset
 
     def perform_destroy(self, instance):
