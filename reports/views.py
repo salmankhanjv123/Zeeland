@@ -11,7 +11,7 @@ from .serializers import (
 )
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from django.db.models import Count, Sum, functions, Q
+from django.db.models import Count, Sum, functions, Q,F,Value,CharField
 from datetime import date, datetime, timedelta
 import calendar
 
@@ -346,6 +346,7 @@ class DealerLedgerView(APIView):
         return Response(booking_data)
 
 
+
 class CustomerLedgerView(APIView):
     def get(self, request):
         project_id = self.request.query_params.get("project_id")
@@ -356,23 +357,33 @@ class CustomerLedgerView(APIView):
         query_filters = Q()
         if project_id:
             query_filters &= Q(project_id=project_id)
-        if customer_id:
-            query_filters &= Q(booking_customer_id=customer_id)
         if start_date and end_date:
             query_filters &= Q(date__gte=start_date) & Q(date__lte=end_date)
 
-        # Calculate total incoming amount
-        booking_data = IncomingFund.objects.filter(query_filters).select_related("booking__customer","bank").values(
+        # Fetch booking data
+        booking_data = Booking.objects.filter(query_filters,customer_id=customer_id).values(
             "id",
-            "date",
-            "booking__booking_id",
-            "amount",
             "remarks",
-            "payment_type",
-            "bank__name",
-            "booking__customer__name",
-            "booking__customer__contact",
-            "booking__customer__address",
+            amount=F("total_amount"),
+            date=F("booking_date"),
+            customer_name=F("customer__name"),
+            reference=Value("booking", output_field=CharField())
         )
 
-        return Response(booking_data)
+        # Fetch payment data
+        payment_data = IncomingFund.objects.filter(query_filters,booking__customer_id=customer_id).values(
+            "id",
+            "date",
+            "amount",
+            "remarks",
+            customer_name=F("booking__customer__name"),
+            reference=Value("payment", output_field=CharField())
+        )
+
+        # Combine and sort by date
+        combined_data = sorted(
+            list(booking_data) + list(payment_data),
+            key=lambda x: x["date"]
+        )
+
+        return Response(combined_data)
