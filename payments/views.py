@@ -1,7 +1,8 @@
 from django.db.models import Max
 from django.db.models import Q, Sum
+from django.shortcuts import get_object_or_404
 import datetime
-from rest_framework import viewsets
+from rest_framework import viewsets,status
 from .serializers import (
     IncomingFundSerializer,
     OutgoingFundSerializer,
@@ -249,3 +250,64 @@ class DuePaymentsView(APIView):
             )
 
         return Response({"due_payments": due_payments})
+
+
+
+
+
+
+class BankTransactionsAPIView(APIView):
+
+    def get(self, request):
+        bank_id = request.query_params.get('bank_id')
+        start_date = request.query_params.get('start_date')
+        end_date = request.query_params.get('end_date')
+        
+        if not bank_id:
+            return Response({"error": "bank_id query parameter is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        bank = get_object_or_404(Bank, pk=bank_id)
+        
+        date_filter = Q()
+        
+        if start_date:
+            start_date = datetime.strptime(start_date, '%Y-%m-%d')
+            date_filter &= Q(date__gte=start_date)
+
+        if end_date:
+            end_date = datetime.strptime(end_date, '%Y-%m-%d')
+            date_filter &= Q(date__lte=end_date)
+
+        payments = bank.payments.filter(date_filter)
+        expenses = bank.expenses.filter(date_filter)
+        
+        combined = []
+        
+        for payment in payments:
+            combined.append({
+                'date': payment.date,
+                'reference': 'payment',
+                'remarks': payment.remarks,
+                'id': payment.id,
+                'payment': 0,
+                'deposit': payment.amount
+            })
+
+        for expense in expenses:
+            combined.append({
+                'date': expense.date,
+                'reference': 'expense',
+                'remarks': expense.remarks,
+                'id': expense.id,
+                'payment': expense.amount,
+                'deposit': 0
+            })
+
+        combined.sort(key=lambda x: x['date'])
+
+        balance = 0
+        for entry in combined:
+            balance += entry['deposit'] - entry['payment']
+            entry['balance'] = balance
+
+        return Response(combined, status=status.HTTP_200_OK)
