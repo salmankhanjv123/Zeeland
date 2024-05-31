@@ -8,6 +8,7 @@ from .views import (
     MonthlyIncomingFundGraphView,
     AnnualIncomingFundGraphView,
     DealerLedgerView,
+    CustomerLedgerView,
 )
 
 urlpatterns = [
@@ -19,4 +20,5 @@ urlpatterns = [
     path("monthly-incoming-fund/", MonthlyIncomingFundGraphView.as_view()),
     path("annual-incoming-fund/", AnnualIncomingFundGraphView.as_view()),
     path("dealer-ledger/", DealerLedgerView.as_view()),
+    path("customer-ledger/", CustomerLedgerView.as_view()),
 ]
