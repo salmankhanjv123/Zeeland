@@ -60,6 +60,9 @@ class IncomingFundViewSet(viewsets.ModelViewSet):
         customer_id = self.request.query_params.get("customer_id")
         booking_id = self.request.query_params.get("booking_id")
         booking_type = self.request.query_params.get("booking_type")
+        payment_type = self.request.query_params.get("payment_type")
+        bank_id = self.request.query_params.get("bank_id")
+
         start_date = self.request.query_params.get("start_date")
         end_date = self.request.query_params.get("end_date")
 
@@ -70,10 +73,15 @@ class IncomingFundViewSet(viewsets.ModelViewSet):
             query_filters &= Q(booking__booking_type=booking_type)
         if booking_id:
             query_filters &= Q(booking_id=booking_id)
+        if payment_type:
+            query_filters &= Q(payment_type=payment_type)
+        if bank_id:
+            query_filters &= Q(bank_id=bank_id)
         if plot_id:
             query_filters &= Q(booking__plot_id=plot_id)
         if customer_id:
             query_filters &= Q(booking__customer_id=customer_id)
+
         if start_date and end_date:
             query_filters &= Q(date__gte=start_date) & Q(date__lte=end_date)
         queryset = IncomingFund.objects.filter(query_filters).select_related(
