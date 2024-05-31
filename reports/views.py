@@ -364,6 +364,7 @@ class CustomerLedgerView(APIView):
         booking_data = Booking.objects.filter(query_filters,customer_id=customer_id).values(
             "id",
             "remarks",
+            document=F("booking_id"),
             amount=F("total_amount"),
             date=F("booking_date"),
             customer_name=F("customer__name"),
@@ -376,6 +377,7 @@ class CustomerLedgerView(APIView):
             "date",
             "amount",
             "remarks",
+            document=F("id"),
             customer_name=F("booking__customer__name"),
             reference=Value("payment", output_field=CharField())
         )
