@@ -35,10 +35,15 @@ class BankViewSet(viewsets.ModelViewSet):
     serializer_class = BankSerializer
 
     def get_queryset(self):
-        queryset = Bank.objects.all()
-        project_id = self.request.query_params.get("project")
-        if project_id:
-            queryset = queryset.filter(project_id=project_id)
+
+        account_type_string= self.request.query_params.get("account_type")
+        query_filters = Q()
+        account_type = (
+            [str for str in account_type_string.split(",")] if account_type_string else None
+        )
+        if account_type:
+            query_filters &= Q(account_type__in=account_type)
+        queryset = Bank.objects.filter(query_filters)
         return queryset
 
 
