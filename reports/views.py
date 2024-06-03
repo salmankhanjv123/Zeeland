@@ -347,6 +347,7 @@ class DealerLedgerView(APIView):
 
 
 
+
 class CustomerLedgerView(APIView):
     def get(self, request):
         project_id = self.request.query_params.get("project_id")
@@ -354,6 +355,7 @@ class CustomerLedgerView(APIView):
         start_date = self.request.query_params.get("start_date")
         end_date = self.request.query_params.get("end_date")
 
+        # Define query filters
         query_filters = Q()
         if project_id:
             query_filters &= Q(project_id=project_id)
@@ -361,7 +363,7 @@ class CustomerLedgerView(APIView):
             query_filters &= Q(date__gte=start_date) & Q(date__lte=end_date)
 
         # Fetch booking data
-        booking_data = Booking.objects.filter(query_filters,customer_id=customer_id).values(
+        booking_data = Booking.objects.filter(query_filters, customer_id=customer_id).values(
             "id",
             "remarks",
             document=F("booking_id"),
@@ -372,7 +374,7 @@ class CustomerLedgerView(APIView):
         )
 
         # Fetch payment data
-        payment_data = IncomingFund.objects.filter(query_filters,booking__customer_id=customer_id).values(
+        payment_data = IncomingFund.objects.filter(query_filters, booking__customer_id=customer_id).values(
             "id",
             "date",
             "amount",
@@ -388,4 +390,34 @@ class CustomerLedgerView(APIView):
             key=lambda x: x["date"]
         )
 
-        return Response(combined_data)
+        # Fetch customer information
+        customer_info = Customers.objects.filter(id=customer_id).values(
+            "id",
+            "name",
+            "father_name",
+            "contact",
+            "address"
+        ).first()
+
+        if not customer_info:
+            return Response({"error": "Customer not found"}, status=404)
+
+        # Calculate opening and closing balances
+        # opening_balance = Booking.objects.filter(customer_id=customer_id, booking_date__lt=start_date).aggregate(total=Sum('total_amount'))['total'] or 0
+        # opening_balance -= IncomingFund.objects.filter(booking__customer_id=customer_id, date__lt=start_date).aggregate(total=Sum('amount'))['total'] or 0
+
+        # closing_balance = opening_balance
+        # for entry in combined_data:
+        #     if entry['reference'] == 'booking':
+        #         closing_balance += entry['amount']
+        #     elif entry['reference'] == 'payment':
+        #         closing_balance -= entry['amount']
+
+        response_data = {
+            "customer_info": customer_info,
+            "opening_balance": 0,
+            "closing_balance": 0,
+            "transactions": combined_data
+        }
+
+        return Response(response_data)
