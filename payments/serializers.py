@@ -11,6 +11,9 @@ from .models import (
     PaymentReminder,
     ExpensePerson,
     Bank,
+    BankDeposit,
+    BankDepositDetail,
+    BankDepositDocuments,
 )
 import datetime
 
@@ -70,12 +73,11 @@ class IncomingFundDocumentsSerializer(serializers.ModelSerializer):
         return validated_data
 
 
-
 class IncomingFundSerializer(serializers.ModelSerializer):
     installement_month = MonthField()
     booking_info = BookingSerializer(source="booking", read_only=True)
-    bank_name=serializers.CharField(source="bank.name",read_only=True)
-    account_type=serializers.CharField(source="bank.account_type",read_only=True)
+    bank_name = serializers.CharField(source="bank.name", read_only=True)
+    account_type = serializers.CharField(source="bank.account_type", read_only=True)
     customer = CustomersSerializer(source="booking.customer", read_only=True)
     files = IncomingFundDocumentsSerializer(many=True, required=False)
 
@@ -87,9 +89,11 @@ class IncomingFundSerializer(serializers.ModelSerializer):
         booking.total_receiving_amount += amount
         booking.remaining -= amount
         booking.save()
-        incoming_fund=IncomingFund.objects.create(**validated_data)
+        incoming_fund = IncomingFund.objects.create(**validated_data)
         for file_data in files_data:
-            IncomingFundDocuments.objects.create(incoming_fund=incoming_fund, **file_data)
+            IncomingFundDocuments.objects.create(
+                incoming_fund=incoming_fund, **file_data
+            )
         return incoming_fund
 
     def update(self, instance, validated_data):
@@ -109,14 +113,18 @@ class IncomingFundSerializer(serializers.ModelSerializer):
         for file_data in files_data:
             file_id = file_data.get("id", None)
             if file_id:
-                file = IncomingFundDocuments.objects.get(id=file_id, incoming_fund=instance)
+                file = IncomingFundDocuments.objects.get(
+                    id=file_id, incoming_fund=instance
+                )
                 file.description = file_data.get("description", file.description)
                 file.type = file_data.get("type", file.type)
                 if "file" in file_data:
                     file.file = file_data.get("file", file.file)
                 file.save()
             else:
-                IncomingFundDocuments.objects.create(incoming_fund=instance, **file_data)
+                IncomingFundDocuments.objects.create(
+                    incoming_fund=instance, **file_data
+                )
         return instance
 
     class Meta:
@@ -140,9 +148,10 @@ class OutgoingFundSerializer(serializers.ModelSerializer):
         source="expense_type.name", read_only=True
     )
     person_name = serializers.CharField(source="person.name", read_only=True)
-    bank_name=serializers.CharField(source="bank.name",read_only=True)
-    account_type=serializers.CharField(source="bank.account_type",read_only=True)
+    bank_name = serializers.CharField(source="bank.name", read_only=True)
+    account_type = serializers.CharField(source="bank.account_type", read_only=True)
     files = OutgoingFundDocumentsSerializer(many=True, required=False)
+
     class Meta:
         model = OutgoingFund
         fields = "__all__"
@@ -153,7 +162,7 @@ class OutgoingFundSerializer(serializers.ModelSerializer):
         person = validated_data.get("person")
         person.balance -= amount
         person.save()
-        outgoing_fund=OutgoingFund.objects.create(**validated_data)
+        outgoing_fund = OutgoingFund.objects.create(**validated_data)
         for file_data in files_data:
             OutgoingFund.objects.create(outgoing_fund=outgoing_fund, **file_data)
         return outgoing_fund
@@ -166,7 +175,7 @@ class OutgoingFundSerializer(serializers.ModelSerializer):
             person = instance.person
             person.balance -= difference
             person.save()
-        
+
         for key, value in validated_data.items():
             setattr(instance, key, value)
         instance.save()
@@ -174,14 +183,18 @@ class OutgoingFundSerializer(serializers.ModelSerializer):
         for file_data in files_data:
             file_id = file_data.get("id", None)
             if file_id:
-                file = OutgoingFundDocuments.objects.get(id=file_id, outgoing_fund=instance)
+                file = OutgoingFundDocuments.objects.get(
+                    id=file_id, outgoing_fund=instance
+                )
                 file.description = file_data.get("description", file.description)
                 file.type = file_data.get("type", file.type)
                 if "file" in file_data:
                     file.file = file_data.get("file", file.file)
                 file.save()
             else:
-                OutgoingFundDocuments.objects.create(outgoing_fund=instance, **file_data)
+                OutgoingFundDocuments.objects.create(
+                    outgoing_fund=instance, **file_data
+                )
         return instance
 
 
@@ -226,3 +239,50 @@ class ExpensePersonSerializer(serializers.ModelSerializer):
         instance.balance += added_balance
         instance.save()
         return instance
+
+
+
+class BankDepositDocumentsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BankDepositDocuments
+        exclude = ["bank_deposit"]
+
+    def to_internal_value(self, data):
+        validated_data = super().to_internal_value(data)
+        validated_data["id"] = data.get("id")
+        return validated_data
+    
+class BankDepositDetailSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BankDepositDetail
+        exclude = ["bank_deposit"]
+
+    def to_internal_value(self, data):
+        validated_data = super().to_internal_value(data)
+        validated_data["id"] = data.get("id")
+        return validated_data
+
+
+class BankDepositSerializer(serializers.ModelSerializer):
+    files = BankDepositDocumentsSerializer(many=True, required=False)
+    details=BankDepositDetailSerializer(many=True,required=False)
+
+    class Meta:
+        model = BankDeposit
+        fields = "__all__"
+
+    def create(self, validated_data):
+        files_data = validated_data.pop("files", [])
+        details_data = validated_data.pop("details", [])
+        bank_deposit = BankDeposit.objects.create(**validated_data)
+        for data in details_data:
+            BankDepositDetail.objects.create(
+                bank_deposit=bank_deposit, **data
+            )
+        for file_data in files_data:
+            BankDepositDocuments.objects.create(
+                bank_deposit=bank_deposit, **file_data
+            )
+        return bank_deposit
+
+

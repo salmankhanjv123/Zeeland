@@ -9,6 +9,7 @@ from .views import (
     ExpensePersonViewSet,
     BankViewSet,
     BankTransactionsAPIView,
+    BankDepositViewSet,
 )
 from rest_framework import routers
 
@@ -23,6 +24,7 @@ router.register(
 )
 router.register(r"expense-persons", ExpensePersonViewSet, basename="expense-persons")
 router.register(r"banks", BankViewSet, basename="banks")
+router.register(r"bank-deposit", BankDepositViewSet, basename="bank-deposit")
 
 
 urlpatterns = [

@@ -2,7 +2,7 @@ from django.db.models import Max
 from django.db.models import Q, Sum
 from django.shortcuts import get_object_or_404
 import datetime
-from rest_framework import viewsets,status
+from rest_framework import viewsets, status
 from .serializers import (
     IncomingFundSerializer,
     OutgoingFundSerializer,
@@ -11,6 +11,7 @@ from .serializers import (
     PaymentReminderSerializer,
     ExpensePersonSerializer,
     BankSerializer,
+    BankDepositSerializer,
 )
 from .models import (
     IncomingFund,
@@ -20,6 +21,7 @@ from .models import (
     PaymentReminder,
     ExpensePerson,
     Bank,
+    BankDeposit,
 )
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -37,10 +39,12 @@ class BankViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
 
-        account_type_string= self.request.query_params.get("account_type")
+        account_type_string = self.request.query_params.get("account_type")
         query_filters = Q()
         account_type = (
-            [str for str in account_type_string.split(",")] if account_type_string else None
+            [str for str in account_type_string.split(",")]
+            if account_type_string
+            else None
         )
         if account_type:
             query_filters &= Q(account_type__in=account_type)
@@ -85,9 +89,11 @@ class IncomingFundViewSet(viewsets.ModelViewSet):
 
         if start_date and end_date:
             query_filters &= Q(date__gte=start_date) & Q(date__lte=end_date)
-        queryset = IncomingFund.objects.filter(query_filters).select_related(
-            "booking", "booking__customer", "booking__plot","bank"
-        ).prefetch_related("files")
+        queryset = (
+            IncomingFund.objects.filter(query_filters)
+            .select_related("booking", "booking__customer", "booking__plot", "bank")
+            .prefetch_related("files")
+        )
         return queryset
 
     def perform_destroy(self, instance):
@@ -107,7 +113,9 @@ class OutgoingFundViewSet(viewsets.ModelViewSet):
     serializer_class = OutgoingFundSerializer
 
     def get_queryset(self):
-        queryset = OutgoingFund.objects.all().select_related("person", "expense_type","bank")
+        queryset = OutgoingFund.objects.all().select_related(
+            "person", "expense_type", "bank"
+        )
         project_id = self.request.query_params.get("project")
         if project_id:
             queryset = queryset.filter(project_id=project_id)
@@ -252,62 +260,85 @@ class DuePaymentsView(APIView):
         return Response({"due_payments": due_payments})
 
 
-
-
-
-
 class BankTransactionsAPIView(APIView):
 
     def get(self, request):
-        bank_id = request.query_params.get('bank_id')
-        start_date = request.query_params.get('start_date')
-        end_date = request.query_params.get('end_date')
-        
+        bank_id = request.query_params.get("bank_id")
+        start_date = request.query_params.get("start_date")
+        end_date = request.query_params.get("end_date")
+
         if not bank_id:
-            return Response({"error": "bank_id query parameter is required"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"error": "bank_id query parameter is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         bank = get_object_or_404(Bank, pk=bank_id)
-        
+
         date_filter = Q()
-        
+
         if start_date:
-            start_date = datetime.strptime(start_date, '%Y-%m-%d')
+            start_date = datetime.strptime(start_date, "%Y-%m-%d")
             date_filter &= Q(date__gte=start_date)
 
         if end_date:
-            end_date = datetime.strptime(end_date, '%Y-%m-%d')
+            end_date = datetime.strptime(end_date, "%Y-%m-%d")
             date_filter &= Q(date__lte=end_date)
 
         payments = bank.payments.filter(date_filter)
         expenses = bank.expenses.filter(date_filter)
-        
+
         combined = []
-        
+
         for payment in payments:
-            combined.append({
-                'date': payment.date,
-                'reference': 'payment',
-                'remarks': payment.remarks,
-                'id': payment.id,
-                'payment': 0,
-                'deposit': payment.amount
-            })
+            combined.append(
+                {
+                    "date": payment.date,
+                    "reference": "payment",
+                    "remarks": payment.remarks,
+                    "id": payment.id,
+                    "payment": 0,
+                    "deposit": payment.amount,
+                }
+            )
 
         for expense in expenses:
-            combined.append({
-                'date': expense.date,
-                'reference': 'expense',
-                'remarks': expense.remarks,
-                'id': expense.id,
-                'payment': expense.amount,
-                'deposit': 0
-            })
+            combined.append(
+                {
+                    "date": expense.date,
+                    "reference": "expense",
+                    "remarks": expense.remarks,
+                    "id": expense.id,
+                    "payment": expense.amount,
+                    "deposit": 0,
+                }
+            )
 
-        combined.sort(key=lambda x: x['date'])
+        combined.sort(key=lambda x: x["date"])
 
         balance = 0
         for entry in combined:
-            balance += entry['deposit'] - entry['payment']
-            entry['balance'] = balance
+            balance += entry["deposit"] - entry["payment"]
+            entry["balance"] = balance
 
         return Response(combined, status=status.HTTP_200_OK)
+
+
+class BankDepositViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint that allows IncomingFund to be viewed or edited.
+    """
+
+    serializer_class = BankDepositSerializer
+
+    def get_queryset(self):
+
+        start_date = self.request.query_params.get("start_date")
+        end_date = self.request.query_params.get("end_date")
+
+        query_filters = Q()
+
+        if start_date and end_date:
+            query_filters &= Q(date__gte=start_date) & Q(date__lte=end_date)
+        queryset = BankDeposit.objects.filter(query_filters).prefetch_related("files")
+        return queryset

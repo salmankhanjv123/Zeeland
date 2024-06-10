@@ -11,6 +11,10 @@ class Bank(models.Model):
     detail_type=models.CharField(max_length=30)
     description=models.TextField(blank=True,null=True)
     balance=models.FloatField(default=0)
+    parent_account = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='sub_accounts')
+
+
+
 
 class MonthField(models.DateField):
     def to_python(self, value):
@@ -114,3 +118,23 @@ class PaymentReminder(models.Model):
 
     class Meta:
         db_table = 'payments_reminder'
+
+
+class BankDeposit(models.Model):
+    deposit_from=models.ForeignKey(Bank,related_name="deposits",on_delete=models.PROTECT)
+    deposit_to=models.ForeignKey(Bank,on_delete=models.PROTECT)
+    amount=models.FloatField(default=0)
+    date=models.DateField()
+
+class BankDepositDetail(models.Model):
+    bank_deposit=models.ForeignKey(BankDeposit,related_name="details",on_delete=models.CASCADE)
+    payment=models.ForeignKey(IncomingFund,on_delete=models.PROTECT)
+
+
+class BankDepositDocuments(models.Model):
+    bank_deposit = models.ForeignKey(BankDeposit, related_name="files", on_delete=models.CASCADE)
+    file = models.FileField(upload_to="media/payments_files")
+    description = models.TextField()
+    type = models.CharField(max_length=20)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
