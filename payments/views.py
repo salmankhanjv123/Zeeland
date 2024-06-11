@@ -67,6 +67,7 @@ class IncomingFundViewSet(viewsets.ModelViewSet):
         booking_type = self.request.query_params.get("booking_type")
         payment_type = self.request.query_params.get("payment_type")
         bank_id = self.request.query_params.get("bank_id")
+        account_detail_type = self.request.query_params.get("account_detail_type")
 
         start_date = self.request.query_params.get("start_date")
         end_date = self.request.query_params.get("end_date")
@@ -82,6 +83,8 @@ class IncomingFundViewSet(viewsets.ModelViewSet):
             query_filters &= Q(payment_type=payment_type)
         if bank_id:
             query_filters &= Q(bank_id=bank_id)
+        if account_detail_type:
+            query_filters &= Q(bank__detail_type=account_detail_type)
         if plot_id:
             query_filters &= Q(booking__plot_id=plot_id)
         if customer_id:
