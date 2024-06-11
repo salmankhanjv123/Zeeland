@@ -1,7 +1,7 @@
 # views.py
 from rest_framework import generics
 from payments.models import IncomingFund, OutgoingFund, JournalVoucher
-from customer.models import Customers
+from customer.models import Customers,CustomerMessages
 from plots.models import Plots
 from booking.models import Booking, Token
 from .serializers import (
@@ -347,7 +347,6 @@ class DealerLedgerView(APIView):
 
 
 
-
 class CustomerLedgerView(APIView):
     def get(self, request):
         project_id = self.request.query_params.get("project_id")
@@ -363,7 +362,7 @@ class CustomerLedgerView(APIView):
             query_filters &= Q(date__gte=start_date) & Q(date__lte=end_date)
 
         # Fetch booking data
-        booking_data = Booking.objects.filter(query_filters, customer_id=customer_id).values(
+        booking_data = Booking.objects.filter(query_filters, customer_id=customer_id).select_related('customer').values(
             "id",
             "remarks",
             document=F("booking_id"),
@@ -372,9 +371,16 @@ class CustomerLedgerView(APIView):
             customer_name=F("customer__name"),
             reference=Value("booking", output_field=CharField())
         )
+        
+        plot_data = Plots.objects.filter(booking_details__customer_id=customer_id).values(
+            "id", "plot_number", "address"
+        )
+        
+        # Fetch customer messages with documents
+        customer_messages = CustomerMessages.objects.filter(booking__customer_id=customer_id).prefetch_related('files')
 
         # Fetch payment data
-        payment_data = IncomingFund.objects.filter(query_filters, booking__customer_id=customer_id).values(
+        payment_data = IncomingFund.objects.filter(query_filters, booking__customer_id=customer_id).select_related('booking__customer').values(
             "id",
             "date",
             "amount",
@@ -402,6 +408,33 @@ class CustomerLedgerView(APIView):
         if not customer_info:
             return Response({"error": "Customer not found"}, status=404)
 
+        # Prepare customer messages data
+        customer_messages_data = [
+            {
+                "id": message.id,
+                "user": message.user_id,
+                "booking": message.booking_id,
+                "date": message.date,
+                "created_at": message.created_at,
+                "updated_at": message.updated_at,
+                "notes": message.notes,
+                "follow_up": message.follow_up,
+                "follow_up_message": message.follow_up_message,
+                "files": [
+                    {
+                        "id": file.id,
+                        "file": file.file.url,
+                        "description": file.description,
+                        "type": file.type,
+                        "created_at": file.created_at,
+                        "updated_at": file.updated_at,
+                    }
+                    for file in message.files.all()
+                ]
+            }
+            for message in customer_messages
+        ]
+
         # Calculate opening and closing balances
         # opening_balance = Booking.objects.filter(customer_id=customer_id, booking_date__lt=start_date).aggregate(total=Sum('total_amount'))['total'] or 0
         # opening_balance -= IncomingFund.objects.filter(booking__customer_id=customer_id, date__lt=start_date).aggregate(total=Sum('amount'))['total'] or 0
@@ -415,6 +448,9 @@ class CustomerLedgerView(APIView):
 
         response_data = {
             "customer_info": customer_info,
+            "booking_data": list(booking_data),
+            "plot_data": list(plot_data),
+            "customer_messages": customer_messages_data,
             "opening_balance": 0,
             "closing_balance": 0,
             "transactions": combined_data

@@ -17,8 +17,14 @@ from .models import (
 )
 import datetime
 
+class SubAccountSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Bank
+        fields = ['id', 'name', 'account_type', 'detail_type', 'description', 'balance']
+
 
 class BankSerializer(serializers.ModelSerializer):
+    sub_accounts = SubAccountSerializer(many=True, read_only=True)
     class Meta:
         model = Bank
         fields = "__all__"
