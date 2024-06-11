@@ -6,9 +6,9 @@ from booking.models import Booking
 
 
 class Bank(models.Model):
-    name=models.CharField(max_length=30)
-    account_type=models.CharField(max_length=30)
-    detail_type=models.CharField(max_length=30)
+    name=models.CharField(max_length=50)
+    account_type=models.CharField(max_length=100)
+    detail_type=models.CharField(max_length=100)
     description=models.TextField(blank=True,null=True)
     balance=models.FloatField(default=0)
     parent_account = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='sub_accounts')

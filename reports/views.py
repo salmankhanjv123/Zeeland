@@ -373,9 +373,9 @@ class CustomerLedgerView(APIView):
             "date",
             "amount",
             "remarks",
+            "reference",
             document=F("id"),
             customer_name=F("booking__customer__name"),
-            reference=Value("payment", output_field=CharField())
         )
         token_data = Token.objects.filter(query_filters, customer_id=customer_id).select_related('customer').values(
             "id",

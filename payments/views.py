@@ -49,7 +49,7 @@ class BankViewSet(viewsets.ModelViewSet):
         )
         if account_type:
             query_filters &= Q(account_type__in=account_type)
-        if parent_account=="Null":
+        if parent_account=="null":
             query_filters &= Q(parent_account__isnull=True)
 
         queryset = Bank.objects.filter(query_filters)
