@@ -16,7 +16,8 @@ from .models import (
     BankDepositDocuments,
 )
 import datetime
-
+from django.db import transaction
+from rest_framework.exceptions import ValidationError
 
 class SubAccountSerializer(serializers.ModelSerializer):
     class Meta:
@@ -302,9 +303,18 @@ class BankDepositSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         files_data = validated_data.pop("files", [])
         details_data = validated_data.pop("details", [])
-        bank_deposit = BankDeposit.objects.create(**validated_data)
-        for data in details_data:
-            BankDepositDetail.objects.create(bank_deposit=bank_deposit, **data)
-        for file_data in files_data:
-            BankDepositDocuments.objects.create(bank_deposit=bank_deposit, **file_data)
-        return bank_deposit
+        
+        try:
+            with transaction.atomic():
+                bank_deposit = BankDeposit.objects.create(**validated_data)
+                for detail_data in details_data:
+                    payment = detail_data.get("payment")
+                    if payment:
+                        payment.bank = validated_data["deposit_to"]
+                        payment.save(update_fields=['bank'])
+                    BankDepositDetail.objects.create(bank_deposit=bank_deposit, **detail_data)
+                for file_data in files_data:
+                    BankDepositDocuments.objects.create(bank_deposit=bank_deposit, **file_data)
+                return bank_deposit
+        except Exception as e:
+            raise ValidationError({"error": str(e)})
