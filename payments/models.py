@@ -122,7 +122,6 @@ class PaymentReminder(models.Model):
 
 
 class BankDeposit(models.Model):
-    deposit_from=models.ForeignKey(Bank,related_name="deposits",on_delete=models.PROTECT)
     deposit_to=models.ForeignKey(Bank,on_delete=models.PROTECT)
     amount=models.FloatField(default=0)
     date=models.DateField()
