@@ -17,15 +17,19 @@ from .models import (
 )
 import datetime
 
+
 class SubAccountSerializer(serializers.ModelSerializer):
     class Meta:
         model = Bank
-        fields = ['id', 'name', 'account_type', 'detail_type', 'description', 'balance']
+        fields = ["id", "name", "account_type", "detail_type", "description", "balance"]
 
 
 class BankSerializer(serializers.ModelSerializer):
     sub_accounts = SubAccountSerializer(many=True, read_only=True)
-    parent_account_name=serializers.CharField(source="parent_account.name",read_only=True)
+    parent_account_name = serializers.CharField(
+        source="parent_account.name", read_only=True
+    )
+
     class Meta:
         model = Bank
         fields = "__all__"
@@ -90,11 +94,18 @@ class IncomingFundSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         files_data = validated_data.pop("files", [])
+        reference = validated_data["reference"]
         booking = validated_data["booking"]
         amount = validated_data["amount"]
+        if reference == "payment":
+            booking.total_receiving_amount += amount
+            booking.remaining -= amount
+        elif reference == "return":
+            booking.total_receiving_amount -= amount
+            booking.remaining += amount
+        else:
+            raise ValueError("Invalid reference type")
 
-        booking.total_receiving_amount += amount
-        booking.remaining -= amount
         booking.save()
         incoming_fund = IncomingFund.objects.create(**validated_data)
         for file_data in files_data:
@@ -105,12 +116,20 @@ class IncomingFundSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         files_data = validated_data.pop("files", [])
+        reference = validated_data.get("reference", instance.reference)
         booking = instance.booking
-        amount = validated_data.get("amount", instance.amount)
-
-        if amount != instance.amount:
-            booking.total_receiving_amount += amount - instance.amount
-            booking.remaining -= amount - instance.amount
+        new_amount = validated_data.get("amount", instance.amount)
+        old_amount = instance.amount
+        
+        if new_amount != old_amount:
+            if reference == "payment":
+                booking.total_receiving_amount += new_amount - old_amount
+                booking.remaining -= new_amount - old_amount
+            elif reference == "return":
+                booking.total_receiving_amount -= new_amount - old_amount
+                booking.remaining += new_amount - old_amount
+            else:
+                raise ValueError(f"Invalid reference type: {reference}")
             booking.save()
 
         for key, value in validated_data.items():
@@ -248,7 +267,6 @@ class ExpensePersonSerializer(serializers.ModelSerializer):
         return instance
 
 
-
 class BankDepositDocumentsSerializer(serializers.ModelSerializer):
     class Meta:
         model = BankDepositDocuments
@@ -258,7 +276,8 @@ class BankDepositDocumentsSerializer(serializers.ModelSerializer):
         validated_data = super().to_internal_value(data)
         validated_data["id"] = data.get("id")
         return validated_data
-    
+
+
 class BankDepositDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = BankDepositDetail
@@ -272,7 +291,7 @@ class BankDepositDetailSerializer(serializers.ModelSerializer):
 
 class BankDepositSerializer(serializers.ModelSerializer):
     files = BankDepositDocumentsSerializer(many=True, required=False)
-    details=BankDepositDetailSerializer(many=True,required=False)
+    details = BankDepositDetailSerializer(many=True, required=False)
 
     class Meta:
         model = BankDeposit
@@ -283,13 +302,7 @@ class BankDepositSerializer(serializers.ModelSerializer):
         details_data = validated_data.pop("details", [])
         bank_deposit = BankDeposit.objects.create(**validated_data)
         for data in details_data:
-            BankDepositDetail.objects.create(
-                bank_deposit=bank_deposit, **data
-            )
+            BankDepositDetail.objects.create(bank_deposit=bank_deposit, **data)
         for file_data in files_data:
-            BankDepositDocuments.objects.create(
-                bank_deposit=bank_deposit, **file_data
-            )
+            BankDepositDocuments.objects.create(bank_deposit=bank_deposit, **file_data)
         return bank_deposit
-
-

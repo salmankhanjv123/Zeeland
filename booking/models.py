@@ -65,6 +65,8 @@ class Token(models.Model):
     expire_date = models.DateField()
     amount = models.FloatField()
     remarks = models.TextField(null=True)
+    payment_type=models.CharField(max_length=20,default="cash")
+    bank=models.ForeignKey("payments.Bank",related_name="token_payments", on_delete=models.PROTECT,blank=True, null=True)
 
 
 class PlotResale(models.Model):

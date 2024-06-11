@@ -353,15 +353,11 @@ class CustomerLedgerView(APIView):
         customer_id = self.request.query_params.get("customer_id")
         start_date = self.request.query_params.get("start_date")
         end_date = self.request.query_params.get("end_date")
-
-        # Define query filters
         query_filters = Q()
         if project_id:
             query_filters &= Q(project_id=project_id)
         if start_date and end_date:
             query_filters &= Q(date__gte=start_date) & Q(date__lte=end_date)
-
-        # Fetch booking data
         booking_data = Booking.objects.filter(query_filters, customer_id=customer_id).select_related('customer').values(
             "id",
             "remarks",
@@ -372,14 +368,6 @@ class CustomerLedgerView(APIView):
             reference=Value("booking", output_field=CharField())
         )
         
-        plot_data = Plots.objects.filter(booking_details__customer_id=customer_id).values(
-            "id", "plot_number", "address"
-        )
-        
-        # Fetch customer messages with documents
-        customer_messages = CustomerMessages.objects.filter(booking__customer_id=customer_id).prefetch_related('files')
-
-        # Fetch payment data
         payment_data = IncomingFund.objects.filter(query_filters, booking__customer_id=customer_id).select_related('booking__customer').values(
             "id",
             "date",
@@ -389,10 +377,19 @@ class CustomerLedgerView(APIView):
             customer_name=F("booking__customer__name"),
             reference=Value("payment", output_field=CharField())
         )
+        token_data = Token.objects.filter(query_filters, customer_id=customer_id).select_related('customer').values(
+            "id",
+            "date",
+            "amount",
+            "remarks",
+            document=F("id"),
+            customer_name=F("customer__name"),
+            reference=Value("token", output_field=CharField())
+        )
 
         # Combine and sort by date
         combined_data = sorted(
-            list(booking_data) + list(payment_data),
+            list(booking_data) + list(payment_data)+ list(token_data),
             key=lambda x: x["date"]
         )
 
@@ -404,11 +401,10 @@ class CustomerLedgerView(APIView):
             "contact",
             "address"
         ).first()
-
-        if not customer_info:
-            return Response({"error": "Customer not found"}, status=404)
-
-        # Prepare customer messages data
+        plot_data = Plots.objects.filter(booking_details__customer_id=customer_id).values(
+            "id", "plot_number", "address"
+        )
+        customer_messages = CustomerMessages.objects.filter(booking__customer_id=customer_id).prefetch_related('files')
         customer_messages_data = [
             {
                 "id": message.id,

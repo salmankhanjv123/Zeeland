@@ -40,6 +40,7 @@ class BankViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
 
         account_type_string = self.request.query_params.get("account_type")
+        parent_account=self.request.query_params.get("parent_account")
         query_filters = Q()
         account_type = (
             [str for str in account_type_string.split(",")]
@@ -48,6 +49,9 @@ class BankViewSet(viewsets.ModelViewSet):
         )
         if account_type:
             query_filters &= Q(account_type__in=account_type)
+        if parent_account=="Null":
+            query_filters &= Q(parent_account__isnull=True)
+
         queryset = Bank.objects.filter(query_filters)
         return queryset
 

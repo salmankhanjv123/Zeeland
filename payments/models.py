@@ -35,6 +35,7 @@ class MonthField(models.DateField):
 
 class IncomingFund(models.Model):
     project = models.ForeignKey(Projects, on_delete=models.PROTECT)
+    reference=models.CharField(max_length=10,default="payment")
     booking = models.ForeignKey(Booking, on_delete=models.PROTECT)
     date = models.DateField()
     installement_month = MonthField()
