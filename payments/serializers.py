@@ -292,6 +292,8 @@ class BankDepositDetailSerializer(serializers.ModelSerializer):
 class BankDepositSerializer(serializers.ModelSerializer):
     files = BankDepositDocumentsSerializer(many=True, required=False)
     details = BankDepositDetailSerializer(many=True, required=False)
+    deposit_to_name=serializers.CharField(source="deposit_to.name",read_only=True)
+    
 
     class Meta:
         model = BankDeposit
