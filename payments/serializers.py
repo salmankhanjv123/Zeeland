@@ -25,6 +25,7 @@ class SubAccountSerializer(serializers.ModelSerializer):
 
 class BankSerializer(serializers.ModelSerializer):
     sub_accounts = SubAccountSerializer(many=True, read_only=True)
+    parent_account_name=serializers.CharField(source="parent_account.name",read_only=True)
     class Meta:
         model = Bank
         fields = "__all__"
