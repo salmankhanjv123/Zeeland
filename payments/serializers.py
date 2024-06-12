@@ -12,6 +12,7 @@ from .models import (
     ExpensePerson,
     Bank,
     BankDeposit,
+    BankDepositTransactions,
     BankDepositDetail,
     BankDepositDocuments,
 )
@@ -290,9 +291,20 @@ class BankDepositDetailSerializer(serializers.ModelSerializer):
         return validated_data
 
 
+class BankDepositTransactionsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BankDepositTransactions
+        exclude = ["bank_deposit"]
+
+    def to_internal_value(self, data):
+        validated_data = super().to_internal_value(data)
+        validated_data["id"] = data.get("id")
+        return validated_data
+
 class BankDepositSerializer(serializers.ModelSerializer):
     files = BankDepositDocumentsSerializer(many=True, required=False)
     details = BankDepositDetailSerializer(many=True, required=False)
+    transactions=BankDepositTransactionsSerializer(many=True, required=False)
     deposit_to_name=serializers.CharField(source="deposit_to.name",read_only=True)
     
 
@@ -303,6 +315,7 @@ class BankDepositSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         files_data = validated_data.pop("files", [])
         details_data = validated_data.pop("details", [])
+        transactions_data= validated_data.pop("transactions", [])
         
         try:
             with transaction.atomic():
@@ -313,6 +326,8 @@ class BankDepositSerializer(serializers.ModelSerializer):
                         payment.bank = validated_data["deposit_to"]
                         payment.save(update_fields=['bank'])
                     BankDepositDetail.objects.create(bank_deposit=bank_deposit, **detail_data)
+                for data in transactions_data:
+                    BankDepositTransactions.objects.create(bank_deposit=bank_deposit, **data)
                 for file_data in files_data:
                     BankDepositDocuments.objects.create(bank_deposit=bank_deposit, **file_data)
                 return bank_deposit

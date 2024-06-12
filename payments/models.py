@@ -1,7 +1,7 @@
 from django.db import models
 from projects.models import Projects
 from booking.models import Booking
-
+from customer.models import Customers
 
 
 
@@ -130,6 +130,17 @@ class BankDepositDetail(models.Model):
     bank_deposit=models.ForeignKey(BankDeposit,related_name="details",on_delete=models.CASCADE)
     payment=models.ForeignKey(IncomingFund,on_delete=models.PROTECT)
 
+class BankDepositTransactions(models.Model):
+    bank_deposit=models.ForeignKey(BankDeposit,related_name="transactions",on_delete=models.CASCADE)
+    project = models.ForeignKey(Projects, on_delete=models.PROTECT)
+    reference=models.CharField(max_length=10,default="payment")
+    customer = models.ForeignKey(Customers, on_delete=models.PROTECT)
+    date = models.DateField()
+    installement_month = MonthField()
+    amount = models.FloatField()
+    remarks = models.TextField(blank=True, null=True)
+    payment_type=models.CharField(max_length=20,default="cash")
+    bank=models.ForeignKey(Bank,related_name="deposits", on_delete=models.PROTECT,blank=True, null=True)    
 
 class BankDepositDocuments(models.Model):
     bank_deposit = models.ForeignKey(BankDeposit, related_name="files", on_delete=models.CASCADE)
