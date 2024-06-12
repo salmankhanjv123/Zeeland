@@ -49,9 +49,12 @@ class BookingForPaymentsListView(ListAPIView):
 
     def get_queryset(self):
         project_id = self.request.query_params.get('project')
+        customer_id = self.request.query_params.get('customer_id')
         query_filters=Q()
         if project_id:
             query_filters &= Q(project_id=project_id)
+        if customer_id:
+            query_filters &= Q(customer_id=customer_id)
         queryset = Booking.objects.filter(query_filters).select_related('customer', 'plot')
         return queryset
 
