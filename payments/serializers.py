@@ -292,6 +292,7 @@ class BankDepositDetailSerializer(serializers.ModelSerializer):
 
 
 class BankDepositTransactionsSerializer(serializers.ModelSerializer):
+    installement_month = MonthField()
     class Meta:
         model = BankDepositTransactions
         exclude = ["bank_deposit"]
