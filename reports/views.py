@@ -14,7 +14,11 @@ from rest_framework.response import Response
 from django.db.models import Count, Sum, functions, Q,F,Value,CharField
 from datetime import date, datetime, timedelta
 import calendar
+# views.py
 
+from payments.models import Bank
+from payments.serializers import BankSerializer
+from collections import defaultdict
 
 class IncomingFundReportView(generics.ListAPIView):
     serializer_class = IncomingFundReportSerializer
@@ -453,3 +457,47 @@ class CustomerLedgerView(APIView):
         }
 
         return Response(response_data)
+
+
+
+
+
+class BalanceSheetView(APIView):
+
+    def get(self, request):
+        banks = Bank.objects.all()
+        main_type_dict = defaultdict(lambda: {'total': 0, 'account_types': defaultdict(lambda: {'total': 0, 'accounts': []})})
+        
+        for bank in banks:
+            main_type = bank.main_type
+            account_type = bank.account_type
+            bank_name = bank.name
+            
+            # Aggregate balances
+            main_type_dict[main_type]['total'] += bank.balance
+            main_type_dict[main_type]['account_types'][account_type]['total'] += bank.balance
+            
+            # Format the sub-account
+            sub_account = {
+                'bank_name': bank_name,
+                'balance': bank.balance
+            }
+            main_type_dict[main_type]['account_types'][account_type]['accounts'].append(sub_account)
+
+        # Convert to the desired output format
+        result = []
+        for main_type, main_data in main_type_dict.items():
+            account_types_list = []
+            for account_type, account_data in main_data['account_types'].items():
+                account_types_list.append({
+                    'account_type': account_type,
+                    'total': account_data['total'],
+                    'accounts': account_data['accounts']
+                })
+            result.append({
+                'main_type': main_type,
+                'total': main_data['total'],
+                'account_types': account_types_list
+            })
+        
+        return Response(result)
