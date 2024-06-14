@@ -466,38 +466,64 @@ class BalanceSheetView(APIView):
 
     def get(self, request):
         banks = Bank.objects.all()
-        main_type_dict = defaultdict(lambda: {'total': 0, 'account_types': defaultdict(lambda: {'total': 0, 'accounts': []})})
-        
+        main_type_dict = defaultdict(lambda: {
+            'total': 0,
+            'account_types': defaultdict(lambda: {
+                'total': 0,
+                'accounts': {}
+            })
+        })
+
         for bank in banks:
             main_type = bank.main_type
             account_type = bank.account_type
             bank_name = bank.name
-            
+            parent_bank = bank.parent_account # Assuming `parent_bank` is a ForeignKey to self
+
             # Aggregate balances
             main_type_dict[main_type]['total'] += bank.balance
             main_type_dict[main_type]['account_types'][account_type]['total'] += bank.balance
-            
-            # Format the sub-account
-            sub_account = {
-                'bank_name': bank_name,
-                'balance': bank.balance
-            }
-            main_type_dict[main_type]['account_types'][account_type]['accounts'].append(sub_account)
+
+            # Create account entry if it doesn't exist
+            if bank.id not in main_type_dict[main_type]['account_types'][account_type]['accounts']:
+                main_type_dict[main_type]['account_types'][account_type]['accounts'][bank.id] = {
+                    'bank_name': bank_name,
+                    'balance': bank.balance,
+                    'sub_accounts': []
+                }
+            else:
+                # Update balance if account already exists (e.g., as a sub-account added earlier)
+                main_type_dict[main_type]['account_types'][account_type]['accounts'][bank.id]['balance'] += bank.balance
+
+            # If the bank has a parent, add it as a sub-account
+            if parent_bank:
+                parent_account_type = parent_bank.account_type
+                parent_main_type = parent_bank.main_type
+                if parent_bank.id not in main_type_dict[parent_main_type]['account_types'][parent_account_type]['accounts']:
+                    main_type_dict[parent_main_type]['account_types'][parent_account_type]['accounts'][parent_bank.id] = {
+                        'bank_name': parent_bank.name,
+                        'balance': 0,  # Initial balance is 0 since it will be updated by its own entry
+                        'sub_accounts': []
+                    }
+                main_type_dict[parent_main_type]['account_types'][parent_account_type]['accounts'][parent_bank.id]['sub_accounts'].append(
+                    main_type_dict[main_type]['account_types'][account_type]['accounts'][bank.id]
+                )
 
         # Convert to the desired output format
         result = []
         for main_type, main_data in main_type_dict.items():
             account_types_list = []
             for account_type, account_data in main_data['account_types'].items():
+                accounts_list = list(account_data['accounts'].values())
                 account_types_list.append({
                     'account_type': account_type,
                     'total': account_data['total'],
-                    'accounts': account_data['accounts']
+                    'accounts': accounts_list
                 })
             result.append({
                 'main_type': main_type,
                 'total': main_data['total'],
                 'account_types': account_types_list
             })
-        
+
         return Response(result)
