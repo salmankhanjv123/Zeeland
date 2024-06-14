@@ -462,6 +462,8 @@ class CustomerLedgerView(APIView):
 
 
 
+
+
 class BalanceSheetView(APIView):
 
     def get(self, request):
@@ -508,6 +510,8 @@ class BalanceSheetView(APIView):
                 main_type_dict[parent_main_type]['account_types'][parent_account_type]['accounts'][parent_bank.id]['sub_accounts'].append(
                     main_type_dict[main_type]['account_types'][account_type]['accounts'][bank.id]
                 )
+                # Remove the sub-account from the main list to avoid duplication
+                del main_type_dict[main_type]['account_types'][account_type]['accounts'][bank.id]
 
         # Convert to the desired output format
         result = []
