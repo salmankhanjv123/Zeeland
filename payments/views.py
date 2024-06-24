@@ -109,8 +109,13 @@ class IncomingFundViewSet(viewsets.ModelViewSet):
     def perform_destroy(self, instance):
         amount = instance.amount
         booking = instance.booking
-        booking.remaining += amount
-        booking.total_receiving_amount -= amount
+        reference=instance.reference
+        if reference=="payment":
+            booking.remaining += amount
+            booking.total_receiving_amount -= amount
+        elif reference=="refund":
+            booking.remaining -= amount
+            booking.total_receiving_amount += amount   
         booking.save()
         return super().perform_destroy(instance)
 

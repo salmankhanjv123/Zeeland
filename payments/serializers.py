@@ -102,7 +102,7 @@ class IncomingFundSerializer(serializers.ModelSerializer):
         if reference == "payment":
             booking.total_receiving_amount += amount
             booking.remaining -= amount
-        elif reference == "return":
+        elif reference == "refund":
             booking.total_receiving_amount -= amount
             booking.remaining += amount
         else:
@@ -127,7 +127,7 @@ class IncomingFundSerializer(serializers.ModelSerializer):
             if reference == "payment":
                 booking.total_receiving_amount += new_amount - old_amount
                 booking.remaining -= new_amount - old_amount
-            elif reference == "return":
+            elif reference == "refund":
                 booking.total_receiving_amount -= new_amount - old_amount
                 booking.remaining += new_amount - old_amount
             else:
