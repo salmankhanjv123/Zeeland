@@ -302,6 +302,7 @@ class BankTransactionsAPIView(APIView):
 
         payments = bank.payments.filter(date_filter)
         expenses = bank.expenses.filter(date_filter)
+        deposits= bank.deposits.filter(date_filter)
 
         combined = []
 
@@ -312,6 +313,17 @@ class BankTransactionsAPIView(APIView):
                     "reference": "payment",
                     "remarks": payment.remarks,
                     "id": payment.id,
+                    "payment": 0,
+                    "deposit": payment.amount,
+                }
+            )
+        for payment in deposits:
+            combined.append(
+                {
+                    "date": payment.date,
+                    "reference": "deposits",
+                    "remarks": payment.remarks,
+                    "id": payment.bank_deposit,
                     "payment": 0,
                     "deposit": payment.amount,
                 }
