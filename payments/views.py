@@ -323,7 +323,7 @@ class BankTransactionsAPIView(APIView):
                     "date": payment.date,
                     "reference": "deposits",
                     "remarks": payment.remarks,
-                    "id": payment.bank_deposit,
+                    "id": payment.bank_deposit_id,
                     "payment": 0,
                     "deposit": payment.amount,
                 }
