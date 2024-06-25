@@ -79,7 +79,7 @@ class TokenViewSet(viewsets.ModelViewSet):
     serializer_class = TokenSerializer
 
     def get_queryset(self):
-        queryset = Token.objects.all().select_related('customer', 'plot')
+        queryset = Token.objects.all().select_related('customer', 'plot','bank')
         project_id = self.request.query_params.get('project')
         if project_id:
             queryset = queryset.filter(project_id=project_id)

@@ -139,6 +139,7 @@ class BookingForPaymentsSerializer(serializers.ModelSerializer):
 class TokenSerializer(serializers.ModelSerializer):
     customer_name = serializers.SerializerMethodField(read_only=True)
     plot_info = serializers.SerializerMethodField(read_only=True)
+    bank_name=serializers.CharField(source="bank.name",read_only=True)
 
     def get_customer_name(self, instance):
         return instance.customer.name

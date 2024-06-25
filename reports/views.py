@@ -435,24 +435,24 @@ class CustomerLedgerView(APIView):
             for message in customer_messages
         ]
 
-        # Calculate opening and closing balances
-        # opening_balance = Booking.objects.filter(customer_id=customer_id, booking_date__lt=start_date).aggregate(total=Sum('total_amount'))['total'] or 0
-        # opening_balance -= IncomingFund.objects.filter(booking__customer_id=customer_id, date__lt=start_date).aggregate(total=Sum('amount'))['total'] or 0
 
-        # closing_balance = opening_balance
-        # for entry in combined_data:
-        #     if entry['reference'] == 'booking':
-        #         closing_balance += entry['amount']
-        #     elif entry['reference'] == 'payment':
-        #         closing_balance -= entry['amount']
+
+        balances = Booking.objects.filter(customer_id=customer_id).aggregate(
+            total_amount=Sum('total_amount'),
+            remaining=Sum('remaining')
+        )
+
+
+        opening_balance = round(balances['total_amount'],2) or 0
+        closing_balance = round(balances['remaining'],2) or 0
 
         response_data = {
             "customer_info": customer_info,
             "booking_data": list(booking_data),
             "plot_data": list(plot_data),
             "customer_messages": customer_messages_data,
-            "opening_balance": 0,
-            "closing_balance": 0,
+            "opening_balance": opening_balance,
+            "closing_balance": closing_balance,
             "transactions": combined_data
         }
 
