@@ -137,7 +137,6 @@ class BankDepositTransactions(models.Model):
     reference=models.CharField(max_length=10,default="payment")
     customer = models.ForeignKey(Customers, on_delete=models.PROTECT)
     date = models.DateField()
-    installement_month = MonthField()
     amount = models.FloatField()
     remarks = models.TextField(blank=True, null=True)
     payment_type=models.CharField(max_length=20,default="cash")

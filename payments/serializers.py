@@ -20,6 +20,7 @@ import datetime
 from django.db import transaction
 from rest_framework.exceptions import ValidationError
 
+
 class SubAccountSerializer(serializers.ModelSerializer):
     class Meta:
         model = Bank
@@ -122,7 +123,7 @@ class IncomingFundSerializer(serializers.ModelSerializer):
         booking = instance.booking
         new_amount = validated_data.get("amount", instance.amount)
         old_amount = instance.amount
-        
+
         if new_amount != old_amount:
             if reference == "payment":
                 booking.total_receiving_amount += new_amount - old_amount
@@ -281,6 +282,7 @@ class BankDepositDocumentsSerializer(serializers.ModelSerializer):
 
 
 class BankDepositDetailSerializer(serializers.ModelSerializer):
+    payment_detail=IncomingFundSerializer(source="payment",read_only=True)
     class Meta:
         model = BankDepositDetail
         exclude = ["bank_deposit"]
@@ -292,7 +294,8 @@ class BankDepositDetailSerializer(serializers.ModelSerializer):
 
 
 class BankDepositTransactionsSerializer(serializers.ModelSerializer):
-    installement_month = MonthField()
+    customer_name=serializers.CharField(source="customer.name",read_only=True)
+
     class Meta:
         model = BankDepositTransactions
         exclude = ["bank_deposit"]
@@ -302,12 +305,12 @@ class BankDepositTransactionsSerializer(serializers.ModelSerializer):
         validated_data["id"] = data.get("id")
         return validated_data
 
+
 class BankDepositSerializer(serializers.ModelSerializer):
     files = BankDepositDocumentsSerializer(many=True, required=False)
     details = BankDepositDetailSerializer(many=True, required=False)
-    transactions=BankDepositTransactionsSerializer(many=True, required=False)
-    deposit_to_name=serializers.CharField(source="deposit_to.name",read_only=True)
-    
+    transactions = BankDepositTransactionsSerializer(many=True, required=False)
+    deposit_to_name = serializers.CharField(source="deposit_to.name", read_only=True)
 
     class Meta:
         model = BankDeposit
@@ -316,8 +319,8 @@ class BankDepositSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         files_data = validated_data.pop("files", [])
         details_data = validated_data.pop("details", [])
-        transactions_data= validated_data.pop("transactions", [])
-        
+        transactions_data = validated_data.pop("transactions", [])
+
         try:
             with transaction.atomic():
                 bank_deposit = BankDeposit.objects.create(**validated_data)
@@ -325,12 +328,83 @@ class BankDepositSerializer(serializers.ModelSerializer):
                     payment = detail_data.get("payment")
                     if payment:
                         payment.bank = validated_data["deposit_to"]
-                        payment.save(update_fields=['bank'])
-                    BankDepositDetail.objects.create(bank_deposit=bank_deposit, **detail_data)
+                        payment.save(update_fields=["bank"])
+                    BankDepositDetail.objects.create(
+                        bank_deposit=bank_deposit, **detail_data
+                    )
                 for data in transactions_data:
-                    BankDepositTransactions.objects.create(bank_deposit=bank_deposit, **data)
+                    BankDepositTransactions.objects.create(
+                        bank_deposit=bank_deposit, **data
+                    )
                 for file_data in files_data:
-                    BankDepositDocuments.objects.create(bank_deposit=bank_deposit, **file_data)
+                    BankDepositDocuments.objects.create(
+                        bank_deposit=bank_deposit, **file_data
+                    )
                 return bank_deposit
+        except Exception as e:
+            raise ValidationError({"error": str(e)})
+
+    def update(self, instance, validated_data):
+        files_data = validated_data.pop("files", [])
+        details_data = validated_data.pop("details", [])
+        transactions_data = validated_data.pop("transactions", [])
+
+        try:
+            with transaction.atomic():
+                # Update the instance itself
+                for attr, value in validated_data.items():
+                    setattr(instance, attr, value)
+                instance.save()
+
+                # Update or create details
+                for detail_data in details_data:
+                    detail_id = detail_data.get("id")
+                    if detail_id:
+                        detail_instance = BankDepositDetail.objects.get(
+                            id=detail_id, bank_deposit=instance
+                        )
+                        for attr, value in detail_data.items():
+                            setattr(detail_instance, attr, value)
+                        detail_instance.save()
+                    else:
+                        payment = detail_data.get("payment")
+                        if payment:
+                            payment.bank = instance.deposit_to
+                            payment.save(update_fields=["bank"])
+                        BankDepositDetail.objects.create(
+                            bank_deposit=instance, **detail_data
+                        )
+
+                # Update or create transactions
+                for transaction_data in transactions_data:
+                    transaction_id = transaction_data.get("id")
+                    if transaction_id:
+                        transaction_instance = BankDepositTransactions.objects.get(
+                            id=transaction_id, bank_deposit=instance
+                        )
+                        for attr, value in transaction_data.items():
+                            setattr(transaction_instance, attr, value)
+                        transaction_instance.save()
+                    else:
+                        BankDepositTransactions.objects.create(
+                            bank_deposit=instance, **transaction_data
+                        )
+
+                # Update or create files
+                for file_data in files_data:
+                    file_id = file_data.get("id")
+                    if file_id:
+                        file_instance = BankDepositDocuments.objects.get(
+                            id=file_id, bank_deposit=instance
+                        )
+                        for attr, value in file_data.items():
+                            setattr(file_instance, attr, value)
+                        file_instance.save()
+                    else:
+                        BankDepositDocuments.objects.create(
+                            bank_deposit=instance, **file_data
+                        )
+
+                return instance
         except Exception as e:
             raise ValidationError({"error": str(e)})
