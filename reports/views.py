@@ -11,7 +11,9 @@ from .serializers import (
 )
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from django.db.models import Count, Sum, functions, Q,F,Value,CharField
+from django.db.models import Count, Sum, functions, Q,F,Value,CharField,FloatField
+from django.db.models.functions import Coalesce
+
 from datetime import date, datetime, timedelta
 import calendar
 # views.py
@@ -438,13 +440,14 @@ class CustomerLedgerView(APIView):
 
 
         balances = Booking.objects.filter(customer_id=customer_id).aggregate(
-            total_amount=Sum('total_amount'),
-            remaining=Sum('remaining')
+            total_amount=Coalesce(Sum('total_amount'), Value(0, output_field=FloatField())),
+            remaining=Coalesce(Sum('remaining'), Value(0, output_field=FloatField()))
         )
 
 
-        opening_balance = round(balances['total_amount'],2) or 0
-        closing_balance = round(balances['remaining'],2) or 0
+
+        opening_balance = round(balances['total_amount'],2) 
+        closing_balance = round(balances['remaining'],2)
 
         response_data = {
             "customer_info": customer_info,
