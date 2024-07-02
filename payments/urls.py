@@ -8,7 +8,7 @@ from .views import (
     PaymentReminderViewSet,
     ExpensePersonViewSet,
     BankViewSet,
-    BankTransactionsAPIView,
+    BankTransactionViewSet,
     BankDepositViewSet,
 )
 from rest_framework import routers
@@ -25,10 +25,12 @@ router.register(
 router.register(r"expense-persons", ExpensePersonViewSet, basename="expense-persons")
 router.register(r"banks", BankViewSet, basename="banks")
 router.register(r"bank-deposit", BankDepositViewSet, basename="bank-deposit")
+router.register(
+    r"bank-transactions", BankTransactionViewSet, basename="bank-transactions"
+)
 
 
 urlpatterns = [
     path("", include(router.urls)),
     path("due-payments/", DuePaymentsView.as_view(), name="due_payments"),
-    path("bank-transactions/", BankTransactionsAPIView.as_view(), name="bank-transactions"),
 ]
