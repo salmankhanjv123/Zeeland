@@ -11,6 +11,7 @@ from .serializers import (
     PaymentReminderSerializer,
     ExpensePersonSerializer,
     BankSerializer,
+    BankTransactionSerializer,
     BankDepositSerializer,
 )
 from .models import (
@@ -21,6 +22,7 @@ from .models import (
     PaymentReminder,
     ExpensePerson,
     Bank,
+    BankTransaction,
     BankDeposit,
 )
 from rest_framework.views import APIView
@@ -53,6 +55,27 @@ class BankViewSet(viewsets.ModelViewSet):
             query_filters &= Q(parent_account__isnull=True)
 
         queryset = Bank.objects.filter(query_filters)
+        return queryset
+
+
+class BankTransactionViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint that allows Banks to be viewed or edited.
+    """
+
+    serializer_class = BankTransactionSerializer
+
+    def get_queryset(self):
+
+        bank_id = self.request.query_params.get("bank_id")
+
+        query_filters = Q()
+
+        if bank_id:
+            query_filters &= Q(bank_id=bank_id)
+
+
+        queryset = BankTransaction.objects.filter(query_filters)
         return queryset
 
 

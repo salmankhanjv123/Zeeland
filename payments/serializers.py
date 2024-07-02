@@ -11,6 +11,7 @@ from .models import (
     PaymentReminder,
     ExpensePerson,
     Bank,
+    BankTransaction,
     BankDeposit,
     BankDepositTransactions,
     BankDepositDetail,
@@ -37,6 +38,14 @@ class BankSerializer(serializers.ModelSerializer):
         model = Bank
         fields = "__all__"
 
+class BankTransactionSerializer(serializers.ModelSerializer):
+    bank_name = serializers.CharField(
+        source="bank.name", read_only=True
+    )
+
+    class Meta:
+        model = BankTransaction
+        fields = "__all__"
 
 class MonthField(serializers.Field):
     def to_internal_value(self, data):

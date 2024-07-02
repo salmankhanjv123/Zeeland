@@ -15,6 +15,16 @@ class Bank(models.Model):
     parent_account = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='sub_accounts')
 
 
+class BankTransaction(models.Model):
+    bank = models.ForeignKey(Bank, on_delete=models.CASCADE)
+    transaction_type = models.CharField(max_length=50)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    transaction_date = models.DateTimeField(auto_now_add=True)
+    related_table = models.CharField(max_length=50)
+    related_id = models.IntegerField()
+
+    def __str__(self):
+        return f"{self.transaction_type} - {self.amount}"
 
 
 class MonthField(models.DateField):
