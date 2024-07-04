@@ -29,6 +29,10 @@ class Booking(models.Model):
     remarks = models.TextField(null=True)
     total_amount = models.FloatField()
     advance = models.FloatField()
+    payment_type=models.CharField(max_length=20,default="cash")
+    cheque_number=models.CharField(max_length=50,blank=True,null=True)
+    bank=models.ForeignKey("payments.Bank",related_name="advance_payments", on_delete=models.PROTECT,blank=True, null=True)
+
     remaining = models.FloatField()
     total_receiving_amount = models.FloatField()
 
@@ -66,8 +70,17 @@ class Token(models.Model):
     amount = models.FloatField()
     remarks = models.TextField(null=True)
     payment_type=models.CharField(max_length=20,default="cash")
+    cheque_number=models.CharField(max_length=50,blank=True,null=True)
     bank=models.ForeignKey("payments.Bank",related_name="token_payments", on_delete=models.PROTECT,blank=True, null=True)
 
+
+class TokenDocuments(models.Model):
+    token = models.ForeignKey(Token, related_name="files", on_delete=models.CASCADE)
+    file = models.FileField(upload_to="media/booking_files")
+    description = models.TextField()
+    type = models.CharField(max_length=20)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
 class PlotResale(models.Model):
     booking=models.ForeignKey(Booking,on_delete=models.CASCADE)

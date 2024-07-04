@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Booking,BookingDocuments, Token,PlotResale
+from .models import Booking,BookingDocuments, Token,PlotResale,TokenDocuments
 from plots.models import Plots
 from payments.models import IncomingFund
 from customer.serializers import CustomersSerializer
@@ -136,10 +136,22 @@ class BookingForPaymentsSerializer(serializers.ModelSerializer):
         fields = ['id', 'booking_details']
 
 
+class TokenDocumentsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TokenDocuments
+        exclude = ["token"]
+
+    def to_internal_value(self, data):
+        validated_data = super().to_internal_value(data)
+        validated_data["id"] = data.get("id")
+        return validated_data
+
+
 class TokenSerializer(serializers.ModelSerializer):
     customer_name = serializers.SerializerMethodField(read_only=True)
     plot_info = serializers.SerializerMethodField(read_only=True)
     bank_name=serializers.CharField(source="bank.name",read_only=True)
+    files = TokenDocumentsSerializer(many=True, required=False)
 
     def get_customer_name(self, instance):
         return instance.customer.name
@@ -153,6 +165,34 @@ class TokenSerializer(serializers.ModelSerializer):
     class Meta:
         model = Token
         fields = '__all__'
+
+
+    def create(self, validated_data):
+        files_data = validated_data.pop("files", [])
+
+        token = Token.objects.create(**validated_data)
+        for file_data in files_data:
+            TokenDocuments.objects.create(token=token, **file_data)
+        return token
+
+    def update(self, instance, validated_data):
+        files_data = validated_data.pop("files", [])
+        for key, value in validated_data.items():
+            setattr(instance, key, value)
+
+        for file_data in files_data:
+            file_id = file_data.get("id", None)
+            if file_id:
+                file = TokenDocuments.objects.get(id=file_id, token=instance)
+                file.description = file_data.get("description", file.description)
+                file.type = file_data.get("type", file.type)
+                if "file" in file_data:
+                    file.file = file_data.get("file", file.file)
+                file.save()
+            else:
+                TokenDocuments.objects.create(token=instance, **file_data)
+
+        return instance
 
 
 

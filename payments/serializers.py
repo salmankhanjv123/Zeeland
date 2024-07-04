@@ -304,6 +304,7 @@ class BankDepositDetailSerializer(serializers.ModelSerializer):
 
 class BankDepositTransactionsSerializer(serializers.ModelSerializer):
     customer_name=serializers.CharField(source="customer.name",read_only=True)
+    bank_name=serializers.CharField(source="bank.name",read_only=True)
 
     class Meta:
         model = BankDepositTransactions

@@ -54,6 +54,7 @@ class IncomingFund(models.Model):
     remarks = models.TextField(blank=True, null=True)
     advance_payment=models.BooleanField(default=False)
     payment_type=models.CharField(max_length=20,default="cash")
+    cheque_number=models.CharField(max_length=50,blank=True,null=True)
     bank=models.ForeignKey(Bank,related_name="payments", on_delete=models.PROTECT,blank=True, null=True)
     
 
@@ -98,6 +99,7 @@ class OutgoingFund(models.Model):
     amount = models.FloatField()
     remarks = models.TextField(blank=True, null=True)
     payment_type=models.CharField(max_length=20,default="cash")
+    cheque_number=models.CharField(max_length=50,blank=True,null=True)
     bank=models.ForeignKey(Bank,related_name="expenses", on_delete=models.PROTECT,blank=True, null=True)
     class Meta:
         db_table = 'outgoing_funds'
@@ -150,6 +152,7 @@ class BankDepositTransactions(models.Model):
     amount = models.FloatField()
     remarks = models.TextField(blank=True, null=True)
     payment_type=models.CharField(max_length=20,default="cash")
+    cheque_number=models.CharField(max_length=50,blank=True,null=True)
     bank=models.ForeignKey(Bank,related_name="deposits", on_delete=models.PROTECT,blank=True, null=True)    
 
 class BankDepositDocuments(models.Model):
