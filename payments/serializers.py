@@ -342,6 +342,7 @@ class BankDepositSerializer(serializers.ModelSerializer):
                     bank=bank,
                     transaction_date=date,
                     deposit=amount,
+                    payment=0,
                     transaction_type="deposit",
                     related_table="bank_deposits",
                     related_id=bank_deposit.id,
@@ -349,6 +350,8 @@ class BankDepositSerializer(serializers.ModelSerializer):
                 )
                 for detail_data in details_data:
                     payment = detail_data.get("payment")
+                    payment.deposit=True
+                    payment.save()
                     BankDepositDetail.objects.create(
                         bank_deposit=bank_deposit, **detail_data
                     )
@@ -363,6 +366,7 @@ class BankDepositSerializer(serializers.ModelSerializer):
                     bank=bank,
                     transaction_date=date,
                     payment=amount,
+                    deposit=0,
                     transaction_type="deposit",
                     related_table="bank_deposits",
                     related_id=bank_deposit.id,

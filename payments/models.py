@@ -56,6 +56,7 @@ class IncomingFund(models.Model):
     payment_type=models.CharField(max_length=20,default="cash")
     cheque_number=models.CharField(max_length=50,blank=True,null=True)
     bank=models.ForeignKey(Bank,related_name="payments", on_delete=models.PROTECT,blank=True, null=True)
+    deposit=models.BooleanField(default=False)
     
 
     class Meta:

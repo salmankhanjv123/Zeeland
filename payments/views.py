@@ -71,20 +71,32 @@ class BankTransactionViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         bank_id = self.request.query_params.get("bank_id")
+        account_type=self.request.query_params.get("account_type")
+        main_type=self.request.query_params.get("main_type")
 
         query_filters = Q()
         if bank_id:
             query_filters &= Q(bank_id=bank_id)
-
+        if account_type:
+            query_filters &= Q(bank__account_type=account_type)
+        if main_type:
+            query_filters &= Q(bank__main_type=main_type)
         queryset = BankTransaction.objects.filter(query_filters)
         return queryset
 
     def list(self, request, *args, **kwargs):
             bank_id = request.query_params.get("bank_id")
+            account_type=request.query_params.get("account_type")
+            main_type=request.query_params.get("main_type")
             start_date = request.query_params.get("start_date")
+            
             query_filters = Q()
             if bank_id:
                 query_filters &= Q(bank_id=bank_id)
+            if account_type:
+                query_filters &= Q(bank__account_type=account_type)
+            if main_type:
+                query_filters &= Q(bank__main_type=main_type)
 
             queryset = BankTransaction.objects.filter(query_filters).order_by('transaction_date', 'id')
             serializer = self.get_serializer(queryset, many=True)
@@ -144,6 +156,8 @@ class IncomingFundViewSet(viewsets.ModelViewSet):
             query_filters &= Q(bank_id=bank_id)
         if account_detail_type:
             query_filters &= Q(bank__detail_type=account_detail_type)
+            if account_detail_type=="Undeposited_Funds":
+                query_filters &= Q(deposit=False)
         if plot_id:
             query_filters &= Q(booking__plot_id=plot_id)
         if customer_id:
