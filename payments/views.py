@@ -411,14 +411,14 @@ def create_or_update_transaction(instance, related_table, transaction_type, amou
             # Update the existing transaction
             transaction.bank = bank_field
             transaction.transaction_type = transaction_type
-            transaction.amount = amount
+            transaction.deposit = amount
             transaction.save()
         except BankTransaction.DoesNotExist:
             # If the transaction doesn't exist, create it
             BankTransaction.objects.create(
                 bank=bank_field,
                 transaction_type=transaction_type,
-                amount=amount,
+                deposit=amount,
                 related_table=related_table,
                 related_id=instance.id,
             )

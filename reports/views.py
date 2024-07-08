@@ -1,6 +1,6 @@
 # views.py
 from rest_framework import generics
-from payments.models import IncomingFund, OutgoingFund, JournalVoucher
+from payments.models import IncomingFund, OutgoingFund, JournalVoucher,BankTransaction
 from customer.models import Customers,CustomerMessages
 from plots.models import Plots
 from booking.models import Booking, Token
@@ -470,6 +470,8 @@ class CustomerLedgerView(APIView):
 
 
 
+
+
 class BalanceSheetView(APIView):
 
     def get(self, request):
@@ -487,23 +489,27 @@ class BalanceSheetView(APIView):
             account_type = bank.account_type
             bank_name = bank.name
             bank_id = bank.id
-            parent_bank = bank.parent_account # Assuming `parent_bank` is a ForeignKey to self
+            parent_bank = bank.parent_account
+
+            # Calculate balance
+            transactions = BankTransaction.objects.filter(bank=bank)
+            balance = sum(t.deposit for t in transactions) - sum(t.payment for t in transactions)
 
             # Aggregate balances
-            main_type_dict[main_type]['total'] += bank.balance
-            main_type_dict[main_type]['account_types'][account_type]['total'] += bank.balance
+            main_type_dict[main_type]['total'] += balance
+            main_type_dict[main_type]['account_types'][account_type]['total'] += balance
 
             # Create account entry if it doesn't exist
             if bank.id not in main_type_dict[main_type]['account_types'][account_type]['accounts']:
                 main_type_dict[main_type]['account_types'][account_type]['accounts'][bank.id] = {
                     'bank_name': bank_name,
                     'bank_id': bank_id,
-                    'balance': bank.balance,
+                    'balance': balance,
                     'sub_accounts': []
                 }
             else:
                 # Update balance if account already exists (e.g., as a sub-account added earlier)
-                main_type_dict[main_type]['account_types'][account_type]['accounts'][bank.id]['balance'] += bank.balance
+                main_type_dict[main_type]['account_types'][account_type]['accounts'][bank.id]['balance'] += balance
 
             # If the bank has a parent, add it as a sub-account
             if parent_bank:
