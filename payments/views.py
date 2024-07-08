@@ -412,6 +412,7 @@ def create_or_update_transaction(instance, related_table, transaction_type, amou
             transaction.bank = bank_field
             transaction.transaction_type = transaction_type
             transaction.deposit = amount
+            transaction.payment = 0
             transaction.save()
         except BankTransaction.DoesNotExist:
             # If the transaction doesn't exist, create it
@@ -419,6 +420,7 @@ def create_or_update_transaction(instance, related_table, transaction_type, amou
                 bank=bank_field,
                 transaction_type=transaction_type,
                 deposit=amount,
+                payment=0,
                 related_table=related_table,
                 related_id=instance.id,
             )
