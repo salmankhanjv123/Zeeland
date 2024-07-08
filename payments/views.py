@@ -2,6 +2,7 @@ from django.db.models import Max
 from django.db.models import Q, Sum
 from django.shortcuts import get_object_or_404
 import datetime
+from decimal import Decimal
 from rest_framework import viewsets, status
 from django.db.models.signals import post_save
 from django.dispatch import receiver
@@ -60,26 +61,52 @@ class BankViewSet(viewsets.ModelViewSet):
         return queryset
 
 
+
+
 class BankTransactionViewSet(viewsets.ModelViewSet):
     """
     API endpoint that allows Banks to be viewed or edited.
     """
-
     serializer_class = BankTransactionSerializer
 
     def get_queryset(self):
-
         bank_id = self.request.query_params.get("bank_id")
 
         query_filters = Q()
-
         if bank_id:
             query_filters &= Q(bank_id=bank_id)
-
 
         queryset = BankTransaction.objects.filter(query_filters)
         return queryset
 
+    def list(self, request, *args, **kwargs):
+            bank_id = request.query_params.get("bank_id")
+            start_date = request.query_params.get("start_date")
+            query_filters = Q()
+            if bank_id:
+                query_filters &= Q(bank_id=bank_id)
+
+            queryset = BankTransaction.objects.filter(query_filters).order_by('transaction_date', 'id')
+            serializer = self.get_serializer(queryset, many=True)
+            serialized_data = serializer.data
+
+            if start_date:
+                # Calculate opening balance before start_date
+                opening_balance_data = queryset.filter(transaction_date__lt=start_date).aggregate(
+                    deposit_sum=Sum('deposit'),
+                    payment_sum=Sum('payment')
+                )
+                opening_balance = (opening_balance_data['deposit_sum'] or 0) - (opening_balance_data['payment_sum'] or 0)
+
+                # Calculate running balance for each transaction starting from the opening balance
+                current_balance = opening_balance
+                for transaction in serialized_data:
+                    deposit = Decimal(transaction['deposit'])
+                    payment = Decimal(transaction['payment'])
+                    current_balance += deposit - payment
+                    transaction['balance'] = str(current_balance)
+
+            return Response(serialized_data)
 
 class IncomingFundViewSet(viewsets.ModelViewSet):
     """

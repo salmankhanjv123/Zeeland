@@ -24,8 +24,7 @@ class BankTransaction(models.Model):
     related_table = models.CharField(max_length=50)
     related_id = models.IntegerField()
 
-    def __str__(self):
-        return f"{self.transaction_type} - {self.amount}"
+
 
 
 class MonthField(models.DateField):
