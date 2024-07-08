@@ -138,7 +138,8 @@ class BankDeposit(models.Model):
     deposit_to=models.ForeignKey(Bank,on_delete=models.PROTECT)
     amount=models.FloatField(default=0)
     date=models.DateField()
-
+    class Meta:
+        db_table = 'bank_deposits'
 class BankDepositDetail(models.Model):
     bank_deposit=models.ForeignKey(BankDeposit,related_name="details",on_delete=models.CASCADE)
     payment=models.ForeignKey(IncomingFund,on_delete=models.PROTECT)

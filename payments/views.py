@@ -3,6 +3,8 @@ from django.db.models import Q, Sum
 from django.shortcuts import get_object_or_404
 import datetime
 from rest_framework import viewsets, status
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 from .serializers import (
     IncomingFundSerializer,
     OutgoingFundSerializer,
@@ -28,7 +30,7 @@ from .models import (
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from datetime import date
-from booking.models import Booking
+from booking.models import Booking,Token
 from customer.models import Customers
 
 
@@ -392,3 +394,45 @@ class BankDepositViewSet(viewsets.ModelViewSet):
             query_filters &= Q(date__gte=start_date) & Q(date__lte=end_date)
         queryset = BankDeposit.objects.filter(query_filters).prefetch_related("files")
         return queryset
+
+
+
+
+
+def create_or_update_transaction(instance, related_table, transaction_type, amount_field):
+    bank_field = getattr(instance, "bank", None)
+    if bank_field:
+        amount = getattr(instance, amount_field, None)
+        try:
+            # Try to get the existing transaction
+            transaction = BankTransaction.objects.get(
+                related_table=related_table, related_id=instance.id
+            )
+            # Update the existing transaction
+            transaction.bank = bank_field
+            transaction.transaction_type = transaction_type
+            transaction.amount = amount
+            transaction.save()
+        except BankTransaction.DoesNotExist:
+            # If the transaction doesn't exist, create it
+            BankTransaction.objects.create(
+                bank=bank_field,
+                transaction_type=transaction_type,
+                amount=amount,
+                related_table=related_table,
+                related_id=instance.id,
+            )
+
+@receiver(post_save, sender=IncomingFund)
+def create_payment_transaction(sender, instance, **kwargs):
+    create_or_update_transaction(instance, "incoming_funds", instance.reference, "amount")
+
+@receiver(post_save, sender=Booking)
+def create_booking_transaction(sender, instance, **kwargs):
+    create_or_update_transaction(instance, "booking", "Booking", "advance")
+
+@receiver(post_save, sender=Token)
+def create_token_transaction(sender, instance, **kwargs):
+    create_or_update_transaction(instance, "token", "Token", "amount")
+
+

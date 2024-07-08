@@ -359,12 +359,15 @@ class CustomerLedgerView(APIView):
         customer_id = self.request.query_params.get("customer_id")
         start_date = self.request.query_params.get("start_date")
         end_date = self.request.query_params.get("end_date")
+        booking_query_filters = Q()
         query_filters = Q()
         if project_id:
+            booking_query_filters &= Q(project_id=project_id)
             query_filters &= Q(project_id=project_id)
         if start_date and end_date:
+            booking_query_filters &= Q(booking_date__gte=start_date) & Q(booking_date__lte=end_date)
             query_filters &= Q(date__gte=start_date) & Q(date__lte=end_date)
-        booking_data = Booking.objects.filter(query_filters, customer_id=customer_id).select_related('customer').values(
+        booking_data = Booking.objects.filter(booking_query_filters, customer_id=customer_id).select_related('customer').values(
             "id",
             "remarks",
             document=F("booking_id"),
@@ -483,6 +486,7 @@ class BalanceSheetView(APIView):
             main_type = bank.main_type
             account_type = bank.account_type
             bank_name = bank.name
+            bank_id = bank.id
             parent_bank = bank.parent_account # Assuming `parent_bank` is a ForeignKey to self
 
             # Aggregate balances
@@ -493,6 +497,7 @@ class BalanceSheetView(APIView):
             if bank.id not in main_type_dict[main_type]['account_types'][account_type]['accounts']:
                 main_type_dict[main_type]['account_types'][account_type]['accounts'][bank.id] = {
                     'bank_name': bank_name,
+                    'bank_id': bank_id,
                     'balance': bank.balance,
                     'sub_accounts': []
                 }

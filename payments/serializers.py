@@ -331,21 +331,43 @@ class BankDepositSerializer(serializers.ModelSerializer):
         details_data = validated_data.pop("details", [])
         transactions_data = validated_data.pop("transactions", [])
 
+        date=validated_data.get("date")
+        amount=validated_data.get("amount")
+        bank=validated_data.get("deposit_to")
+
         try:
             with transaction.atomic():
                 bank_deposit = BankDeposit.objects.create(**validated_data)
+                BankTransaction.objects.create(
+                    bank=bank,
+                    transaction_date=date,
+                    amount=amount,
+                    transaction_type="deposit",
+                    related_table="bank_deposits",
+                    related_id=bank_deposit.id,
+
+                )
                 for detail_data in details_data:
                     payment = detail_data.get("payment")
-                    if payment:
-                        payment.bank = validated_data["deposit_to"]
-                        payment.save(update_fields=["bank"])
                     BankDepositDetail.objects.create(
                         bank_deposit=bank_deposit, **detail_data
                     )
                 for data in transactions_data:
+                    date=data.get("date")
+                    amount=abs(data.get("amount"))
+                    bank=data.get("bank")
                     BankDepositTransactions.objects.create(
                         bank_deposit=bank_deposit, **data
                     )
+                    BankTransaction.objects.create(
+                    bank=bank,
+                    transaction_date=date,
+                    amount=amount,
+                    transaction_type="deposit",
+                    related_table="bank_deposits",
+                    related_id=bank_deposit.id,
+
+                )
                 for file_data in files_data:
                     BankDepositDocuments.objects.create(
                         bank_deposit=bank_deposit, **file_data

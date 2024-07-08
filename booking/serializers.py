@@ -179,7 +179,7 @@ class TokenSerializer(serializers.ModelSerializer):
         files_data = validated_data.pop("files", [])
         for key, value in validated_data.items():
             setattr(instance, key, value)
-
+        instance.save()
         for file_data in files_data:
             file_id = file_data.get("id", None)
             if file_id:

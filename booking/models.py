@@ -72,7 +72,8 @@ class Token(models.Model):
     payment_type=models.CharField(max_length=20,default="cash")
     cheque_number=models.CharField(max_length=50,blank=True,null=True)
     bank=models.ForeignKey("payments.Bank",related_name="token_payments", on_delete=models.PROTECT,blank=True, null=True)
-
+    class Meta:
+        db_table = 'token'
 
 class TokenDocuments(models.Model):
     token = models.ForeignKey(Token, related_name="files", on_delete=models.CASCADE)
