@@ -39,6 +39,7 @@ class BookingDocumentsSerializer(serializers.ModelSerializer):
 class BookingSerializer(serializers.ModelSerializer):
     customer_info = CustomersSerializer(source="customer", read_only=True)
     dealer_name = serializers.CharField(source="dealer.name", read_only=True)
+    bank_name = serializers.CharField(source="bank.name", read_only=True)
     plot_info = PlotsSerializer(source="plot", read_only=True)
     files = BookingDocumentsSerializer(many=True, required=False)
 
