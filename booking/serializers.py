@@ -4,7 +4,7 @@ from plots.models import Plots
 from payments.models import IncomingFund
 from customer.serializers import CustomersSerializer
 from plots.serializers import PlotsSerializer
-from django.db.models import Sum
+from django.db.models import Sum,Q
 import datetime
 
 
@@ -75,9 +75,10 @@ class BookingSerializer(serializers.ModelSerializer):
         plot = validated_data["plot"]
         plot.status = "sold"
         plot.save()
-        existing_resale_exists = Booking.objects.filter(
-            plot=plot, status="resale"
-        ).exists()
+
+        existing_resale = PlotResale.objects.filter(
+            Q(booking__plot=plot) | Q(booking__plot=plot.parent_plot)
+        ).last()
         booking = Booking.objects.create(**validated_data)
         if booking:
             IncomingFund.objects.create(
@@ -92,13 +93,8 @@ class BookingSerializer(serializers.ModelSerializer):
                 payment_type=payment_type,
                 cheque_number=cheque_number,
             )
-        if existing_resale_exists:
-            PlotResale.objects.create(
-                booking=booking,
-                plot=plot,
-                entry_type="booking",
-                new_plot_price=total_amount,
-            )
+        if existing_resale:
+            existing_resale.company_profit=(existing_resale.remaining+existing_resale.company_amount_paid)
         for file_data in files_data:
             BookingDocuments.objects.create(booking=booking, **file_data)
         return booking
@@ -159,7 +155,7 @@ class BookingForPaymentsSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Booking
-        fields = ["id", "booking_details"]
+        fields = ["id", "booking_details","total_amount","total_receiving_amount","remaining"]
 
 
 class TokenDocumentsSerializer(serializers.ModelSerializer):
@@ -232,11 +228,21 @@ class PlotResaleSerializer(serializers.ModelSerializer):
     plot_info = serializers.SerializerMethodField(read_only=True)
 
     def get_plot_info(self, instance):
-        plot_number = instance.plot.plot_number
-        plot_size = instance.plot.get_plot_size()
-        plot_type = instance.plot.get_type_display()
+        plot_number = instance.booking.plot.plot_number
+        plot_size = instance.booking.plot.get_plot_size()
+        plot_type = instance.booking.plot.get_type_display()
         return f"{plot_number} || {plot_type} || {plot_size}"
 
     class Meta:
         model = PlotResale
         fields = "__all__"
+
+
+    def create(self, validated_data):
+        booking_instance = validated_data.get('booking')
+        if booking_instance:
+            booking_instance.status = "close"
+            booking_instance.plot.status="active"
+            booking_instance.plot.save()
+            booking_instance.save()
+        return PlotResale.objects.create(**validated_data)

@@ -11,7 +11,8 @@ class Booking(models.Model):
     user = models.ForeignKey(User, on_delete=models.PROTECT)
     plot = models.ForeignKey(
         Plots, related_name="booking_details", on_delete=models.PROTECT)
-    customer = models.ForeignKey(Customers, on_delete=models.PROTECT)
+    
+    customer = models.ForeignKey(Customers,related_name="bookings", on_delete=models.PROTECT)
    
     booking_id = models.CharField(max_length=10)
     booking_date = models.DateField()
@@ -85,13 +86,9 @@ class TokenDocuments(models.Model):
 
 class PlotResale(models.Model):
     booking=models.ForeignKey(Booking,on_delete=models.CASCADE)
-    plot=models.ForeignKey(Plots,related_name="resale_plots",on_delete=models.PROTECT)
-    entry_type=models.CharField(max_length=10,default="resale")
-    old_plot_price=models.FloatField(default=0)
+    remaining = models.FloatField(default=0)
+    amount_received = models.FloatField(default=0)
     company_amount_paid=models.FloatField(default=0)
-    customer_amount_paid=models.FloatField(default=0)
-    new_plot_price=models.FloatField(default=0)
-    per_marla_price=models.FloatField(default=0)
     customer_profit=models.FloatField(default=0)
     company_profit=models.FloatField(default=0)
     remarks=models.TextField(blank=True,null=True)

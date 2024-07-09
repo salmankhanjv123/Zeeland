@@ -49,7 +49,7 @@ class IncomingFund(models.Model):
     reference=models.CharField(max_length=10,default="payment")
     booking = models.ForeignKey(Booking, on_delete=models.PROTECT)
     date = models.DateField()
-    installement_month = MonthField()
+    installement_month = MonthField(blank=True, null=True)
     amount = models.FloatField()
     remarks = models.TextField(blank=True, null=True)
     advance_payment=models.BooleanField(default=False)

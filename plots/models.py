@@ -15,9 +15,9 @@ class Plots(models.Model):
     type = models.IntegerField(choices=Types)
     marlas = models.FloatField(default=0)
     square_fts = models.FloatField(default=0)
-    rate = models.FloatField()
-    pic = models.ImageField(upload_to='media/plots', blank=True, null=True)
+    rate = models.FloatField(default=0)
     status = models.CharField(max_length=10, default='active')
+    parent_plot = models.ForeignKey('self', on_delete=models.CASCADE, blank=True, null=True, related_name='sub_plots')
 
     def __str__(self):
         return self.plot_number

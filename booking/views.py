@@ -91,7 +91,7 @@ class PlotResaleViewSet(viewsets.ModelViewSet):
     serializer_class = PlotResaleSerializer
 
     def get_queryset(self):
-        queryset = PlotResale.objects.all().select_related("plot","booking__customer")
+        queryset = PlotResale.objects.all().select_related("booking__customer")
         project_id = self.request.query_params.get('project')
         plot_id = self.request.query_params.get('plot_id')
         if project_id:

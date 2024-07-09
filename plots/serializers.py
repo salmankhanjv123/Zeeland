@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from rest_framework.exceptions import ValidationError
 from .models import Plots,PlotsDocuments
 from booking.models import Booking
 
@@ -14,11 +15,25 @@ class PlotsDocumentsSerializer(serializers.ModelSerializer):
         validated_data["id"] = data.get("id")
         return validated_data
 
+class SubPlotsSerializer(serializers.ModelSerializer):
+    plot_size = serializers.SerializerMethodField(read_only=True)
+    category_name = serializers.SerializerMethodField(read_only=True)
+    def get_plot_size(self, instance):
+        return instance.get_plot_size()
+
+    def get_category_name(self, instance):
+        category_name = instance.get_type_display()
+        return f"{category_name}"
+    class Meta:
+        model = Plots
+        fields = ['id', 'plot_number', 'address', 'type', 'marlas', 'square_fts', 'rate', 'status','plot_size','category_name']
+
 
 class PlotsSerializer(serializers.ModelSerializer):
     category_name = serializers.SerializerMethodField(read_only=True)
     plot_size = serializers.SerializerMethodField(read_only=True)
     files = PlotsDocumentsSerializer(many=True, required=False)
+    sub_plots=SubPlotsSerializer(many=True,read_only=True)
 
     def get_plot_size(self, instance):
         return instance.get_plot_size()
@@ -34,6 +49,13 @@ class PlotsSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         files_data = validated_data.pop("files", [])
+        project = validated_data.get('project')
+        plot_number = validated_data.get('plot_number')
+
+        if Plots.objects.filter(project=project, plot_number=plot_number).exists():
+            raise ValidationError({"error": f"A plot with number '{plot_number}' already exists in this project."})
+
+
         plot = Plots.objects.create(**validated_data)
         for file_data in files_data:
             PlotsDocuments.objects.create(plot=plot, **file_data)
@@ -41,6 +63,12 @@ class PlotsSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         files_data = validated_data.pop("files", [])
+        project = validated_data.get('project', instance.project)
+        plot_number = validated_data.get('plot_number', instance.plot_number)
+        
+        if Plots.objects.filter(project=project, plot_number=plot_number).exclude(id=instance.id).exists():
+            raise ValidationError({"error": f"A plot with number '{plot_number}' already exists in this project."})
+        
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
