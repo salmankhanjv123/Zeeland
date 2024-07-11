@@ -377,8 +377,12 @@ class CustomerLedgerView(APIView):
             customer_name=F("customer__name"),
             reference=Value("booking", output_field=CharField())
         )
-        dealer_data=Booking.objects.filter(booking_query_filters, customer_id=customer_id).select_related("dealer").values("dealer_id","dealer__name")
-        
+        dealer_data = Booking.objects.filter(
+            booking_query_filters,
+            customer_id=customer_id
+        ).exclude(
+            dealer_id__isnull=True
+        ).select_related("dealer").values("dealer_id", "dealer__name")
         payment_data = IncomingFund.objects.filter(query_filters, booking__customer_id=customer_id).select_related('booking__customer').values(
             "id",
             "date",
