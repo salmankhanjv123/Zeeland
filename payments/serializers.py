@@ -137,12 +137,14 @@ class IncomingFundSerializer(serializers.ModelSerializer):
             if reference == "payment":
                 booking.total_receiving_amount += new_amount - old_amount
                 booking.remaining -= new_amount - old_amount
+                booking.save()
             elif reference == "refund":
                 booking.total_receiving_amount -= new_amount - old_amount
                 booking.remaining += new_amount - old_amount
+                booking.save()
             else:
                 raise ValueError(f"Invalid reference type: {reference}")
-            booking.save()
+            
 
         for key, value in validated_data.items():
             setattr(instance, key, value)

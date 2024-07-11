@@ -170,13 +170,11 @@ class TokenDocumentsSerializer(serializers.ModelSerializer):
 
 
 class TokenSerializer(serializers.ModelSerializer):
-    customer_name = serializers.SerializerMethodField(read_only=True)
-    plot_info = serializers.SerializerMethodField(read_only=True)
+    customer_info = CustomersSerializer(source="customer", read_only=True)
+    plot_info = PlotsSerializer(source="plot", read_only=True)
     bank_name = serializers.CharField(source="bank.name", read_only=True)
     files = TokenDocumentsSerializer(many=True, required=False)
 
-    def get_customer_name(self, instance):
-        return instance.customer.name
 
     def get_plot_info(self, instance):
         plot_number = instance.plot.plot_number
