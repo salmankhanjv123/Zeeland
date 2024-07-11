@@ -498,11 +498,13 @@ class PlotLedgerView(APIView):
             booking_data = Booking.objects.filter(booking_query_filters).select_related('customer').values(
                 "id",
                 "remarks",
+                "status",
                 document=F("booking_id"),
                 amount=F("total_amount"),
                 date=F("booking_date"),
                 customer_name=F("customer__name"),
-                reference=Value("booking", output_field=CharField())
+                reference=Value("booking", output_field=CharField()),
+                
             )
 
             # Build payment query filters
