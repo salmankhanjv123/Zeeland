@@ -34,6 +34,7 @@ class PlotsSerializer(serializers.ModelSerializer):
     plot_size = serializers.SerializerMethodField(read_only=True)
     files = PlotsDocumentsSerializer(many=True, required=False)
     sub_plots=SubPlotsSerializer(many=True,read_only=True)
+    parent_plot_info=SubPlotsSerializer(source="parent_plot",read_only=True)
 
     def get_plot_size(self, instance):
         return instance.get_plot_size()
