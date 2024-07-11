@@ -85,6 +85,7 @@ class TokenDocuments(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
 class PlotResale(models.Model):
+    date = models.DateField()
     booking=models.ForeignKey(Booking,on_delete=models.CASCADE)
     remaining = models.FloatField(default=0)
     amount_received = models.FloatField(default=0)

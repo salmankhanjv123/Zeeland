@@ -3,7 +3,7 @@ from rest_framework import generics
 from payments.models import IncomingFund, OutgoingFund, JournalVoucher,BankTransaction
 from customer.models import Customers,CustomerMessages
 from plots.models import Plots
-from booking.models import Booking, Token
+from booking.models import Booking, Token,PlotResale
 from .serializers import (
     IncomingFundReportSerializer,
     OutgoingFundReportSerializer,
@@ -401,10 +401,18 @@ class CustomerLedgerView(APIView):
             customer_name=F("customer__name"),
             reference=Value("token", output_field=CharField())
         )
-
+        resale_data = PlotResale.objects.filter(booking__customer_id=customer_id).select_related('customer').values(
+            "id",
+            "date",
+            "remarks",
+            amount=Value(0.0, output_field=FloatField()),
+            document=F("id"),
+            customer_name=F("booking__customer__name"),
+            reference=Value("resale", output_field=CharField())
+        )
         # Combine and sort by date
         combined_data = sorted(
-            list(booking_data) + list(payment_data)+ list(token_data),
+            list(booking_data) + list(payment_data)+ list(token_data)+ list(resale_data),
             key=lambda x: x["date"]
         )
 
@@ -542,9 +550,19 @@ class PlotLedgerView(APIView):
                 reference=Value("token", output_field=CharField())
             )
 
+            resale_data = PlotResale.objects.filter(booking__plot_id=plot_id).select_related('customer').values(
+            "id",
+            "date",
+            "remarks",
+            amount=Value(0.0, output_field=FloatField()),
+            document=F("id"),
+            customer_name=F("booking__customer__name"),
+            reference=Value("resale", output_field=CharField())
+        )
+
             # Combine and sort by date
             combined_data = sorted(
-                list(booking_data) + list(payment_data) + list(token_data),
+                list(booking_data) + list(payment_data) + list(token_data)+list(resale_data),
                 key=lambda x: x["date"]
             )
 
@@ -596,9 +614,28 @@ class PlotLedgerView(APIView):
                 total_amount=Coalesce(Sum('total_amount'), Value(0, output_field=FloatField())),
                 remaining=Coalesce(Sum('remaining'), Value(0, output_field=FloatField()))
             )
+            balances = Booking.objects.filter(Q(plot_id=plot_id) | Q(plot__parent_plot_id=plot_id)).aggregate(
+                total_amount=Coalesce(Sum('total_amount'), Value(0, output_field=FloatField()))
+            )
+            net_amount = IncomingFund.objects.filter(
+                Q(booking__plot_id=plot_id) | Q(booking__plot__parent_plot_id=plot_id)
+            ).aggregate(
+                total_amount=Sum(
+                    Case(
+                        When(reference="payment", then=F('amount')),
+                        When(reference="refund", then=-F('amount')),
+                        default=Value(0),
+                        output_field=FloatField(),
+                    )
+                )
+            )['total_amount'] or 0.0
+            token_amount=Token.objects.filter(Q(plot_id=plot_id) | Q(plot__parent_plot_id=plot_id)).aggregate(
+                total_amount=Coalesce(Sum('amount'), Value(0, output_field=FloatField()))
+            )['total_amount'] or 0.0
 
-            opening_balance = round(balances['total_amount'], 2)
-            closing_balance = round(balances['remaining'], 2)
+
+            opening_balance = round(balances['total_amount'],2) 
+            closing_balance = round((opening_balance-net_amount-token_amount),2)
 
             response_data = {
                 "customer_info": list(customer_info),
