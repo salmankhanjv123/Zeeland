@@ -3,6 +3,7 @@ from rest_framework import generics
 from payments.models import IncomingFund, OutgoingFund, JournalVoucher,BankTransaction
 from customer.models import Customers,CustomerMessages
 from plots.models import Plots
+from plots.serializers import PlotsSerializer
 from booking.models import Booking, Token,PlotResale
 from .serializers import (
     IncomingFundReportSerializer,
@@ -424,9 +425,8 @@ class CustomerLedgerView(APIView):
             "contact",
             "address"
         ).first()
-        plot_data = Plots.objects.filter(booking_details__customer_id=customer_id).values(
-            "id", "plot_number", "address"
-        )
+        plot_query = Plots.objects.filter(booking_details__customer_id=customer_id)
+        plot_serializer=PlotsSerializer(plot_query,many=True)
         customer_messages = CustomerMessages.objects.filter(booking__customer_id=customer_id).prefetch_related('files')
         customer_messages_data = [
             {
@@ -482,7 +482,7 @@ class CustomerLedgerView(APIView):
         response_data = {
             "customer_info": customer_info,
             "booking_data": list(booking_data),
-            "plot_data": list(plot_data),
+            "plot_data": plot_serializer.data,
             "dealer_data":list(dealer_data),
             "customer_messages": customer_messages_data,
             "opening_balance": opening_balance,
@@ -577,9 +577,8 @@ class PlotLedgerView(APIView):
             )
 
             # Fetch plot information
-            plot_data = Plots.objects.filter(id=plot_id).values(
-                "id", "plot_number", "address"
-            )
+            plot_query = Plots.objects.filter(id=plot_id)
+            plot_serializer=PlotsSerializer(plot_query,many=True)
 
             # Fetch customer messages
             customer_messages = CustomerMessages.objects.filter(payment_query_filters).prefetch_related('files')
@@ -640,7 +639,7 @@ class PlotLedgerView(APIView):
             response_data = {
                 "customer_info": list(customer_info),
                 "booking_data": list(booking_data),
-                "plot_data": list(plot_data),
+                "plot_data": plot_serializer.data,
                 "customer_messages": customer_messages_data,
                 "opening_balance": opening_balance,
                 "closing_balance": closing_balance,

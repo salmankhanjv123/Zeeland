@@ -149,7 +149,7 @@ class BankDepositTransactions(models.Model):
     bank_deposit=models.ForeignKey(BankDeposit,related_name="transactions",on_delete=models.CASCADE)
     project = models.ForeignKey(Projects, on_delete=models.PROTECT)
     reference=models.CharField(max_length=10,default="payment")
-    customer = models.ForeignKey(Customers, on_delete=models.PROTECT)
+    customer = models.ForeignKey(Customers, on_delete=models.PROTECT,blank=True, null=True)
     date = models.DateField()
     amount = models.FloatField()
     remarks = models.TextField(blank=True, null=True)
