@@ -10,6 +10,7 @@ from .views import (
     BankViewSet,
     BankTransactionViewSet,
     BankDepositViewSet,
+    BankTransactionAPIView,
 )
 from rest_framework import routers
 
@@ -33,4 +34,5 @@ router.register(
 urlpatterns = [
     path("", include(router.urls)),
     path("due-payments/", DuePaymentsView.as_view(), name="due_payments"),
+    path("v2/bank-transactions/", BankTransactionAPIView.as_view()),
 ]

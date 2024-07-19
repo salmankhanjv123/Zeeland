@@ -120,6 +120,66 @@ class BankTransactionViewSet(viewsets.ModelViewSet):
 
             return Response(serialized_data)
 
+
+class BankTransactionAPIView(APIView):
+    def get(self, request, *args, **kwargs):
+        bank_id = request.query_params.get('bank_id')
+        start_date = request.query_params.get('start_date')
+        end_date = request.query_params.get('end_date')
+
+        if not bank_id or not start_date or not end_date:
+            return Response({'error': 'bank_id, start_date, and end_date are required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            start_date = datetime.datetime.strptime(start_date, '%Y-%m-%d').date()
+            end_date = datetime.datetime.strptime(end_date, '%Y-%m-%d').date()
+        except ValueError:
+            return Response({'error': 'Invalid date format. Use YYYY-MM-DD.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Filter transactions based on bank_id and date range
+        query_filters = Q(bank_id=bank_id)
+        transactions = BankTransaction.objects.filter(query_filters, transaction_date__range=[start_date, end_date]).order_by('transaction_date', 'id')
+
+        # Calculate opening balance before start_date
+        opening_balance_data = BankTransaction.objects.filter(query_filters, transaction_date__lt=start_date).aggregate(
+            deposit_sum=Sum('deposit'),
+            payment_sum=Sum('payment')
+        )
+        opening_balance = (opening_balance_data['deposit_sum'] or 0) - (opening_balance_data['payment_sum'] or 0)
+
+        # Prepare transaction records with running balance
+        transaction_records = []
+        current_balance = opening_balance
+        for transaction in transactions:
+            deposit = transaction.deposit
+            payment = transaction.payment
+            current_balance += deposit - payment
+            transaction_records.append({
+                'id': transaction.id,
+                'bank_id': transaction.bank_id,
+                'transaction_type': transaction.transaction_type,
+                'payment': str(payment),
+                'deposit': str(deposit),
+                'transaction_date': transaction.transaction_date,
+                'related_table': transaction.related_table,
+                'related_id': transaction.related_id,
+                'balance': str(current_balance)
+            })
+
+        # Calculate closing balance
+        closing_balance = current_balance
+
+        response_data = {
+            'opening_balance': str(opening_balance),
+            'closing_balance': str(closing_balance),
+            'transactions': transaction_records
+        }
+
+        return Response(response_data)
+
+# Ensure to add the URL route for this view in your urls.py
+
+
 class IncomingFundViewSet(viewsets.ModelViewSet):
     """
     API endpoint that allows IncomingFund to be viewed or edited.
