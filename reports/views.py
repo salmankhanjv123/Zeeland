@@ -504,149 +504,155 @@ class PlotLedgerView(APIView):
             return Response({"error": "plot_id parameter is required"}, status=400)
 
         try:
+            parent_plot = Plots.objects.filter(id=plot_id).first()
+            child_plots = Plots.objects.filter(parent_plot_id=plot_id)
+            plots = [parent_plot] + list(child_plots)
+            plot_ids = [plot.id for plot in plots]
+            result=[]
             # Build booking query filters
-            booking_query_filters = Q(plot_id=plot_id) | Q(plot__parent_plot_id=plot_id)
+            for plot_id in plot_ids:
+                booking_query_filters = Q(plot_id=plot_id) 
+                booking_data = Booking.objects.filter(booking_query_filters).select_related('customer').values(
+                    "id",
+                    "remarks",
+                    "status",
+                    document=F("booking_id"),
+                    amount=F("total_amount"),
+                    date=F("booking_date"),
+                    customer_name=F("customer__name"),
+                    reference=Value("booking", output_field=CharField()),
+                    
+                )
 
-            booking_data = Booking.objects.filter(booking_query_filters).select_related('customer').values(
-                "id",
-                "remarks",
-                "status",
-                document=F("booking_id"),
-                amount=F("total_amount"),
-                date=F("booking_date"),
-                customer_name=F("customer__name"),
-                reference=Value("booking", output_field=CharField()),
-                
-            )
+                # Build payment query filters
+                payment_query_filters = Q(booking__plot_id=plot_id) 
+                if start_date and end_date:
+                    payment_query_filters &= Q(date__gte=start_date) & Q(date__lte=end_date)
 
-            # Build payment query filters
-            payment_query_filters = Q(booking__plot_id=plot_id) | Q(booking__plot__parent_plot_id=plot_id)
-            if start_date and end_date:
-                payment_query_filters &= Q(date__gte=start_date) & Q(date__lte=end_date)
+                payment_data = IncomingFund.objects.filter(payment_query_filters).select_related('booking__customer').values(
+                    "id",
+                    "date",
+                    "amount",
+                    "remarks",
+                    "reference",
+                    document=F("id"),
+                    customer_name=F("booking__customer__name"),
+                )
 
-            payment_data = IncomingFund.objects.filter(payment_query_filters).select_related('booking__customer').values(
+                # Build token query filters
+                token_query_filters = Q(plot_id=plot_id) 
+                if start_date and end_date:
+                    token_query_filters &= Q(date__gte=start_date) & Q(date__lte=end_date)
+
+
+                token_data = Token.objects.filter(token_query_filters).select_related('customer').values(
+                    "id",
+                    "date",
+                    "amount",
+                    "remarks",
+                    document=F("id"),
+                    customer_name=F("customer__name"),
+                    reference=Value("token", output_field=CharField())
+                )
+
+                resale_data = PlotResale.objects.filter(booking__plot_id=plot_id).select_related('customer').values(
                 "id",
                 "date",
-                "amount",
                 "remarks",
-                "reference",
+                amount=Value(0.0, output_field=FloatField()),
                 document=F("id"),
                 customer_name=F("booking__customer__name"),
+                reference=Value("resale", output_field=CharField())
             )
 
-            # Build token query filters
-            token_query_filters = Q(plot_id=plot_id) | Q(plot__parent_plot_id=plot_id)
-            if start_date and end_date:
-                token_query_filters &= Q(date__gte=start_date) & Q(date__lte=end_date)
-
-
-            token_data = Token.objects.filter(token_query_filters).select_related('customer').values(
-                "id",
-                "date",
-                "amount",
-                "remarks",
-                document=F("id"),
-                customer_name=F("customer__name"),
-                reference=Value("token", output_field=CharField())
-            )
-
-            resale_data = PlotResale.objects.filter(booking__plot_id=plot_id).select_related('customer').values(
-            "id",
-            "date",
-            "remarks",
-            amount=Value(0.0, output_field=FloatField()),
-            document=F("id"),
-            customer_name=F("booking__customer__name"),
-            reference=Value("resale", output_field=CharField())
-        )
-
-            # Combine and sort by date
-            combined_data = sorted(
-                list(booking_data) + list(payment_data) + list(token_data)+list(resale_data),
-                key=lambda x: x["date"]
-            )
-
-            # Fetch customer information
-            customer_query_filters = Q(bookings__plot_id=plot_id) | Q(bookings__plot__parent_plot_id=plot_id)
-            customer_info = Customers.objects.filter(customer_query_filters).values(
-                "id",
-                "name",
-                "father_name",
-                "contact",
-                "address"
-            )
-
-            # Fetch plot information
-            plot_query = Plots.objects.filter(id=plot_id)
-            plot_serializer=PlotsSerializer(plot_query,many=True)
-
-            # Fetch customer messages
-            customer_messages = CustomerMessages.objects.filter(payment_query_filters).prefetch_related('files')
-            customer_messages_data = [
-                {
-                    "id": message.id,
-                    "user": message.user_id,
-                    "booking": message.booking_id,
-                    "date": message.date,
-                    "created_at": message.created_at,
-                    "updated_at": message.updated_at,
-                    "notes": message.notes,
-                    "follow_up": message.follow_up,
-                    "follow_up_message": message.follow_up_message,
-                    "files": [
-                        {
-                            "id": file.id,
-                            "file": file.file.url,
-                            "description": file.description,
-                            "type": file.type,
-                            "created_at": file.created_at,
-                            "updated_at": file.updated_at,
-                        }
-                        for file in message.files.all()
-                    ]
-                }
-                for message in customer_messages
-            ]
-
-            # Calculate balances
-            balances = Booking.objects.filter(Q(plot_id=plot_id) | Q(plot__parent_plot_id=plot_id)).aggregate(
-                total_amount=Coalesce(Sum('total_amount'), Value(0, output_field=FloatField())),
-                remaining=Coalesce(Sum('remaining'), Value(0, output_field=FloatField()))
-            )
-            balances = Booking.objects.filter(Q(plot_id=plot_id) | Q(plot__parent_plot_id=plot_id)).aggregate(
-                total_amount=Coalesce(Sum('total_amount'), Value(0, output_field=FloatField()))
-            )
-            net_amount = IncomingFund.objects.filter(
-                Q(booking__plot_id=plot_id) | Q(booking__plot__parent_plot_id=plot_id)
-            ).aggregate(
-                total_amount=Sum(
-                    Case(
-                        When(reference="payment", then=F('amount')),
-                        When(reference="refund", then=-F('amount')),
-                        default=Value(0),
-                        output_field=FloatField(),
-                    )
+                # Combine and sort by date
+                combined_data = sorted(
+                    list(booking_data) + list(payment_data) + list(token_data)+list(resale_data),
+                    key=lambda x: x["date"]
                 )
-            )['total_amount'] or 0.0
-            token_amount=Token.objects.filter(Q(plot_id=plot_id) | Q(plot__parent_plot_id=plot_id)).aggregate(
-                total_amount=Coalesce(Sum('amount'), Value(0, output_field=FloatField()))
-            )['total_amount'] or 0.0
+
+                # Fetch customer information
+                customer_query_filters = Q(bookings__plot_id=plot_id)
+                customer_info = Customers.objects.filter(customer_query_filters).values(
+                    "id",
+                    "name",
+                    "father_name",
+                    "contact",
+                    "address"
+                )
+
+                # Fetch plot information
+                plot_query = Plots.objects.filter(id=plot_id)
+                plot_serializer=PlotsSerializer(plot_query,many=True)
+
+                # Fetch customer messages
+                customer_messages = CustomerMessages.objects.filter(payment_query_filters).prefetch_related('files')
+                customer_messages_data = [
+                    {
+                        "id": message.id,
+                        "user": message.user_id,
+                        "booking": message.booking_id,
+                        "date": message.date,
+                        "created_at": message.created_at,
+                        "updated_at": message.updated_at,
+                        "notes": message.notes,
+                        "follow_up": message.follow_up,
+                        "follow_up_message": message.follow_up_message,
+                        "files": [
+                            {
+                                "id": file.id,
+                                "file": file.file.url,
+                                "description": file.description,
+                                "type": file.type,
+                                "created_at": file.created_at,
+                                "updated_at": file.updated_at,
+                            }
+                            for file in message.files.all()
+                        ]
+                    }
+                    for message in customer_messages
+                ]
+
+                # Calculate balances
+                balances = Booking.objects.filter(Q(plot_id=plot_id) ).aggregate(
+                    total_amount=Coalesce(Sum('total_amount'), Value(0, output_field=FloatField())),
+                    remaining=Coalesce(Sum('remaining'), Value(0, output_field=FloatField()))
+                )
+                balances = Booking.objects.filter(Q(plot_id=plot_id) ).aggregate(
+                    total_amount=Coalesce(Sum('total_amount'), Value(0, output_field=FloatField()))
+                )
+                net_amount = IncomingFund.objects.filter(
+                    Q(booking__plot_id=plot_id) | Q(booking__plot__parent_plot_id=plot_id)
+                ).aggregate(
+                    total_amount=Sum(
+                        Case(
+                            When(reference="payment", then=F('amount')),
+                            When(reference="refund", then=-F('amount')),
+                            default=Value(0),
+                            output_field=FloatField(),
+                        )
+                    )
+                )['total_amount'] or 0.0
+                token_amount=Token.objects.filter(Q(plot_id=plot_id) ).aggregate(
+                    total_amount=Coalesce(Sum('amount'), Value(0, output_field=FloatField()))
+                )['total_amount'] or 0.0
 
 
-            opening_balance = round(balances['total_amount'],2) 
-            closing_balance = round((opening_balance-net_amount-token_amount),2)
+                opening_balance = round(balances['total_amount'],2) 
+                closing_balance = round((opening_balance-net_amount-token_amount),2)
 
-            response_data = {
-                "customer_info": list(customer_info),
-                "booking_data": list(booking_data),
-                "plot_data": plot_serializer.data,
-                "customer_messages": customer_messages_data,
-                "opening_balance": opening_balance,
-                "closing_balance": closing_balance,
-                "transactions": combined_data
-            }
+                response_data = {
+                    "customer_info": list(customer_info),
+                    "booking_data": list(booking_data),
+                    "plot_data": plot_serializer.data,
+                    "customer_messages": customer_messages_data,
+                    "opening_balance": opening_balance,
+                    "closing_balance": closing_balance,
+                    "transactions": combined_data
+                }
+                result.append(response_data)
 
-            return Response(response_data)
+            return Response(result)
 
         except ValidationError as e:
             return Response({"error": str(e)}, status=400)

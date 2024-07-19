@@ -437,9 +437,6 @@ class BankDepositViewSet(viewsets.ModelViewSet):
         return queryset
 
 
-
-
-
 def create_or_update_transaction(instance, related_table, transaction_type, amount_field):
     bank_field = getattr(instance, "bank", None)
     if bank_field:
@@ -452,27 +449,40 @@ def create_or_update_transaction(instance, related_table, transaction_type, amou
             # Update the existing transaction
             transaction.bank = bank_field
             transaction.transaction_type = transaction_type
-            transaction.deposit = amount
-            transaction.payment = 0
+            if transaction_type == "refund":
+                transaction.payment = amount
+                transaction.deposit = 0
+            else:
+                transaction.deposit = amount
+                transaction.payment = 0
             transaction.save()
         except BankTransaction.DoesNotExist:
             # If the transaction doesn't exist, create it
-            BankTransaction.objects.create(
-                bank=bank_field,
-                transaction_type=transaction_type,
-                deposit=amount,
-                payment=0,
-                related_table=related_table,
-                related_id=instance.id,
-            )
-
+            if transaction_type == "refund":
+                BankTransaction.objects.create(
+                    bank=bank_field,
+                    transaction_type=transaction_type,
+                    deposit=0,
+                    payment=amount,
+                    related_table=related_table,
+                    related_id=instance.id,
+                )
+            else:
+                BankTransaction.objects.create(
+                    bank=bank_field,
+                    transaction_type=transaction_type,
+                    deposit=amount,
+                    payment=0,
+                    related_table=related_table,
+                    related_id=instance.id,
+                )
 @receiver(post_save, sender=IncomingFund)
 def create_payment_transaction(sender, instance, **kwargs):
     create_or_update_transaction(instance, "incoming_funds", instance.reference, "amount")
 
-@receiver(post_save, sender=Booking)
-def create_booking_transaction(sender, instance, **kwargs):
-    create_or_update_transaction(instance, "booking", "Booking", "advance")
+# @receiver(post_save, sender=Booking)
+# def create_booking_transaction(sender, instance, **kwargs):
+#     create_or_update_transaction(instance, "booking", "Booking", "advance")
 
 @receiver(post_save, sender=Token)
 def create_token_transaction(sender, instance, **kwargs):
