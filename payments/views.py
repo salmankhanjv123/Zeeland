@@ -157,6 +157,7 @@ class BankTransactionAPIView(APIView):
             transaction_records.append({
                 'id': transaction.id,
                 'bank_id': transaction.bank_id,
+                'bank_name':transaction.bank.name,
                 'transaction_type': transaction.transaction_type,
                 'payment': str(payment),
                 'deposit': str(deposit),
