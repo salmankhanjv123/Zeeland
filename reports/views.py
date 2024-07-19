@@ -3,12 +3,12 @@ from rest_framework import generics
 from payments.models import IncomingFund, OutgoingFund, JournalVoucher,BankTransaction
 from customer.models import Customers,CustomerMessages
 from plots.models import Plots
-from plots.serializers import PlotsSerializer
 from booking.models import Booking, Token,PlotResale
 from .serializers import (
     IncomingFundReportSerializer,
     OutgoingFundReportSerializer,
     JournalVoucherReportSerializer,
+    PlotsSerializer
 )
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -582,8 +582,8 @@ class PlotLedgerView(APIView):
                 )
 
                 # Fetch plot information
-                plot_query = Plots.objects.filter(id=plot_id)
-                plot_serializer=PlotsSerializer(plot_query,many=True)
+                plot_query = Plots.objects.get(id=plot_id)
+                plot_serializer=PlotsSerializer(plot_query)
 
                 # Fetch customer messages
                 customer_messages = CustomerMessages.objects.filter(payment_query_filters).prefetch_related('files')
@@ -641,12 +641,14 @@ class PlotLedgerView(APIView):
                 opening_balance = round(balances['total_amount'],2) 
                 closing_balance = round((opening_balance-net_amount-token_amount),2)
 
+                plot_data=plot_serializer.data
+                plot_amount=plot_data.get("total")
                 response_data = {
                     "customer_info": list(customer_info),
                     "booking_data": list(booking_data),
-                    "plot_data": plot_serializer.data,
+                    "plot_data": plot_data,
                     "customer_messages": customer_messages_data,
-                    "opening_balance": opening_balance,
+                    "opening_balance": plot_amount,
                     "closing_balance": closing_balance,
                     "transactions": combined_data
                 }
