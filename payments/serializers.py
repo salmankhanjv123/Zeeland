@@ -352,12 +352,22 @@ class BankDepositSerializer(serializers.ModelSerializer):
                 )
                 for detail_data in details_data:
                     payment = detail_data.get("payment")
+                    undeposit_bank=payment.bank
                     payment.deposit=True
                     payment.save()
                     BankDepositDetail.objects.create(
                         bank_deposit=bank_deposit, **detail_data
                     )
-                    # here add payment in undeposit fund
+                BankTransaction.objects.create(
+                    bank=undeposit_bank,
+                    transaction_date=date,
+                    deposit=0,
+                    payment=amount,
+                    transaction_type="deposit",
+                    related_table="bank_deposits",
+                    related_id=bank_deposit.id,
+
+                )
                 for data in transactions_data:
                     date=data.get("date")
                     amount=abs(data.get("amount"))

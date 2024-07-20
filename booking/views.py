@@ -105,7 +105,7 @@ class PlotResaleViewSet(viewsets.ModelViewSet):
         if booking_id:
             try:
                 booking = Booking.objects.get(pk=booking_id)
-                booking.status = "resale"
+                booking.status = "close"
                 booking.plot.status="active"
                 booking.plot.save()
                 booking.save()
