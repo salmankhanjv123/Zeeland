@@ -4,15 +4,20 @@ from booking.models import Booking
 from customer.models import Customers
 
 
-
 class Bank(models.Model):
-    name=models.CharField(max_length=50)
-    main_type=models.CharField(max_length=100,default="asset")
-    account_type=models.CharField(max_length=100)
-    detail_type=models.CharField(max_length=100)
-    description=models.TextField(blank=True,null=True)
-    balance=models.FloatField(default=0)
-    parent_account = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='sub_accounts')
+    name = models.CharField(max_length=50)
+    main_type = models.CharField(max_length=100, default="asset")
+    account_type = models.CharField(max_length=100)
+    detail_type = models.CharField(max_length=100)
+    description = models.TextField(blank=True, null=True)
+    balance = models.FloatField(default=0)
+    parent_account = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="sub_accounts",
+    )
 
 
 class BankTransaction(models.Model):
@@ -23,8 +28,6 @@ class BankTransaction(models.Model):
     transaction_date = models.DateField(auto_now_add=True)
     related_table = models.CharField(max_length=50)
     related_id = models.IntegerField()
-
-
 
 
 class MonthField(models.DateField):
@@ -46,36 +49,40 @@ class MonthField(models.DateField):
 
 class IncomingFund(models.Model):
     project = models.ForeignKey(Projects, on_delete=models.PROTECT)
-    reference=models.CharField(max_length=10,default="payment")
+    reference = models.CharField(max_length=10, default="payment")
     booking = models.ForeignKey(Booking, on_delete=models.PROTECT)
     date = models.DateField()
     installement_month = MonthField(blank=True, null=True)
     amount = models.FloatField()
     remarks = models.TextField(blank=True, null=True)
-    advance_payment=models.BooleanField(default=False)
-    payment_type=models.CharField(max_length=20,default="cash")
-    cheque_number=models.CharField(max_length=50,blank=True,null=True)
-    bank=models.ForeignKey(Bank,related_name="payments", on_delete=models.PROTECT,blank=True, null=True)
-    deposit=models.BooleanField(default=False)
-    
+    advance_payment = models.BooleanField(default=False)
+    payment_type = models.CharField(max_length=20, default="cash")
+    cheque_number = models.CharField(max_length=50, blank=True, null=True)
+    bank = models.ForeignKey(
+        Bank, related_name="payments", on_delete=models.PROTECT, blank=True, null=True
+    )
+    deposit = models.BooleanField(default=False)
 
     class Meta:
-        db_table = 'incoming_funds'
+        db_table = "incoming_funds"
 
 
 class IncomingFundDocuments(models.Model):
-    incoming_fund = models.ForeignKey(IncomingFund, related_name="files", on_delete=models.CASCADE)
+    incoming_fund = models.ForeignKey(
+        IncomingFund, related_name="files", on_delete=models.CASCADE
+    )
     file = models.FileField(upload_to="media/payments_files")
     description = models.TextField()
     type = models.CharField(max_length=20)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+
 class ExpenseType(models.Model):
     name = models.CharField(max_length=50)
 
     class Meta:
-        db_table = 'expense_type'
+        db_table = "expense_type"
 
     def __str__(self):
         return self.name
@@ -88,8 +95,9 @@ class ExpensePerson(models.Model):
     date = models.DateField()
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
     class Meta:
-        db_table = 'expense_persons'
+        db_table = "expense_persons"
 
 
 class OutgoingFund(models.Model):
@@ -99,20 +107,26 @@ class OutgoingFund(models.Model):
     date = models.DateField()
     amount = models.FloatField()
     remarks = models.TextField(blank=True, null=True)
-    payment_type=models.CharField(max_length=20,default="cash")
-    cheque_number=models.CharField(max_length=50,blank=True,null=True)
-    bank=models.ForeignKey(Bank,related_name="expenses", on_delete=models.PROTECT,blank=True, null=True)
+    payment_type = models.CharField(max_length=20, default="cash")
+    cheque_number = models.CharField(max_length=50, blank=True, null=True)
+    bank = models.ForeignKey(
+        Bank, related_name="expenses", on_delete=models.PROTECT, blank=True, null=True
+    )
+
     class Meta:
-        db_table = 'outgoing_funds'
+        db_table = "outgoing_funds"
 
 
 class OutgoingFundDocuments(models.Model):
-    outgoing_fund = models.ForeignKey(OutgoingFund, related_name="files", on_delete=models.CASCADE)
+    outgoing_fund = models.ForeignKey(
+        OutgoingFund, related_name="files", on_delete=models.CASCADE
+    )
     file = models.FileField(upload_to="media/dealer_files")
     description = models.TextField()
     type = models.CharField(max_length=20)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
 
 class JournalVoucher(models.Model):
     project = models.ForeignKey(Projects, on_delete=models.PROTECT)
@@ -122,7 +136,7 @@ class JournalVoucher(models.Model):
     remarks = models.TextField(blank=True, null=True)
 
     class Meta:
-        db_table = 'journal_voucher'
+        db_table = "journal_voucher"
 
 
 class PaymentReminder(models.Model):
@@ -132,33 +146,48 @@ class PaymentReminder(models.Model):
     reminder_date = models.DateField()
 
     class Meta:
-        db_table = 'payments_reminder'
+        db_table = "payments_reminder"
 
 
 class BankDeposit(models.Model):
-    deposit_to=models.ForeignKey(Bank,on_delete=models.PROTECT)
-    amount=models.FloatField(default=0)
-    date=models.DateField()
+    deposit_to = models.ForeignKey(Bank, on_delete=models.PROTECT)
+    amount = models.FloatField(default=0)
+    date = models.DateField()
+
     class Meta:
-        db_table = 'bank_deposits'
+        db_table = "bank_deposits"
+
+
 class BankDepositDetail(models.Model):
-    bank_deposit=models.ForeignKey(BankDeposit,related_name="details",on_delete=models.CASCADE)
-    payment=models.ForeignKey(IncomingFund,on_delete=models.PROTECT)
+    bank_deposit = models.ForeignKey(
+        BankDeposit, related_name="details", on_delete=models.CASCADE
+    )
+    payment = models.ForeignKey(IncomingFund, on_delete=models.PROTECT)
+
 
 class BankDepositTransactions(models.Model):
-    bank_deposit=models.ForeignKey(BankDeposit,related_name="transactions",on_delete=models.CASCADE)
+    bank_deposit = models.ForeignKey(
+        BankDeposit, related_name="transactions", on_delete=models.CASCADE
+    )
     project = models.ForeignKey(Projects, on_delete=models.PROTECT)
-    reference=models.CharField(max_length=10,default="payment")
-    customer = models.ForeignKey(Customers, on_delete=models.PROTECT,blank=True, null=True)
+    reference = models.CharField(max_length=10, default="payment")
+    customer = models.ForeignKey(
+        Customers, on_delete=models.PROTECT, blank=True, null=True
+    )
     date = models.DateField()
     amount = models.FloatField()
     remarks = models.TextField(blank=True, null=True)
-    payment_type=models.CharField(max_length=20,default="cash")
-    cheque_number=models.CharField(max_length=50,blank=True,null=True)
-    bank=models.ForeignKey(Bank,related_name="deposits", on_delete=models.PROTECT,blank=True, null=True)    
+    payment_type = models.CharField(max_length=20, default="cash")
+    cheque_number = models.CharField(max_length=50, blank=True, null=True)
+    bank = models.ForeignKey(
+        Bank, related_name="deposits", on_delete=models.PROTECT, blank=True, null=True
+    )
+
 
 class BankDepositDocuments(models.Model):
-    bank_deposit = models.ForeignKey(BankDeposit, related_name="files", on_delete=models.CASCADE)
+    bank_deposit = models.ForeignKey(
+        BankDeposit, related_name="files", on_delete=models.CASCADE
+    )
     file = models.FileField(upload_to="media/payments_files")
     description = models.TextField()
     type = models.CharField(max_length=20)

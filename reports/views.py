@@ -390,6 +390,7 @@ class CustomerLedgerView(APIView):
             "amount",
             "remarks",
             "reference",
+            "booking_id",
             document=F("id"),
             customer_name=F("booking__customer__name"),
         )
