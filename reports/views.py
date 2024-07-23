@@ -559,7 +559,7 @@ class PlotLedgerView(APIView):
                 "id",
                 "date",
                 "remarks",
-                amount=Value(0.0, output_field=FloatField()),
+                amount=F("company_amount_paid"),
                 document=F("id"),
                 customer_name=F("booking__customer__name"),
                 reference=Value("close booking", output_field=CharField())
