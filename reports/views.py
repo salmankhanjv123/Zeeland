@@ -409,7 +409,7 @@ class CustomerLedgerView(APIView):
             amount=Value(0.0, output_field=FloatField()),
             document=F("id"),
             customer_name=F("booking__customer__name"),
-            reference=Value("resale", output_field=CharField())
+            reference=Value("close booking", output_field=CharField())
         )
         # Combine and sort by date
         combined_data = sorted(
@@ -559,10 +559,10 @@ class PlotLedgerView(APIView):
                 "id",
                 "date",
                 "remarks",
-                amount=Value(0.0, output_field=FloatField()),
+                amount=F("company_amount_paid"),
                 document=F("id"),
                 customer_name=F("booking__customer__name"),
-                reference=Value("resale", output_field=CharField())
+                reference=Value("close booking", output_field=CharField())
             )
 
                 # Combine and sort by date
