@@ -369,10 +369,12 @@ class DealerLedgerView(APIView):
                 "id",
                 document=F("booking_id"),
             )
+            
             booking_data = Booking.objects.filter(booking_query_filters).select_related("dealer").values(
                 "id", "remarks",
                 document=F("booking_id"),
                 credit=F("dealer_comission_amount"),
+                debit=Value(0.0),
                 date=F("booking_date"),
                 dealer_name=F("dealer__name"),
                 reference=Value("booking", output_field=CharField()),
@@ -380,7 +382,16 @@ class DealerLedgerView(APIView):
 
             payment_data = DealerPayments.objects.filter(payment_query_filters).select_related("booking__dealer").values(
                 "id", "date", "remarks", "reference",
-                debit=F("amount"),
+                credit=Case(
+                    When(reference="return", then=F("amount")),
+                    default=Value(0),
+                    output_field=FloatField()
+                ),
+                debit=Case(
+                    When(reference="payment", then=F("amount")),
+                    default=Value(0),
+                    output_field=FloatField()
+                ),
                 document=F("id"),
                 dealer_name=F("booking__dealer__name"),
             )
@@ -389,18 +400,30 @@ class DealerLedgerView(APIView):
                 list(booking_data) + list(payment_data), key=lambda x: x["date"]
             )
 
-            total_amount = Booking.objects.filter(
+            comission_amount = Booking.objects.filter(
                 dealer_id=dealer_id, booking_date__lt=start_date
             ).aggregate(
                 total_amount=Coalesce(Sum("dealer_comission_amount"), Value(0, output_field=FloatField()))
             )["total_amount"] or 0.0
+        
+            paid_amount = (
+            DealerPayments.objects.filter(booking__dealer_id=dealer_id,date__lt=start_date).aggregate(
+                total_amount=Sum(
+                    Case(
+                        When(reference="payment", then=F("amount")),
+                        When(reference="refund", then=-F("amount")),
+                        default=Value(0),
+                        output_field=FloatField(),
+                    )
+                )
+            )["total_amount"]
+            or 0.0
+        )
 
-            opening_balance = round(total_amount, 2)
+            opening_balance = round((comission_amount-paid_amount), 2)
             current_balance = opening_balance
 
             for entry in combined_data:
-                entry['credit'] = entry.get('credit', 0)
-                entry['debit'] = entry.get('debit', 0)
                 current_balance += entry['credit'] - entry['debit']
                 entry['balance'] = current_balance
 

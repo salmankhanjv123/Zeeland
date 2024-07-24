@@ -43,6 +43,7 @@ class Booking(models.Model):
     dealer_comission_percentage=models.FloatField(default=0)
     dealer_comission_amount=models.FloatField(default=0)
     status = models.CharField(max_length=10, default='active')
+    token=models.ForeignKey("Token",on_delete=models.PROTECT,blank=True,null=True)
 
     def __str__(self):
         return self.booking_id
@@ -73,6 +74,7 @@ class Token(models.Model):
     payment_type=models.CharField(max_length=20,default="cash")
     cheque_number=models.CharField(max_length=50,blank=True,null=True)
     bank=models.ForeignKey("payments.Bank",related_name="token_payments", on_delete=models.PROTECT,blank=True, null=True)
+    status = models.CharField(max_length=10, default='pending')
     class Meta:
         db_table = 'token'
 
