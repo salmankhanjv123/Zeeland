@@ -47,7 +47,6 @@ class MonthField(models.DateField):
         return value
 
 
-
 class IncomingFund(models.Model):
     project = models.ForeignKey(Projects, on_delete=models.PROTECT)
     reference = models.CharField(max_length=10, default="payment")
@@ -206,7 +205,11 @@ class DealerPayments(models.Model):
     payment_type = models.CharField(max_length=20, default="cash")
     cheque_number = models.CharField(max_length=50, blank=True, null=True)
     bank = models.ForeignKey(
-        Bank, related_name="dealer_payments", on_delete=models.PROTECT, blank=True, null=True
+        Bank,
+        related_name="dealer_payments",
+        on_delete=models.PROTECT,
+        blank=True,
+        null=True,
     )
     deposit = models.BooleanField(default=False)
 
@@ -214,14 +217,12 @@ class DealerPayments(models.Model):
         db_table = "dealer_payments"
 
 
-
 class DealerPaymentsDocuments(models.Model):
     payment = models.ForeignKey(
         DealerPayments, related_name="files", on_delete=models.CASCADE
     )
-    file = models.FileField(upload_to="media/payments_files")
+    file = models.FileField(upload_to="media/dealer_payments_files")
     description = models.TextField()
     type = models.CharField(max_length=20)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-
