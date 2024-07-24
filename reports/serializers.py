@@ -54,5 +54,5 @@ class PlotsSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Plots
-        fields = '__all__'  # or specify specific fields
+        exclude=["parent_plot","status","project"]
 
