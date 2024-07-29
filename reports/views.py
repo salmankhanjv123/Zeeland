@@ -15,6 +15,8 @@ from .serializers import (
     OutgoingFundReportSerializer,
     JournalVoucherReportSerializer,
     PlotsSerializer,
+    BookingPaymentsSerializer,
+    TokenPaymentsSerializer,
 )
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -32,7 +34,8 @@ from django.db.models import (
 )
 from django.db.models.functions import Coalesce
 from rest_framework.exceptions import ValidationError
-
+from itertools import groupby
+from operator import itemgetter
 
 from datetime import date, datetime, timedelta
 import calendar
@@ -341,6 +344,9 @@ class AnnualIncomingFundGraphView(APIView):
         return Response(result_with_month_names)
 
 
+# new reports
+
+
 class DealerLedgerView(APIView):
     def get(self, request):
         project_id = request.query_params.get("project_id")
@@ -369,12 +375,9 @@ class DealerLedgerView(APIView):
             payment_query_filters &= Q(date__gte=start_date) & Q(date__lte=end_date)
 
         try:
-            bookings = (
-                Booking.objects.filter(dealer_id=dealer_id)
-                .values(
-                    "id",
-                    document=F("booking_id"),
-                )
+            bookings = Booking.objects.filter(dealer_id=dealer_id).values(
+                "id",
+                document=F("booking_id"),
             )
 
             booking_data = (
@@ -498,15 +501,12 @@ class CustomerLedgerView(APIView):
             query_filters &= Q(date__gte=start_date) & Q(date__lte=end_date)
             booking_query_filters &= Q(booking_date__gte=start_date) & Q(
                 booking_date__lte=end_date
-            )        
-        
-        bookings = (
-                Booking.objects.filter(customer_id=customer_id)
-                .values(
-                    "id",
-                    document=F("booking_id"),
-                )
             )
+
+        bookings = Booking.objects.filter(customer_id=customer_id).values(
+            "id",
+            document=F("booking_id"),
+        )
         dealers = (
             Booking.objects.filter(customer_id=customer_id)
             .exclude(dealer_id__isnull=True)
@@ -539,15 +539,15 @@ class CustomerLedgerView(APIView):
                 "reference",
                 "booking_id",
                 credit=Case(
-                        When(reference="return", then=F("amount")),
-                        default=Value(0),
-                        output_field=FloatField(),
-                    ),
+                    When(reference="return", then=F("amount")),
+                    default=Value(0),
+                    output_field=FloatField(),
+                ),
                 debit=Case(
-                        When(reference="payment", then=F("amount")),
-                        default=Value(0),
-                        output_field=FloatField(),
-                    ),
+                    When(reference="payment", then=F("amount")),
+                    default=Value(0),
+                    output_field=FloatField(),
+                ),
                 document=F("id"),
                 customer_name=F("booking__customer__name"),
             )
@@ -633,7 +633,6 @@ class CustomerLedgerView(APIView):
 
         opening_balance = booking_amount - paid_amount - token_amount
         current_balance = opening_balance
-
 
         for entry in combined_data:
             current_balance += entry["credit"] - entry["debit"]
@@ -847,7 +846,7 @@ class PlotLedgerView(APIView):
                     + list(resale_data),
                     key=lambda x: x["date"],
                 )
-                
+
                 booking_amount = (
                     Booking.objects.filter(
                         plot_id=plot_id, booking_date__lt=start_date
@@ -896,7 +895,7 @@ class PlotLedgerView(APIView):
                 for entry in combined_data:
                     current_balance += entry["credit"] - entry["debit"]
                     entry["balance"] = current_balance
-                
+
                 # Fetch customer information
                 customer_query_filters = Q(bookings__plot_id=plot_id)
                 customer_info = Customers.objects.filter(customer_query_filters).values(
@@ -945,7 +944,7 @@ class PlotLedgerView(APIView):
                     "booking_data": list(bookings),
                     "dealers": list(dealers),
                     "customer_messages": customer_messages_data,
-                    "plot_amount":plot_amount,
+                    "plot_amount": plot_amount,
                     "opening_balance": opening_balance,
                     "closing_balance": current_balance,
                     "transactions": combined_data,
@@ -1058,3 +1057,104 @@ class BalanceSheetView(APIView):
             )
 
         return Response(result)
+
+
+class IncomingPaymentsReport(APIView):
+    def get(self, request):
+        project_id = self.request.query_params.get("project_id")
+        start_date = self.request.query_params.get("start_date")
+        end_date = self.request.query_params.get("end_date")
+        payment_type = self.request.query_params.get("payment_type")
+
+        query_filters = Q()
+        if project_id:
+            query_filters &= Q(project_id=project_id)
+
+        if payment_type:
+            query_filters &= Q(payment_type=payment_type)
+
+        if start_date and end_date:
+            query_filters &= Q(date__gte=start_date) & Q(date__lte=end_date)
+       
+        booking_payments = IncomingFund.objects.filter(
+            query_filters, reference="payment"
+        ).select_related("booking__customer", "booking__plot", "bank")
+        token_payments = Token.objects.filter(query_filters).select_related(
+            "customer", "plot", "bank"
+        )
+
+        booking_payments_serialized = BookingPaymentsSerializer(
+            booking_payments, many=True
+        ).data
+        token_payments_serialized = TokenPaymentsSerializer(
+            token_payments, many=True
+        ).data
+
+        combined_payments = sorted(
+            booking_payments_serialized + token_payments_serialized,
+            key=lambda x: x["date"],
+        )
+
+        payment_types = ["Cash", "Cheque", "Bank_Transfer"]
+        grouped_payments = {
+            ptype: {"total_amount": 0, "payments": []} for ptype in payment_types
+        }
+
+        for payment in combined_payments:
+            payment_type = payment["payment_type"]
+            if payment_type in grouped_payments:
+                grouped_payments[payment_type]["total_amount"] += payment["amount"]
+                grouped_payments[payment_type]["payments"].append(payment)
+
+        response_data = [
+            {
+                "payment_type": ptype,
+                "total_amount": data["total_amount"],
+                "payments": data["payments"],
+            }
+            for ptype, data in grouped_payments.items()
+        ]
+
+        return Response(response_data)
+
+
+class IncomingChequeReport(APIView):
+    def get(self, request):
+        project_id = self.request.query_params.get("project_id")
+        start_date = self.request.query_params.get("start_date")
+        end_date = self.request.query_params.get("end_date")
+        payment_type = self.request.query_params.get("payment_type")
+
+        query_filters = Q()
+        if project_id:
+            query_filters &= Q(project_id=project_id)
+
+        if payment_type:
+            query_filters &= Q(payment_type=payment_type)
+
+        if start_date and end_date:
+            query_filters &= Q(date__gte=start_date) & Q(date__lte=end_date)
+        
+        booking_payments = IncomingFund.objects.filter(
+            query_filters, reference="payment",payment_type="Cheque"
+        ).select_related("booking__customer", "booking__plot", "bank")
+        
+        token_payments = Token.objects.filter(query_filters,payment_type="Cheque").select_related(
+            "customer", "plot", "bank"
+        )
+
+        booking_payments_serialized = BookingPaymentsSerializer(
+            booking_payments, many=True
+        ).data
+        token_payments_serialized = TokenPaymentsSerializer(
+            token_payments, many=True
+        ).data
+
+        combined_payments = sorted(
+            booking_payments_serialized + token_payments_serialized,
+            key=lambda x: x["date"],
+        )
+
+
+
+        return Response(combined_payments)

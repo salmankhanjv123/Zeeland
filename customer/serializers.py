@@ -23,6 +23,13 @@ class CustomersDocumentsSerializer(serializers.ModelSerializer):
         validated_data["id"] = data.get("id")
         return validated_data
 
+class CustomersInfoSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Customers
+        fields = "__all__"  # or specify specific fields
+
+
 class CustomersSerializer(serializers.ModelSerializer):
     files = CustomersDocumentsSerializer(many=True, required=False)
 

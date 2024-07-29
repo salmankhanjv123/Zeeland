@@ -3,9 +3,9 @@ from django.db import transaction
 from .models import Booking, BookingDocuments, Token, PlotResale, TokenDocuments
 from plots.models import Plots
 from payments.models import IncomingFund
-from customer.serializers import CustomersSerializer
+from customer.serializers import CustomersInfoSerializer
 from plots.serializers import PlotsSerializer
-from django.db.models import Sum,Q,Case,Value,F,When,FloatField
+from django.db.models import Sum, Q, Case, Value, F, When, FloatField
 import datetime
 
 
@@ -38,7 +38,7 @@ class BookingDocumentsSerializer(serializers.ModelSerializer):
 
 
 class BookingSerializer(serializers.ModelSerializer):
-    customer_info = CustomersSerializer(source="customer", read_only=True)
+    customer_info = CustomersInfoSerializer(source="customer", read_only=True)
     dealer_name = serializers.CharField(source="dealer.name", read_only=True)
     bank_name = serializers.CharField(source="bank.name", read_only=True)
     plot_info = PlotsSerializer(source="plot", read_only=True)
@@ -52,20 +52,26 @@ class BookingSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         files_data = validated_data.pop("files", [])
         booking_date = validated_data.get("booking_date")
-        installement_month = datetime.datetime(booking_date.year, booking_date.month, 1).date()
+        installement_month = datetime.datetime(
+            booking_date.year, booking_date.month, 1
+        ).date()
 
         try:
             with transaction.atomic():
                 project = validated_data.get("project")
                 try:
-                    latest_booking = Booking.objects.filter(project=project).latest("created_at")
-                    latest_booking_number = int(latest_booking.booking_id.split("-")[1]) + 1
+                    latest_booking = Booking.objects.filter(project=project).latest(
+                        "created_at"
+                    )
+                    latest_booking_number = (
+                        int(latest_booking.booking_id.split("-")[1]) + 1
+                    )
                 except Booking.DoesNotExist:
                     latest_booking_number = 1
 
                 booking_id_str = f"{project.id}-{str(latest_booking_number).zfill(3)}"
                 validated_data["booking_id"] = booking_id_str
-                
+
                 advance_amount = validated_data.get("advance", 0)
                 token = validated_data.get("token")
                 token_amount = token.amount if token else 0
@@ -99,12 +105,14 @@ class BookingSerializer(serializers.ModelSerializer):
                 ).last()
 
                 if existing_resale:
-                    existing_resale.company_profit = existing_resale.remaining + existing_resale.company_amount_paid
+                    existing_resale.company_profit = (
+                        existing_resale.remaining + existing_resale.company_amount_paid
+                    )
                     existing_resale.save()
 
                 for file_data in files_data:
                     BookingDocuments.objects.create(booking=booking, **file_data)
-                
+
                 return booking
         except Exception as e:
             raise serializers.ValidationError(f"Error creating booking: {e}")
@@ -118,26 +126,31 @@ class BookingSerializer(serializers.ModelSerializer):
             with transaction.atomic():
                 for key, value in validated_data.items():
                     setattr(instance, key, value)
-                
+
                 instance.save()
 
                 advance_amount = validated_data.get("advance", instance.advance)
-                advance_payment_obj = IncomingFund.objects.filter(booking=instance, advance_payment=True).first()
+                advance_payment_obj = IncomingFund.objects.filter(
+                    booking=instance, advance_payment=True
+                ).first()
 
                 if advance_payment_obj:
                     advance_payment_obj.amount = advance_amount
                     advance_payment_obj.save()
 
-                payments = IncomingFund.objects.filter(booking=instance.id).aggregate(
-                    total=Sum(
-                        Case(
-                            When(reference='payment', then=F('amount')),
-                            When(reference='return', then=F('amount') * -1),
-                            default=Value(0),
-                            output_field=FloatField(),
+                payments = (
+                    IncomingFund.objects.filter(booking=instance.id).aggregate(
+                        total=Sum(
+                            Case(
+                                When(reference="payment", then=F("amount")),
+                                When(reference="return", then=F("amount") * -1),
+                                default=Value(0),
+                                output_field=FloatField(),
+                            )
                         )
-                    )
-                )['total'] or 0.0
+                    )["total"]
+                    or 0.0
+                )
 
                 print(instance.total_amount)
                 print(payments)
@@ -148,18 +161,23 @@ class BookingSerializer(serializers.ModelSerializer):
                 for file_data in files_data:
                     file_id = file_data.get("id", None)
                     if file_id:
-                        file = BookingDocuments.objects.get(id=file_id, booking=instance)
-                        file.description = file_data.get("description", file.description)
+                        file = BookingDocuments.objects.get(
+                            id=file_id, booking=instance
+                        )
+                        file.description = file_data.get(
+                            "description", file.description
+                        )
                         file.type = file_data.get("type", file.type)
                         if "file" in file_data:
                             file.file = file_data.get("file", file.file)
                         file.save()
                     else:
                         BookingDocuments.objects.create(booking=instance, **file_data)
-                
+
                 return instance
         except Exception as e:
             raise serializers.ValidationError(f"Error updating booking: {e}")
+
 
 class BookingForPaymentsSerializer(serializers.ModelSerializer):
 
@@ -171,7 +189,13 @@ class BookingForPaymentsSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Booking
-        fields = ["id", "booking_details","total_amount","total_receiving_amount","remaining"]
+        fields = [
+            "id",
+            "booking_details",
+            "total_amount",
+            "total_receiving_amount",
+            "remaining",
+        ]
 
 
 class TokenDocumentsSerializer(serializers.ModelSerializer):
@@ -186,11 +210,10 @@ class TokenDocumentsSerializer(serializers.ModelSerializer):
 
 
 class TokenSerializer(serializers.ModelSerializer):
-    customer_info = CustomersSerializer(source="customer", read_only=True)
+    customer_info = CustomersInfoSerializer(source="customer", read_only=True)
     plot_info = PlotsSerializer(source="plot", read_only=True)
     bank_name = serializers.CharField(source="bank.name", read_only=True)
     files = TokenDocumentsSerializer(many=True, required=False)
-
 
     def get_plot_info(self, instance):
         plot_number = instance.plot.plot_number
@@ -251,12 +274,11 @@ class PlotResaleSerializer(serializers.ModelSerializer):
         model = PlotResale
         fields = "__all__"
 
-
     def create(self, validated_data):
-        booking_instance = validated_data.get('booking')
+        booking_instance = validated_data.get("booking")
         if booking_instance:
             booking_instance.status = "close"
-            booking_instance.plot.status="active"
+            booking_instance.plot.status = "active"
             booking_instance.plot.save()
             booking_instance.save()
         return PlotResale.objects.create(**validated_data)

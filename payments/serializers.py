@@ -1,6 +1,7 @@
 from rest_framework import serializers
-from booking.models import Booking
+from booking.models import Booking,Token
 from customer.models import Customers, Dealers
+from payments.models import IncomingFund
 from .models import (
     ExpenseType,
     IncomingFund,
@@ -43,10 +44,43 @@ class BankSerializer(serializers.ModelSerializer):
 
 class BankTransactionSerializer(serializers.ModelSerializer):
     bank_name = serializers.CharField(source="bank.name", read_only=True)
+    customer_name = serializers.SerializerMethodField()
+    plot_number = serializers.SerializerMethodField()
 
     class Meta:
         model = BankTransaction
         fields = "__all__"
+
+    def get_customer_name(self, obj):
+        if obj.related_table == 'incoming_funds':
+            try:
+                related_instance = IncomingFund.objects.get(pk=obj.related_id)
+                return related_instance.booking.customer.name
+            except IncomingFund.DoesNotExist:
+                return None
+        elif obj.related_table == 'token':
+            try:
+                related_instance = Token.objects.get(pk=obj.related_id)
+                return related_instance.customer.name
+            except Token.DoesNotExist:
+                return None
+        return None
+
+    def get_plot_number(self, obj):
+        if obj.related_table == 'incoming_funds':
+            try:
+                related_instance = IncomingFund.objects.get(pk=obj.related_id)
+                booking=related_instance.booking
+                return f"{booking.plot.plot_number} || {booking.plot.get_plot_size()} || {booking.plot.get_type_display()}" 
+            except IncomingFund.DoesNotExist:
+                return None
+        elif obj.related_table == 'token':
+            try:
+                related_instance = Token.objects.get(pk=obj.related_id)
+                return f"{related_instance.plot.plot_number} || {related_instance.plot.get_plot_size()} || {related_instance.plot.get_type_display()}"  
+            except Token.DoesNotExist:
+                return None
+        return None
 
 
 class MonthField(serializers.Field):

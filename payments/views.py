@@ -74,7 +74,7 @@ class BankTransactionViewSet(viewsets.ModelViewSet):
         bank_id = self.request.query_params.get("bank_id")
         account_type = self.request.query_params.get("account_type")
         main_type = self.request.query_params.get("main_type")
-
+        is_deposit=self.request.query_params.get("is_deposit")
         query_filters = Q()
         if bank_id:
             query_filters &= Q(bank_id=bank_id)
@@ -82,47 +82,10 @@ class BankTransactionViewSet(viewsets.ModelViewSet):
             query_filters &= Q(bank__account_type=account_type)
         if main_type:
             query_filters &= Q(bank__main_type=main_type)
+        if is_deposit:
+            query_filters &=Q(is_deposit=is_deposit)
         queryset = BankTransaction.objects.filter(query_filters)
         return queryset
-
-    def list(self, request, *args, **kwargs):
-        bank_id = request.query_params.get("bank_id")
-        account_type = request.query_params.get("account_type")
-        main_type = request.query_params.get("main_type")
-        start_date = request.query_params.get("start_date")
-
-        query_filters = Q()
-        if bank_id:
-            query_filters &= Q(bank_id=bank_id)
-        if account_type:
-            query_filters &= Q(bank__account_type=account_type)
-        if main_type:
-            query_filters &= Q(bank__main_type=main_type)
-
-        queryset = BankTransaction.objects.filter(query_filters).order_by(
-            "transaction_date", "id"
-        )
-        serializer = self.get_serializer(queryset, many=True)
-        serialized_data = serializer.data
-
-        if start_date:
-            # Calculate opening balance before start_date
-            opening_balance_data = queryset.filter(
-                transaction_date__lt=start_date
-            ).aggregate(deposit_sum=Sum("deposit"), payment_sum=Sum("payment"))
-            opening_balance = (opening_balance_data["deposit_sum"] or 0) - (
-                opening_balance_data["payment_sum"] or 0
-            )
-
-            # Calculate running balance for each transaction starting from the opening balance
-            current_balance = opening_balance
-            for transaction in serialized_data:
-                deposit = Decimal(transaction["deposit"])
-                payment = Decimal(transaction["payment"])
-                current_balance += deposit - payment
-                transaction["balance"] = str(current_balance)
-
-        return Response(serialized_data)
 
 
 class BankTransactionAPIView(APIView):
@@ -505,11 +468,15 @@ class BankDepositViewSet(viewsets.ModelViewSet):
 
         start_date = self.request.query_params.get("start_date")
         end_date = self.request.query_params.get("end_date")
+        bank_id=self.request.query_params.get("end_date")
 
         query_filters = Q()
 
         if start_date and end_date:
             query_filters &= Q(date__gte=start_date) & Q(date__lte=end_date)
+        if bank_id:
+            query_filters &= Q(deposit_to=bank_id)
+            
         queryset = BankDeposit.objects.filter(query_filters).prefetch_related("files")
         return queryset
 

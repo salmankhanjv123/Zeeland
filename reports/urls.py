@@ -11,10 +11,14 @@ from .views import (
     CustomerLedgerView,
     PlotLedgerView,
     BalanceSheetView,
+    IncomingPaymentsReport,
+    IncomingChequeReport
 )
 
 urlpatterns = [
     path("incoming-fund-report/", IncomingFundReportView.as_view()),
+    path("incoming-payment-report/", IncomingPaymentsReport.as_view()),
+    path("incoming-cheque-report/", IncomingChequeReport.as_view()),
     path("outgoing-fund-report/", OutgoingFundReportView.as_view()),
     path("journal-voucher-report/", JournalVoucherReportView.as_view()),
     path("dashboard-counts/", TotalCountView.as_view()),

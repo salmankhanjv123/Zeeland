@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from payments.models import IncomingFund, OutgoingFund, JournalVoucher
+from booking.models import Token
 from rest_framework.exceptions import ValidationError
 from plots.models import Plots
 
@@ -13,22 +14,30 @@ class IncomingFundReportSerializer(serializers.ModelSerializer):
 
     def get_plot(self, instance):
         plot = instance.booking.plot
-        return f"{plot.plot_number} || {plot.get_type_display()} || {plot.get_plot_size()}"
+        return (
+            f"{plot.plot_number} || {plot.get_type_display()} || {plot.get_plot_size()}"
+        )
 
     class Meta:
         model = IncomingFund
-        fields = ['project', 'customer', 'plot', 'date',
-                  'installement_month', 'amount', 'remarks']
+        fields = [
+            "project",
+            "customer",
+            "plot",
+            "date",
+            "installement_month",
+            "amount",
+            "remarks",
+        ]
         read_only_fields = fields
 
 
 class OutgoingFundReportSerializer(serializers.ModelSerializer):
-    expense_type = serializers.CharField(
-        source='expense_type.name', read_only=True)
+    expense_type = serializers.CharField(source="expense_type.name", read_only=True)
 
     class Meta:
         model = OutgoingFund
-        fields = ['project', 'expense_type', 'date', 'amount', 'remarks']
+        fields = ["project", "expense_type", "date", "amount", "remarks"]
         read_only_fields = fields
 
 
@@ -36,9 +45,8 @@ class JournalVoucherReportSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = JournalVoucher
-        fields = ['project', 'type', 'date', 'amount', 'remarks']
+        fields = ["project", "type", "date", "amount", "remarks"]
         read_only_fields = fields
-
 
 
 class PlotsSerializer(serializers.ModelSerializer):
@@ -54,5 +62,45 @@ class PlotsSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Plots
-        exclude=["parent_plot","status","project"]
+        exclude = ["parent_plot", "status", "project"]
 
+
+class BookingPaymentsSerializer(serializers.ModelSerializer):
+    customer_name = serializers.CharField(
+        source="booking.customer.name", read_only=True
+    )
+    bank_name = serializers.CharField(source="bank.name", read_only=True)
+    plot = serializers.SerializerMethodField(read_only=True)
+
+    def get_plot(self, instance):
+        plot = instance.booking.plot
+        return (
+            f"{plot.plot_number} || {plot.get_type_display()} || {plot.get_plot_size()}"
+        )
+
+    class Meta:
+        model = IncomingFund
+        fields ="__all__"
+
+
+class TokenPaymentsSerializer(serializers.ModelSerializer):
+    customer_name = serializers.CharField(
+        source="customer.name", read_only=True
+    )
+    bank_name = serializers.CharField(source="bank.name", read_only=True)
+    plot = serializers.SerializerMethodField(read_only=True)
+    reference=serializers.SerializerMethodField(read_only=True)
+
+    def get_plot(self, instance):
+        plot = instance.plot
+        return (
+            f"{plot.plot_number} || {plot.get_type_display()} || {plot.get_plot_size()}"
+        )
+
+    def get_reference(self, instance):
+        return "token"
+
+
+    class Meta:
+        model = Token
+        fields ="__all__"
