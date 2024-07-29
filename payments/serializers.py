@@ -294,7 +294,7 @@ class BankDepositDocumentsSerializer(serializers.ModelSerializer):
 
 
 class BankDepositDetailSerializer(serializers.ModelSerializer):
-    payment_detail = IncomingFundSerializer(source="payment", read_only=True)
+    payment_detail = BankTransactionSerializer(source="payment", read_only=True)
 
     class Meta:
         model = BankDepositDetail

@@ -28,6 +28,7 @@ class BankTransaction(models.Model):
     transaction_date = models.DateField(auto_now_add=True)
     related_table = models.CharField(max_length=50)
     related_id = models.IntegerField()
+    is_deposit = models.BooleanField(default=True)
 
 
 class MonthField(models.DateField):
@@ -61,7 +62,6 @@ class IncomingFund(models.Model):
     bank = models.ForeignKey(
         Bank, related_name="payments", on_delete=models.PROTECT, blank=True, null=True
     )
-    deposit = models.BooleanField(default=False)
 
     class Meta:
         db_table = "incoming_funds"
@@ -162,7 +162,7 @@ class BankDepositDetail(models.Model):
     bank_deposit = models.ForeignKey(
         BankDeposit, related_name="details", on_delete=models.CASCADE
     )
-    payment = models.ForeignKey(IncomingFund, on_delete=models.PROTECT)
+    payment = models.ForeignKey(BankTransaction, on_delete=models.PROTECT)
 
 
 class BankDepositTransactions(models.Model):
@@ -211,7 +211,6 @@ class DealerPayments(models.Model):
         blank=True,
         null=True,
     )
-    deposit = models.BooleanField(default=False)
 
     class Meta:
         db_table = "dealer_payments"

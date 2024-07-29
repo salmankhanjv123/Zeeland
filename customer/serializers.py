@@ -90,7 +90,7 @@ class CustomerMessagesDocumentsSerializer(serializers.ModelSerializer):
 
 
 class CustomerMessagesSerializer(serializers.ModelSerializer):
-    files = CustomerMessagesDocumentsSerializer(many=True)
+    files = CustomerMessagesDocumentsSerializer(many=True,required=False)
     username = serializers.CharField(source="user.username", read_only=True)
     booking_details = serializers.SerializerMethodField(read_only=True)
 
@@ -105,7 +105,7 @@ class CustomerMessagesSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
     def create(self, validated_data):
-        files_data = validated_data.pop("files")
+        files_data = validated_data.pop("files",[])
         date = validated_data.get("date")
         follow_up_message = validated_data.get("follow_up_message")
         customer_message = CustomerMessages.objects.create(**validated_data)
