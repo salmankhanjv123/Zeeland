@@ -16,6 +16,7 @@ from .serializers import (
     BankSerializer,
     BankTransactionSerializer,
     BankDepositSerializer,
+    DealerPaymentsSerializer,
 )
 from .models import (
     IncomingFund,
@@ -27,11 +28,12 @@ from .models import (
     Bank,
     BankTransaction,
     BankDeposit,
+    DealerPayments,
 )
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from datetime import date
-from booking.models import Booking,Token
+from booking.models import Booking, Token
 from customer.models import Customers
 
 
@@ -45,7 +47,7 @@ class BankViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
 
         account_type_string = self.request.query_params.get("account_type")
-        parent_account=self.request.query_params.get("parent_account")
+        parent_account = self.request.query_params.get("parent_account")
         query_filters = Q()
         account_type = (
             [str for str in account_type_string.split(",")]
@@ -54,25 +56,24 @@ class BankViewSet(viewsets.ModelViewSet):
         )
         if account_type:
             query_filters &= Q(account_type__in=account_type)
-        if parent_account=="null":
+        if parent_account == "null":
             query_filters &= Q(parent_account__isnull=True)
 
         queryset = Bank.objects.filter(query_filters)
         return queryset
 
 
-
-
 class BankTransactionViewSet(viewsets.ModelViewSet):
     """
     API endpoint that allows Banks to be viewed or edited.
     """
+
     serializer_class = BankTransactionSerializer
 
     def get_queryset(self):
         bank_id = self.request.query_params.get("bank_id")
-        account_type=self.request.query_params.get("account_type")
-        main_type=self.request.query_params.get("main_type")
+        account_type = self.request.query_params.get("account_type")
+        main_type = self.request.query_params.get("main_type")
 
         query_filters = Q()
         if bank_id:
@@ -85,67 +86,79 @@ class BankTransactionViewSet(viewsets.ModelViewSet):
         return queryset
 
     def list(self, request, *args, **kwargs):
-            bank_id = request.query_params.get("bank_id")
-            account_type=request.query_params.get("account_type")
-            main_type=request.query_params.get("main_type")
-            start_date = request.query_params.get("start_date")
-            
-            query_filters = Q()
-            if bank_id:
-                query_filters &= Q(bank_id=bank_id)
-            if account_type:
-                query_filters &= Q(bank__account_type=account_type)
-            if main_type:
-                query_filters &= Q(bank__main_type=main_type)
+        bank_id = request.query_params.get("bank_id")
+        account_type = request.query_params.get("account_type")
+        main_type = request.query_params.get("main_type")
+        start_date = request.query_params.get("start_date")
 
-            queryset = BankTransaction.objects.filter(query_filters).order_by('transaction_date', 'id')
-            serializer = self.get_serializer(queryset, many=True)
-            serialized_data = serializer.data
+        query_filters = Q()
+        if bank_id:
+            query_filters &= Q(bank_id=bank_id)
+        if account_type:
+            query_filters &= Q(bank__account_type=account_type)
+        if main_type:
+            query_filters &= Q(bank__main_type=main_type)
 
-            if start_date:
-                # Calculate opening balance before start_date
-                opening_balance_data = queryset.filter(transaction_date__lt=start_date).aggregate(
-                    deposit_sum=Sum('deposit'),
-                    payment_sum=Sum('payment')
-                )
-                opening_balance = (opening_balance_data['deposit_sum'] or 0) - (opening_balance_data['payment_sum'] or 0)
+        queryset = BankTransaction.objects.filter(query_filters).order_by(
+            "transaction_date", "id"
+        )
+        serializer = self.get_serializer(queryset, many=True)
+        serialized_data = serializer.data
 
-                # Calculate running balance for each transaction starting from the opening balance
-                current_balance = opening_balance
-                for transaction in serialized_data:
-                    deposit = Decimal(transaction['deposit'])
-                    payment = Decimal(transaction['payment'])
-                    current_balance += deposit - payment
-                    transaction['balance'] = str(current_balance)
+        if start_date:
+            # Calculate opening balance before start_date
+            opening_balance_data = queryset.filter(
+                transaction_date__lt=start_date
+            ).aggregate(deposit_sum=Sum("deposit"), payment_sum=Sum("payment"))
+            opening_balance = (opening_balance_data["deposit_sum"] or 0) - (
+                opening_balance_data["payment_sum"] or 0
+            )
 
-            return Response(serialized_data)
+            # Calculate running balance for each transaction starting from the opening balance
+            current_balance = opening_balance
+            for transaction in serialized_data:
+                deposit = Decimal(transaction["deposit"])
+                payment = Decimal(transaction["payment"])
+                current_balance += deposit - payment
+                transaction["balance"] = str(current_balance)
+
+        return Response(serialized_data)
 
 
 class BankTransactionAPIView(APIView):
     def get(self, request, *args, **kwargs):
-        bank_id = request.query_params.get('bank_id')
-        start_date = request.query_params.get('start_date')
-        end_date = request.query_params.get('end_date')
+        bank_id = request.query_params.get("bank_id")
+        start_date = request.query_params.get("start_date")
+        end_date = request.query_params.get("end_date")
 
         if not bank_id or not start_date or not end_date:
-            return Response({'error': 'bank_id, start_date, and end_date are required'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"error": "bank_id, start_date, and end_date are required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         try:
-            start_date = datetime.datetime.strptime(start_date, '%Y-%m-%d').date()
-            end_date = datetime.datetime.strptime(end_date, '%Y-%m-%d').date()
+            start_date = datetime.datetime.strptime(start_date, "%Y-%m-%d").date()
+            end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d").date()
         except ValueError:
-            return Response({'error': 'Invalid date format. Use YYYY-MM-DD.'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"error": "Invalid date format. Use YYYY-MM-DD."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         # Filter transactions based on bank_id and date range
         query_filters = Q(bank_id=bank_id)
-        transactions = BankTransaction.objects.filter(query_filters, transaction_date__range=[start_date, end_date]).order_by('transaction_date', 'id')
+        transactions = BankTransaction.objects.filter(
+            query_filters, transaction_date__range=[start_date, end_date]
+        ).order_by("transaction_date", "id")
 
         # Calculate opening balance before start_date
-        opening_balance_data = BankTransaction.objects.filter(query_filters, transaction_date__lt=start_date).aggregate(
-            deposit_sum=Sum('deposit'),
-            payment_sum=Sum('payment')
+        opening_balance_data = BankTransaction.objects.filter(
+            query_filters, transaction_date__lt=start_date
+        ).aggregate(deposit_sum=Sum("deposit"), payment_sum=Sum("payment"))
+        opening_balance = (opening_balance_data["deposit_sum"] or 0) - (
+            opening_balance_data["payment_sum"] or 0
         )
-        opening_balance = (opening_balance_data['deposit_sum'] or 0) - (opening_balance_data['payment_sum'] or 0)
 
         # Prepare transaction records with running balance
         transaction_records = []
@@ -154,29 +167,32 @@ class BankTransactionAPIView(APIView):
             deposit = transaction.deposit
             payment = transaction.payment
             current_balance += deposit - payment
-            transaction_records.append({
-                'id': transaction.id,
-                'bank_id': transaction.bank_id,
-                'bank_name':transaction.bank.name,
-                'transaction_type': transaction.transaction_type,
-                'payment': str(payment),
-                'deposit': str(deposit),
-                'transaction_date': transaction.transaction_date,
-                'related_table': transaction.related_table,
-                'related_id': transaction.related_id,
-                'balance': str(current_balance)
-            })
+            transaction_records.append(
+                {
+                    "id": transaction.id,
+                    "bank_id": transaction.bank_id,
+                    "bank_name": transaction.bank.name,
+                    "transaction_type": transaction.transaction_type,
+                    "payment": str(payment),
+                    "deposit": str(deposit),
+                    "transaction_date": transaction.transaction_date,
+                    "related_table": transaction.related_table,
+                    "related_id": transaction.related_id,
+                    "balance": str(current_balance),
+                }
+            )
 
         # Calculate closing balance
         closing_balance = current_balance
 
         response_data = {
-            'opening_balance': str(opening_balance),
-            'closing_balance': str(closing_balance),
-            'transactions': transaction_records
+            "opening_balance": str(opening_balance),
+            "closing_balance": str(closing_balance),
+            "transactions": transaction_records,
         }
 
         return Response(response_data)
+
 
 # Ensure to add the URL route for this view in your urls.py
 
@@ -217,7 +233,7 @@ class IncomingFundViewSet(viewsets.ModelViewSet):
             query_filters &= Q(bank_id=bank_id)
         if account_detail_type:
             query_filters &= Q(bank__detail_type=account_detail_type)
-            if account_detail_type=="Undeposited_Funds":
+            if account_detail_type == "Undeposited_Funds":
                 query_filters &= Q(deposit=False)
         if plot_id:
             query_filters &= Q(booking__plot_id=plot_id)
@@ -236,13 +252,13 @@ class IncomingFundViewSet(viewsets.ModelViewSet):
     def perform_destroy(self, instance):
         amount = instance.amount
         booking = instance.booking
-        reference=instance.reference
-        if reference=="payment":
+        reference = instance.reference
+        if reference == "payment":
             booking.remaining += amount
             booking.total_receiving_amount -= amount
-        elif reference=="refund":
+        elif reference == "refund":
             booking.remaining -= amount
-            booking.total_receiving_amount += amount   
+            booking.total_receiving_amount += amount
         booking.save()
         return super().perform_destroy(instance)
 
@@ -429,7 +445,7 @@ class BankTransactionsAPIView(APIView):
 
         payments = bank.payments.filter(date_filter)
         expenses = bank.expenses.filter(date_filter)
-        deposits= bank.deposits.filter(date_filter)
+        deposits = bank.deposits.filter(date_filter)
 
         combined = []
 
@@ -498,7 +514,63 @@ class BankDepositViewSet(viewsets.ModelViewSet):
         return queryset
 
 
-def create_or_update_transaction(instance, related_table, transaction_type, amount_field):
+class DealerPaymentsViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint that allows DealerPayments to be viewed or edited.
+    """
+
+    serializer_class = DealerPaymentsSerializer
+
+    def get_queryset(self):
+        project_id = self.request.query_params.get("project")
+        plot_id = self.request.query_params.get("plot_id")
+        dealer_id = self.request.query_params.get("dealer_id")
+        booking_id = self.request.query_params.get("booking_id")
+        booking_type = self.request.query_params.get("booking_type")
+        payment_type = self.request.query_params.get("payment_type")
+        bank_id = self.request.query_params.get("bank_id")
+        account_detail_type = self.request.query_params.get("account_detail_type")
+        reference = self.request.query_params.get("reference")
+
+        start_date = self.request.query_params.get("start_date")
+        end_date = self.request.query_params.get("end_date")
+
+        query_filters = Q()
+        if project_id:
+            query_filters &= Q(project_id=project_id)
+        if reference:
+            query_filters &= Q(reference=reference)
+        if booking_type:
+            query_filters &= Q(booking__booking_type=booking_type)
+        if booking_id:
+            query_filters &= Q(booking_id=booking_id)
+        if payment_type:
+            query_filters &= Q(payment_type=payment_type)
+        if bank_id:
+            query_filters &= Q(bank_id=bank_id)
+        if account_detail_type:
+            query_filters &= Q(bank__detail_type=account_detail_type)
+            if account_detail_type == "Undeposited_Funds":
+                query_filters &= Q(deposit=False)
+        if plot_id:
+            query_filters &= Q(booking__plot_id=plot_id)
+        if dealer_id:
+            query_filters &= Q(booking__dealer_id=dealer_id)
+
+        if start_date and end_date:
+            query_filters &= Q(date__gte=start_date) & Q(date__lte=end_date)
+        queryset = (
+            DealerPayments.objects.filter(query_filters)
+            .select_related("booking", "booking__dealer", "booking__plot", "bank")
+            .prefetch_related("files")
+        )
+        return queryset
+
+
+
+def create_or_update_transaction(
+    instance, related_table, transaction_type, amount_field
+):
     bank_field = getattr(instance, "bank", None)
     if bank_field:
         amount = getattr(instance, amount_field, None)
@@ -537,16 +609,20 @@ def create_or_update_transaction(instance, related_table, transaction_type, amou
                     related_table=related_table,
                     related_id=instance.id,
                 )
+
+
 @receiver(post_save, sender=IncomingFund)
 def create_payment_transaction(sender, instance, **kwargs):
-    create_or_update_transaction(instance, "incoming_funds", instance.reference, "amount")
+    create_or_update_transaction(
+        instance, "incoming_funds", instance.reference, "amount"
+    )
+
 
 # @receiver(post_save, sender=Booking)
 # def create_booking_transaction(sender, instance, **kwargs):
 #     create_or_update_transaction(instance, "booking", "Booking", "advance")
 
+
 @receiver(post_save, sender=Token)
 def create_token_transaction(sender, instance, **kwargs):
     create_or_update_transaction(instance, "token", "Token", "amount")
-
-

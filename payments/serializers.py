@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from booking.models import Booking
-from customer.models import Customers
+from customer.models import Customers, Dealers
 from .models import (
     ExpenseType,
     IncomingFund,
@@ -16,6 +16,8 @@ from .models import (
     BankDepositTransactions,
     BankDepositDetail,
     BankDepositDocuments,
+    DealerPayments,
+    DealerPaymentsDocuments,
 )
 import datetime
 from django.db import transaction
@@ -38,14 +40,14 @@ class BankSerializer(serializers.ModelSerializer):
         model = Bank
         fields = "__all__"
 
+
 class BankTransactionSerializer(serializers.ModelSerializer):
-    bank_name = serializers.CharField(
-        source="bank.name", read_only=True
-    )
+    bank_name = serializers.CharField(source="bank.name", read_only=True)
 
     class Meta:
         model = BankTransaction
         fields = "__all__"
+
 
 class MonthField(serializers.Field):
     def to_internal_value(self, data):
@@ -144,7 +146,6 @@ class IncomingFundSerializer(serializers.ModelSerializer):
                 booking.save()
             else:
                 raise ValueError(f"Invalid reference type: {reference}")
-            
 
         for key, value in validated_data.items():
             setattr(instance, key, value)
@@ -293,7 +294,8 @@ class BankDepositDocumentsSerializer(serializers.ModelSerializer):
 
 
 class BankDepositDetailSerializer(serializers.ModelSerializer):
-    payment_detail=IncomingFundSerializer(source="payment",read_only=True)
+    payment_detail = IncomingFundSerializer(source="payment", read_only=True)
+
     class Meta:
         model = BankDepositDetail
         exclude = ["bank_deposit"]
@@ -305,8 +307,8 @@ class BankDepositDetailSerializer(serializers.ModelSerializer):
 
 
 class BankDepositTransactionsSerializer(serializers.ModelSerializer):
-    customer_name=serializers.CharField(source="customer.name",read_only=True)
-    bank_name=serializers.CharField(source="bank.name",read_only=True)
+    customer_name = serializers.CharField(source="customer.name", read_only=True)
+    bank_name = serializers.CharField(source="bank.name", read_only=True)
 
     class Meta:
         model = BankDepositTransactions
@@ -333,9 +335,9 @@ class BankDepositSerializer(serializers.ModelSerializer):
         details_data = validated_data.pop("details", [])
         transactions_data = validated_data.pop("transactions", [])
 
-        date=validated_data.get("date")
-        amount=validated_data.get("amount")
-        bank=validated_data.get("deposit_to")
+        date = validated_data.get("date")
+        amount = validated_data.get("amount")
+        bank = validated_data.get("deposit_to")
 
         try:
             with transaction.atomic():
@@ -348,12 +350,11 @@ class BankDepositSerializer(serializers.ModelSerializer):
                     transaction_type="deposit",
                     related_table="bank_deposits",
                     related_id=bank_deposit.id,
-
                 )
                 for detail_data in details_data:
                     payment = detail_data.get("payment")
-                    undeposit_bank=payment.bank
-                    payment.deposit=True
+                    undeposit_bank = payment.bank
+                    payment.deposit = True
                     payment.save()
                     BankDepositDetail.objects.create(
                         bank_deposit=bank_deposit, **detail_data
@@ -366,25 +367,23 @@ class BankDepositSerializer(serializers.ModelSerializer):
                     transaction_type="deposit",
                     related_table="bank_deposits",
                     related_id=bank_deposit.id,
-
                 )
                 for data in transactions_data:
-                    date=data.get("date")
-                    amount=abs(data.get("amount"))
-                    bank=data.get("bank")
+                    date = data.get("date")
+                    amount = abs(data.get("amount"))
+                    bank = data.get("bank")
                     BankDepositTransactions.objects.create(
                         bank_deposit=bank_deposit, **data
                     )
                     BankTransaction.objects.create(
-                    bank=bank,
-                    transaction_date=date,
-                    payment=amount,
-                    deposit=0,
-                    transaction_type="deposit",
-                    related_table="bank_deposits",
-                    related_id=bank_deposit.id,
-
-                )
+                        bank=bank,
+                        transaction_date=date,
+                        payment=amount,
+                        deposit=0,
+                        transaction_type="deposit",
+                        related_table="bank_deposits",
+                        related_id=bank_deposit.id,
+                    )
                 for file_data in files_data:
                     BankDepositDocuments.objects.create(
                         bank_deposit=bank_deposit, **file_data
@@ -457,3 +456,60 @@ class BankDepositSerializer(serializers.ModelSerializer):
                 return instance
         except Exception as e:
             raise ValidationError({"error": str(e)})
+
+
+class DealersSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Dealers
+        fields = ["name", "contact", "cnic", "address"]
+
+
+class DealerPaymentsDocumentsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DealerPaymentsDocuments
+        exclude = ["payment"]
+
+    def to_internal_value(self, data):
+        validated_data = super().to_internal_value(data)
+        validated_data["id"] = data.get("id")
+        return validated_data
+
+
+class DealerPaymentsSerializer(serializers.ModelSerializer):
+    files = DealerPaymentsDocumentsSerializer(many=True, required=False)
+    booking_info = BookingSerializer(source="booking", read_only=True)
+    dealer = DealersSerializer(source="booking.dealer", read_only=True)
+    bank_name = serializers.CharField(source="bank.name", read_only=True)
+    account_type = serializers.CharField(source="bank.account_type", read_only=True)
+
+    class Meta:
+        model = DealerPayments
+        fields = "__all__"
+
+    def create(self, validated_data):
+        files_data = validated_data.pop("files", [])
+        payment = DealerPayments.objects.create(**validated_data)
+        for file_data in files_data:
+            DealerPaymentsDocuments.objects.create(payment=payment, **file_data)
+        return payment
+
+    def update(self, instance, validated_data):
+        files_data = validated_data.pop("files", [])
+
+        for key, value in validated_data.items():
+            setattr(instance, key, value)
+        instance.save()
+
+        for file_data in files_data:
+            file_id = file_data.get("id", None)
+            if file_id:
+                file = DealerPaymentsDocuments.objects.get(id=file_id, payment=instance)
+                file.description = file_data.get("description", file.description)
+                file.type = file_data.get("type", file.type)
+                if "file" in file_data:
+                    file.file = file_data.get("file", file.file)
+                file.save()
+            else:
+                DealerPaymentsDocuments.objects.create(payment=instance, **file_data)
+        return instance
