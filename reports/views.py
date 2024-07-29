@@ -535,10 +535,19 @@ class CustomerLedgerView(APIView):
             .values(
                 "id",
                 "date",
-                "amount",
                 "remarks",
                 "reference",
                 "booking_id",
+                credit=Case(
+                        When(reference="return", then=F("amount")),
+                        default=Value(0),
+                        output_field=FloatField(),
+                    ),
+                debit=Case(
+                        When(reference="payment", then=F("amount")),
+                        default=Value(0),
+                        output_field=FloatField(),
+                    ),
                 document=F("id"),
                 customer_name=F("booking__customer__name"),
             )
@@ -549,8 +558,9 @@ class CustomerLedgerView(APIView):
             .values(
                 "id",
                 "date",
-                "amount",
                 "remarks",
+                debit=F("amount"),
+                credit=Value(0.0),
                 document=F("id"),
                 customer_name=F("customer__name"),
                 reference=Value("token", output_field=CharField()),
@@ -563,7 +573,8 @@ class CustomerLedgerView(APIView):
                 "id",
                 "date",
                 "remarks",
-                amount=Value(0.0, output_field=FloatField()),
+                debit=F("company_amount_paid"),
+                credit=Value(0.0),
                 document=F("id"),
                 customer_name=F("booking__customer__name"),
                 reference=Value("close booking", output_field=CharField()),
@@ -578,6 +589,55 @@ class CustomerLedgerView(APIView):
             key=lambda x: x["date"],
         )
 
+        booking_amount = (
+            Booking.objects.filter(
+                customer_id=customer_id, booking_date__lt=start_date
+            ).aggregate(
+                total_amount=Coalesce(
+                    Sum("total_amount"), Value(0, output_field=FloatField())
+                )
+            )[
+                "total_amount"
+            ]
+            or 0.0
+        )
+        paid_amount = (
+            IncomingFund.objects.filter(
+                booking__customer_id=customer_id, date__lt=start_date
+            ).aggregate(
+                total_amount=Sum(
+                    Case(
+                        When(reference="payment", then=F("amount")),
+                        When(reference="refund", then=-F("amount")),
+                        default=Value(0),
+                        output_field=FloatField(),
+                    )
+                )
+            )[
+                "total_amount"
+            ]
+            or 0.0
+        )
+        token_amount = (
+            Token.objects.filter(
+                customer_id=customer_id, date__lt=start_date
+            ).aggregate(
+                total_amount=Coalesce(
+                    Sum("amount"), Value(0, output_field=FloatField())
+                )
+            )[
+                "total_amount"
+            ]
+            or 0.0
+        )
+
+        opening_balance = booking_amount - paid_amount - token_amount
+        current_balance = opening_balance
+
+
+        for entry in combined_data:
+            current_balance += entry["credit"] - entry["debit"]
+            entry["balance"] = current_balance
         # Fetch customer information
         customer_info = (
             Customers.objects.filter(id=customer_id)
