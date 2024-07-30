@@ -534,13 +534,14 @@ class DealerPaymentsViewSet(viewsets.ModelViewSet):
         return queryset
 
 
-
 def create_or_update_transaction(
     instance, related_table, transaction_type, amount_field
 ):
     bank_field = getattr(instance, "bank", None)
     if bank_field:
         amount = getattr(instance, amount_field, None)
+        is_deposit = bank_field.detail_type != "Undeposited_Funds"
+        
         try:
             # Try to get the existing transaction
             transaction = BankTransaction.objects.get(
@@ -555,6 +556,7 @@ def create_or_update_transaction(
             else:
                 transaction.deposit = amount
                 transaction.payment = 0
+            transaction.is_deposit = is_deposit
             transaction.save()
         except BankTransaction.DoesNotExist:
             # If the transaction doesn't exist, create it
@@ -566,6 +568,7 @@ def create_or_update_transaction(
                     payment=amount,
                     related_table=related_table,
                     related_id=instance.id,
+                    is_deposit=is_deposit
                 )
             else:
                 BankTransaction.objects.create(
@@ -575,19 +578,14 @@ def create_or_update_transaction(
                     payment=0,
                     related_table=related_table,
                     related_id=instance.id,
+                    is_deposit=is_deposit
                 )
-
 
 @receiver(post_save, sender=IncomingFund)
 def create_payment_transaction(sender, instance, **kwargs):
     create_or_update_transaction(
         instance, "incoming_funds", instance.reference, "amount"
     )
-
-
-# @receiver(post_save, sender=Booking)
-# def create_booking_transaction(sender, instance, **kwargs):
-#     create_or_update_transaction(instance, "booking", "Booking", "advance")
 
 
 @receiver(post_save, sender=Token)
