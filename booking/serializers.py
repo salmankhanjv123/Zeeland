@@ -82,7 +82,7 @@ class BookingSerializer(serializers.ModelSerializer):
                 plot.save()
 
                 if token:
-                    token.status = "done"
+                    token.status = "accepted"
                     token.save()
 
                 booking = Booking.objects.create(**validated_data)
@@ -151,9 +151,6 @@ class BookingSerializer(serializers.ModelSerializer):
                     )["total"]
                     or 0.0
                 )
-
-                print(instance.total_amount)
-                print(payments)
                 instance.total_receiving_amount = payments + token_amount
                 instance.remaining = instance.total_amount - payments - token_amount
                 instance.save()
