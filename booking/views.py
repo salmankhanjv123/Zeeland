@@ -103,7 +103,7 @@ class TokenViewSet(viewsets.ModelViewSet):
         if customer_id:
             query_filters &= Q(customer_id=customer_id)
         if start_date and end_date:
-            query_filters &= Q(booking_date__gte=start_date) & Q(booking_date__lte=end_date)
+            query_filters &= Q(date__gte=start_date) & Q(date__lte=end_date)
         queryset = Token.objects.filter(query_filters).select_related('customer','bank', 'plot').prefetch_related("files")
         return queryset
 
