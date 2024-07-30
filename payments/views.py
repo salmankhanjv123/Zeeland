@@ -468,7 +468,7 @@ class BankDepositViewSet(viewsets.ModelViewSet):
 
         start_date = self.request.query_params.get("start_date")
         end_date = self.request.query_params.get("end_date")
-        bank_id=self.request.query_params.get("end_date")
+        bank_id=self.request.query_params.get("bank_id")
 
         query_filters = Q()
 
