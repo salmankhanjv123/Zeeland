@@ -386,9 +386,10 @@ class BankDepositSerializer(serializers.ModelSerializer):
                     related_id=bank_deposit.id,
                 )
                 for detail_data in details_data:
+                    print(detail_data)
                     payment = detail_data.get("payment")
                     undeposit_bank = payment.bank
-                    payment.id_deposit = True
+                    payment.is_deposit = True
                     payment.save()
                     BankDepositDetail.objects.create(
                         bank_deposit=bank_deposit, **detail_data

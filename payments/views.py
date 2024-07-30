@@ -496,7 +496,6 @@ class DealerPaymentsViewSet(viewsets.ModelViewSet):
         booking_type = self.request.query_params.get("booking_type")
         payment_type = self.request.query_params.get("payment_type")
         bank_id = self.request.query_params.get("bank_id")
-        account_detail_type = self.request.query_params.get("account_detail_type")
         reference = self.request.query_params.get("reference")
 
         start_date = self.request.query_params.get("start_date")
@@ -515,10 +514,7 @@ class DealerPaymentsViewSet(viewsets.ModelViewSet):
             query_filters &= Q(payment_type=payment_type)
         if bank_id:
             query_filters &= Q(bank_id=bank_id)
-        if account_detail_type:
-            query_filters &= Q(bank__detail_type=account_detail_type)
-            if account_detail_type == "Undeposited_Funds":
-                query_filters &= Q(deposit=False)
+
         if plot_id:
             query_filters &= Q(booking__plot_id=plot_id)
         if dealer_id:
