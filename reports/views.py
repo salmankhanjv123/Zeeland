@@ -1017,14 +1017,46 @@ class PlotLedgerView(APIView):
                 ]
 
                 plot_data = plot_serializer.data
+                paid_amount = (
+                    IncomingFund.objects.filter(
+                        booking__plot_id=plot_id
+                    ).aggregate(
+                        total_amount=Sum(
+                            Case(
+                                When(reference="payment", then=F("amount")),
+                                When(reference="refund", then=-F("amount")),
+                                default=Value(0),
+                                output_field=FloatField(),
+                            )
+                        )
+                    )[
+                        "total_amount"
+                    ]
+                    or 0.0
+                )
+                token_amount = (
+                    Token.objects.filter(
+                        plot_id=plot_id
+                    ).aggregate(
+                        total_amount=Coalesce(
+                            Sum("amount"), Value(0, output_field=FloatField())
+                        )
+                    )[
+                        "total_amount"
+                    ]
+                    or 0.0
+                )
                 plot_amount = plot_data.get("total")
+                remaining_amount=plot_amount-token_amount-paid_amount
+
                 response_data = {
                     "plot_data": plot_data,
                     "customer_info": list(customer_info),
                     "booking_data": list(bookings),
                     "dealers": list(dealers),
                     "customer_messages": customer_messages_data,
-                    "plot_amount": plot_amount,
+                    "total_amount": plot_amount,
+                    "remaining_amount":remaining_amount,
                     "opening_balance": opening_balance,
                     "closing_balance": current_balance,
                     "transactions": combined_data,
