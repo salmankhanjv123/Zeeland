@@ -27,6 +27,7 @@ urlpatterns = [
     path("annual-incoming-fund/", AnnualIncomingFundGraphView.as_view()),
     path("dealer-ledger/", DealerLedgerView.as_view()),
     path("customer-ledger/", CustomerLedgerView.as_view()),
+    
     path("plot-ledger/", PlotLedgerView.as_view()),
     path("balance-report/", BalanceSheetView.as_view()),
 ]

@@ -32,7 +32,6 @@ class Booking(models.Model):
     installment_per_month = models.FloatField()
 
     remarks = models.TextField(null=True)
-    plot_amount = models.FloatField()
     total_amount = models.FloatField()
     advance = models.FloatField()
     payment_type = models.CharField(max_length=20, default="cash")
