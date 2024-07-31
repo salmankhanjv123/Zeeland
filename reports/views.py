@@ -407,7 +407,7 @@ class DealerLedgerView(APIView):
                     "remarks",
                     "reference",
                     credit=Case(
-                        When(reference="return", then=F("amount")),
+                        When(reference="refund", then=F("amount")),
                         default=Value(0),
                         output_field=FloatField(),
                     ),
