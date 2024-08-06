@@ -947,6 +947,9 @@ class PlotLedgerView(APIView):
                         )
 
                         plot_data = plot_serializer.data
+                        plot_amount = Booking.objects.filter(id=booking_id).aggregate(
+                            total_amount=Coalesce(Sum("total_amount"), Value(0, output_field=FloatField()))
+                        )["total_amount"] or 0.0
                         paid_amount = (
                             IncomingFund.objects.filter(booking_id=booking_id).aggregate(
                                 total_amount=Sum(
@@ -975,7 +978,6 @@ class PlotLedgerView(APIView):
                             or 0.0
                         )
 
-                        plot_amount = plot_data.get("total")
                         remaining_amount = plot_amount - token_amount - paid_amount - resale_amount
 
                         response_data = {
