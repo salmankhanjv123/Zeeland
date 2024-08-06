@@ -646,3 +646,8 @@ def create_dealerpayment_transaction(sender, instance, **kwargs):
         transaction_type = instance.reference.lower()  # or set a default value
     
     create_or_update_expenses_transaction(instance, "dealer_payments", transaction_type, "amount")
+
+
+@receiver(post_save, sender=OutgoingFund)
+def create_expense_transaction(sender, instance, **kwargs):
+    create_or_update_expenses_transaction(instance, "outgoing_funds", "expense", "amount")
