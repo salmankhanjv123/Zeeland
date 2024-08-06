@@ -61,7 +61,7 @@ class Booking(models.Model):
     dealer_comission_percentage = models.FloatField(default=0)
     dealer_comission_amount = models.FloatField(default=0)
     status = models.CharField(max_length=10, default="active")
-    token = models.ForeignKey("Token", on_delete=models.PROTECT, blank=True, null=True)
+    token = models.ForeignKey("Token", on_delete=models.PROTECT,related_name="booking", blank=True, null=True)
 
     def __str__(self):
         return self.booking_id
