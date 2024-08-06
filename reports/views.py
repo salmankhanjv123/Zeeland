@@ -968,8 +968,19 @@ class PlotLedgerView(APIView):
                     ]
                     or 0.0
                 )
-
-                opening_balance = booking_amount - paid_amount - token_amount
+                resale_amount = (
+                    PlotResale.objects.filter(
+                        booking__plot_id=plot_id, date__lt=start_date
+                    ).aggregate(
+                        total_amount=Coalesce(
+                            Sum("company_amount_paid"), Value(0, output_field=FloatField())
+                        )
+                    )[
+                        "total_amount"
+                    ]
+                    or 0.0
+                )
+                opening_balance = booking_amount - paid_amount - token_amount -resale_amount
                 current_balance = opening_balance
 
                 for entry in combined_data:
@@ -1046,8 +1057,20 @@ class PlotLedgerView(APIView):
                     ]
                     or 0.0
                 )
+                resale_amount = (
+                    PlotResale.objects.filter(
+                        booking__plot_id=plot_id,
+                    ).aggregate(
+                        total_amount=Coalesce(
+                            Sum("company_amount_paid"), Value(0, output_field=FloatField())
+                        )
+                    )[
+                        "total_amount"
+                    ]
+                    or 0.0
+                )
                 plot_amount = plot_data.get("total")
-                remaining_amount=plot_amount-token_amount-paid_amount
+                remaining_amount=plot_amount-token_amount-paid_amount-resale_amount
 
                 response_data = {
                     "plot_data": plot_data,
