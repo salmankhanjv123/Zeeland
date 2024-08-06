@@ -838,7 +838,7 @@ class PlotLedgerView(APIView):
                             "reference",
                             "booking_id",
                             credit=Case(
-                                When(reference="return", then=F("amount")),
+                                When(reference="refund", then=F("amount")),
                                 default=Value(0),
                                 output_field=FloatField(),
                             ),
