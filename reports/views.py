@@ -795,7 +795,6 @@ class CustomerLedgerView(APIView):
         }
 
         return Response(response_data)
-
 class PlotLedgerView(APIView):
     def get(self, request):
         plot_id = self.request.query_params.get("plot_id")
@@ -861,7 +860,7 @@ class PlotLedgerView(APIView):
                         reference=Value("token", output_field=CharField()),
                     )
 
-                    resale_data = PlotResale.objects.filter(booking_id=booking_id).select_related("customer").values(
+                    resale_data = PlotResale.objects.filter(booking=booking_id).select_related("customer").values(
                         "id",
                         "date",
                         "remarks",
@@ -896,7 +895,7 @@ class PlotLedgerView(APIView):
                         total_amount=Coalesce(Sum("amount"), Value(0, output_field=FloatField()))
                     )["total_amount"] or 0.0
 
-                    resale_amount = PlotResale.objects.filter(booking_id=booking_id, date__lt=start_date).aggregate(
+                    resale_amount = PlotResale.objects.filter(booking=booking_id, date__lt=start_date).aggregate(
                         total_amount=Coalesce(Sum("company_amount_paid"), Value(0, output_field=FloatField()))
                     )["total_amount"] or 0.0
 
@@ -968,7 +967,7 @@ class PlotLedgerView(APIView):
                     )
 
                     resale_amount = (
-                        PlotResale.objects.filter(booking_id=booking_id).aggregate(
+                        PlotResale.objects.filter(booking=booking_id).aggregate(
                             total_amount=Coalesce(Sum("company_amount_paid"), Value(0, output_field=FloatField()))
                         )["total_amount"]
                         or 0.0
@@ -1006,18 +1005,51 @@ class PlotLedgerView(APIView):
 
             # Add separate tokens without related bookings at the end
             for token in separate_tokens:
-                result.append({
-                    "plot_data": None,
-                    "customer_info": None,
-                    "booking_data": None,
-                    "dealer_info": None,
-                    "customer_messages": None,
-                    "total_amount": None,
-                    "remaining_amount": None,
-                    "opening_balance": None,
-                    "closing_balance": None,
-                    "transactions": [token],
-                })
+                token_id = token["id"]
+
+
+
+                opening_balance = 0.0
+                current_balance = opening_balance
+                combined_data=[token]
+                for entry in combined_data:
+                    entry["balance"] = current_balance
+
+                customer_info = Customers.objects.filter(token=token_id).values(
+                    "id", "name", "father_name", "contact", "address"
+                )
+
+                plot_query = Plots.objects.get(id=plot_id)
+                plot_serializer = PlotsSerializer(plot_query)
+
+                plot_data = plot_serializer.data
+
+
+                token_amount = (
+                    Token.objects.filter(id=token_id).aggregate(
+                        total_amount=Coalesce(Sum("amount"), Value(0, output_field=FloatField()))
+                    )["total_amount"]
+                    or 0.0
+                )
+
+
+
+                plot_amount = plot_data.get("total")
+                remaining_amount = plot_amount - token_amount 
+
+                response_data = {
+                    "plot_data": plot_data,
+                    "customer_info": list(customer_info),
+                    "booking_data": [],
+                    "dealer_info": [],
+                    "customer_messages": [],
+                    "total_amount": plot_amount,
+                    "remaining_amount": remaining_amount,
+                    "opening_balance": opening_balance,
+                    "closing_balance": current_balance,
+                    "transactions": combined_data,
+                }
+                result.append(response_data)
 
             return Response(result)
 
