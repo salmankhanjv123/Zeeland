@@ -811,15 +811,15 @@ class PlotLedgerView(APIView):
             plots = [parent_plot] + list(child_plots)
             plot_ids = [plot.id for plot in plots]
             result = []
-            separate_tokens = []
 
             for plot_id in plot_ids:
                 bookings = Booking.objects.filter(plot_id=plot_id)
+                
                 if bookings.exists():
                     for booking in bookings:
                         booking_id = booking.id
 
-                        booking_data = Booking.objects.filter(id=booking_id).select_related("customer").values(
+                        booking_data = Booking.objects.filter(id=booking_id,booking_date__gte=start_date,booking_date__lte=end_date).select_related("customer").values(
                             "id",
                             "remarks",
                             "status",
@@ -831,7 +831,7 @@ class PlotLedgerView(APIView):
                             reference=Value("booking", output_field=CharField()),
                         )
 
-                        payment_data = IncomingFund.objects.filter(booking_id=booking_id).select_related("booking__customer").values(
+                        payment_data = IncomingFund.objects.filter(booking_id=booking_id,date__gte=start_date,date__lte=end_date).select_related("booking__customer").values(
                             "id",
                             "date",
                             "remarks",
@@ -851,7 +851,7 @@ class PlotLedgerView(APIView):
                             customer_name=F("booking__customer__name"),
                         )
 
-                        token_data = Token.objects.filter(plot_id=plot_id, booking=booking_id).select_related("customer").values(
+                        token_data = Token.objects.filter(plot_id=plot_id, booking=booking_id,date__gte=start_date,date__lte=end_date).select_related("customer").values(
                             "id",
                             "date",
                             "remarks",
@@ -862,7 +862,7 @@ class PlotLedgerView(APIView):
                             reference=Value("token", output_field=CharField()),
                         )
 
-                        resale_data = PlotResale.objects.filter(booking=booking_id).select_related("customer").values(
+                        resale_data = PlotResale.objects.filter(booking=booking_id,date__gte=start_date,date__lte=end_date).select_related("customer").values(
                             "id",
                             "date",
                             "remarks",
@@ -873,8 +873,8 @@ class PlotLedgerView(APIView):
                             reference=Value("close booking", output_field=CharField()),
                         )
 
-                        combined_data = sorted(
-                            list(booking_data) + list(payment_data) + list(token_data) + list(resale_data),
+                        combined_data = sorted(list(token_data) +
+                            list(booking_data) + list(payment_data) +  list(resale_data),
                             key=lambda x: x["date"],
                         )
 
@@ -991,95 +991,96 @@ class PlotLedgerView(APIView):
                             "transactions": combined_data,
                         }
                         result.append(response_data)
-                else:
-                    token_data_no_booking = Token.objects.filter(plot_id=plot_id, booking__isnull=True).select_related("customer").values(
-                        "id",
-                        "date",
-                        "remarks",
-                        debit=F("amount"),
-                        credit=Value(0.0),
-                        document=F("id"),
-                        customer_name=F("customer__name"),
-                        reference=Value("token", output_field=CharField()),
-                    )
-                    if token_data_no_booking.exists():
-                        for token in token_data_no_booking:
-                            token_id = token["id"]
+                
 
-                            token_data = Token.objects.filter(id=token_id).select_related("customer").values(
-                                "id",
-                                "date",
-                                "remarks",
-                                debit=F("amount"),
-                                credit=Value(0.0),
-                                document=F("id"),
-                                customer_name=F("customer__name"),
-                                reference=Value("token", output_field=CharField()),
-                            )
-
-                            combined_data = sorted(list(token_data), key=lambda x: x["date"]  )
-
-                            opening_balance = 0.0
-                            current_balance = opening_balance
-
-                            for entry in combined_data:
-                                current_balance += entry["credit"] - entry["debit"]
-                                entry["balance"] = current_balance
-
-                            customer_info = Customers.objects.filter(token__id=token_id).values(
-                                "id", "name", "father_name", "contact", "address"
-                            )
-
-                            plot_query = Plots.objects.get(id=plot_id)
-                            plot_serializer = PlotsSerializer(plot_query)
-
-                            plot_data = plot_serializer.data
-                            
-                            token_amount = (
-                                Token.objects.filter(id=token_id).aggregate(
-                                    total_amount=Coalesce(Sum("amount"), Value(0, output_field=FloatField()))
-                                )["total_amount"]
-                                or 0.0
-                            )
-
-                            plot_amount = plot_data.get("total")
-                            remaining_amount = plot_amount - token_amount 
-
-                            response_data = {
-                                "plot_data": plot_data,
-                                "customer_info": list(customer_info),
-                                "booking_data": [],
-                                "dealer_info": [],
-                                "customer_messages": [],
-                                "total_amount": plot_amount,
-                                "remaining_amount": remaining_amount,
-                                "opening_balance": opening_balance,
-                                "closing_balance": current_balance,
-                                "transactions": combined_data,
-                            }
-                            result.append(response_data)
-                    else:
-                            
+                token_data_no_booking = Token.objects.filter(plot_id=plot_id, booking__isnull=True).select_related("customer").values(
+                    "id",
+                    "date",
+                    "remarks",
+                    debit=F("amount"),
+                    credit=Value(0.0),
+                    document=F("id"),
+                    customer_name=F("customer__name"),
+                    reference=Value("token", output_field=CharField()),
+                )
+                
+                if token_data_no_booking.exists():
+                    for token in token_data_no_booking:
+                        token_id = token["id"]
                         plot_query = Plots.objects.get(id=plot_id)
                         plot_serializer = PlotsSerializer(plot_query)
                         plot_data = plot_serializer.data
                         plot_amount = plot_data.get("total")
-   
+                        
+                        token_amount = (
+                            Token.objects.filter(id=token_id).aggregate(
+                                total_amount=Coalesce(Sum("amount"), Value(0, output_field=FloatField()))
+                            )["total_amount"]
+                            or 0.0
+                        )                            
+                        remaining_amount = plot_amount - token_amount 
+                        
+                        token_data = Token.objects.filter(id=token_id).select_related("customer").values(
+                            "id",
+                            "date",
+                            "remarks",
+                            debit=F("amount"),
+                            credit=Value(0.0),
+                            document=F("id"),
+                            customer_name=F("customer__name"),
+                            reference=Value("token", output_field=CharField()),
+                        )
+
+                        combined_data = sorted(list(token_data), key=lambda x: x["date"]  )
+
+                        opening_balance = plot_amount
+                        current_balance = opening_balance
+
+                        for entry in combined_data:
+                            current_balance += entry["credit"] - entry["debit"]
+                            entry["balance"] = current_balance
+
+                        customer_info = Customers.objects.filter(token__id=token_id).values(
+                            "id", "name", "father_name", "contact", "address"
+                        )
+
 
                         response_data = {
                             "plot_data": plot_data,
-                            "customer_info": [],
+                            "customer_info": list(customer_info),
                             "booking_data": [],
                             "dealer_info": [],
                             "customer_messages": [],
                             "total_amount": plot_amount,
-                            "remaining_amount": plot_amount,
-                            "opening_balance": plot_amount,
-                            "closing_balance": plot_amount,
-                            "transactions": [],
+                            "remaining_amount": remaining_amount,
+                            "opening_balance": opening_balance,
+                            "closing_balance": current_balance,
+                            "transactions": combined_data,
                         }
                         result.append(response_data)
- 
+                
+                
+                if not result:
+                    plot_query = Plots.objects.get(id=plot_id)
+                    plot_serializer = PlotsSerializer(plot_query)
+                    plot_data = plot_serializer.data
+                    plot_amount = plot_data.get("total")
+
+
+                    response_data = {
+                        "plot_data": plot_data,
+                        "customer_info": [],
+                        "booking_data": [],
+                        "dealer_info": [],
+                        "customer_messages": [],
+                        "total_amount": plot_amount,
+                        "remaining_amount": plot_amount,
+                        "opening_balance": plot_amount,
+                        "closing_balance": plot_amount,
+                        "transactions": [],
+                    }
+                    result.append(response_data)
+
             return Response(result)
 
         except ValidationError as e:

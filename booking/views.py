@@ -136,6 +136,13 @@ class PlotResaleViewSet(viewsets.ModelViewSet):
 
         return super().create(request, *args, **kwargs)
 
+    def perform_destroy(self, instance):
+        booking = instance.booking
+        booking.status = "active"
+        booking.plot.status = "sold"
+        booking.plot.save()
+        booking.save()
+        super().perform_destroy(instance)
 
 from rest_framework.views import APIView
 
