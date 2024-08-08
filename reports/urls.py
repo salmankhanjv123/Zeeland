@@ -14,6 +14,7 @@ from .views import (
     IncomingPaymentsReport,
     IncomingChequeReport,
     OutgoingPaymentsReport,
+    OutgoingChequeReport,
 )
 
 urlpatterns = [
@@ -23,6 +24,8 @@ urlpatterns = [
     
     path("outgoing-fund-report/", OutgoingFundReportView.as_view()),
     path("outgoing-payment-report/", OutgoingPaymentsReport.as_view()),
+    path("outgoing-cheque-report/", OutgoingChequeReport.as_view()),
+    
     path("journal-voucher-report/", JournalVoucherReportView.as_view()),
     path("dashboard-counts/", TotalCountView.as_view()),
     path("dashboard-amounts/", TotalAmountView.as_view()),

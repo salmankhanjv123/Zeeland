@@ -1363,3 +1363,53 @@ class IncomingChequeReport(APIView):
 
         return Response(combined_payments)
 
+
+
+class OutgoingChequeReport(APIView):
+    def get(self, request):
+        project_id = self.request.query_params.get("project_id")
+        start_date = self.request.query_params.get("start_date")
+        end_date = self.request.query_params.get("end_date")
+        bank_id=self.request.query_params.get("bank_id")
+
+
+
+        payment_filters = Q()
+        expense_filters =Q()
+        if project_id:
+            expense_filters &= Q(project_id=project_id)
+            payment_filters &= Q(project_id=project_id)
+        
+        if bank_id:
+            expense_filters &= Q(bank_id=bank_id)
+            payment_filters &= Q(bank_id=bank_id)
+
+        if start_date and end_date:
+            expense_filters &= Q(date__gte=start_date) & Q(date__lte=end_date)
+            payment_filters &= Q(date__gte=start_date) & Q(date__lte=end_date)
+        
+        booking_payments = IncomingFund.objects.filter(
+            payment_filters, reference="refund",payment_type="Cheque"
+        ).select_related("booking__customer", "booking__plot", "bank")
+        
+        outgoing_payments = OutgoingFund.objects.filter(expense_filters,payment_type="Cheque").select_related(
+            "expense_type", "bank"
+        )
+
+        booking_payments_serialized = BookingPaymentsSerializer(
+            booking_payments, many=True
+        ).data
+        
+        outgoing_payments_serialized = OutgoingFundReportSerializer(
+            outgoing_payments, many=True
+        ).data
+
+        combined_payments = sorted(
+            booking_payments_serialized + outgoing_payments_serialized,
+            key=lambda x: x["date"],
+        )
+
+
+
+        return Response(combined_payments)
+
