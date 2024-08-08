@@ -12,14 +12,17 @@ from .views import (
     PlotLedgerView,
     BalanceSheetView,
     IncomingPaymentsReport,
-    IncomingChequeReport
+    IncomingChequeReport,
+    OutgoingPaymentsReport,
 )
 
 urlpatterns = [
     path("incoming-fund-report/", IncomingFundReportView.as_view()),
     path("incoming-payment-report/", IncomingPaymentsReport.as_view()),
     path("incoming-cheque-report/", IncomingChequeReport.as_view()),
+    
     path("outgoing-fund-report/", OutgoingFundReportView.as_view()),
+    path("outgoing-payment-report/", OutgoingPaymentsReport.as_view()),
     path("journal-voucher-report/", JournalVoucherReportView.as_view()),
     path("dashboard-counts/", TotalCountView.as_view()),
     path("dashboard-amounts/", TotalAmountView.as_view()),

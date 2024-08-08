@@ -34,11 +34,16 @@ class IncomingFundReportSerializer(serializers.ModelSerializer):
 
 class OutgoingFundReportSerializer(serializers.ModelSerializer):
     expense_type = serializers.CharField(source="expense_type.name", read_only=True)
+    bank_name = serializers.CharField(source="bank.name", read_only=True)
+    reference=serializers.SerializerMethodField(read_only=True)
 
+    def get_reference(self, instance):
+        return "expense"
+    
     class Meta:
         model = OutgoingFund
-        fields = ["project", "expense_type", "date", "amount", "remarks"]
-        read_only_fields = fields
+        fields = "__all__"
+        
 
 
 class JournalVoucherReportSerializer(serializers.ModelSerializer):

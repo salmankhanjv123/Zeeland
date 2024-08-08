@@ -1249,6 +1249,68 @@ class IncomingPaymentsReport(APIView):
         return Response(response_data)
 
 
+
+class OutgoingPaymentsReport(APIView):
+    def get(self, request):
+        project_id = self.request.query_params.get("project_id")
+        start_date = self.request.query_params.get("start_date")
+        end_date = self.request.query_params.get("end_date")
+        payment_type = self.request.query_params.get("payment_type")
+
+        query_filters = Q()
+        if project_id:
+            query_filters &= Q(project_id=project_id)
+
+        if payment_type:
+            query_filters &= Q(payment_type=payment_type)
+
+        if start_date and end_date:
+            query_filters &= Q(date__gte=start_date) & Q(date__lte=end_date)
+       
+        booking_payments = IncomingFund.objects.filter(
+            query_filters, reference="refund"
+        ).select_related("booking__customer", "booking__plot", "bank")
+        expense_payments=OutgoingFund.objects.filter(query_filters).select_related(
+            "expense_type","bank"
+        )
+
+
+        booking_payments_serialized = BookingPaymentsSerializer(
+            booking_payments, many=True
+        ).data
+       
+        expense_payment_serialized = OutgoingFundReportSerializer(
+            expense_payments, many=True
+        ).data
+
+        combined_payments = sorted(
+            booking_payments_serialized + expense_payment_serialized,
+            key=lambda x: x["date"],
+        )
+
+        payment_types = ["Cash", "Cheque", "Bank_Transfer"]
+        grouped_payments = {
+            ptype: {"total_amount": 0, "payments": []} for ptype in payment_types
+        }
+
+        for payment in combined_payments:
+            payment_type = payment["payment_type"]
+            if payment_type in grouped_payments:
+                grouped_payments[payment_type]["total_amount"] += payment["amount"]
+                grouped_payments[payment_type]["payments"].append(payment)
+
+        response_data = [
+            {
+                "payment_type": ptype,
+                "total_amount": data["total_amount"],
+                "payments": data["payments"],
+            }
+            for ptype, data in grouped_payments.items()
+        ]
+
+        return Response(response_data)
+
+
 class IncomingChequeReport(APIView):
     def get(self, request):
         project_id = self.request.query_params.get("project_id")
@@ -1300,3 +1362,4 @@ class IncomingChequeReport(APIView):
 
 
         return Response(combined_payments)
+
