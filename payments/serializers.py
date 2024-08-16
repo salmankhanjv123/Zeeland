@@ -7,6 +7,7 @@ from .models import (
     IncomingFund,
     IncomingFundDocuments,
     OutgoingFund,
+    OutgoingFundDetails,
     OutgoingFundDocuments,
     JournalVoucher,
     PaymentReminder,
@@ -24,6 +25,7 @@ from .models import (
     JournalEntryDocuments,
     BankTransfer,
     BankTransferDocuments,
+    
 )
 import datetime
 from django.db import transaction
@@ -222,15 +224,22 @@ class OutgoingFundDocumentsSerializer(serializers.ModelSerializer):
         validated_data["id"] = data.get("id")
         return validated_data
 
+class OutgoingFundDetailsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = OutgoingFundDetails
+        exclude = ["outgoing_fund"]
+
+    def to_internal_value(self, data):
+        validated_data = super().to_internal_value(data)
+        validated_data["id"] = data.get("id")
+        return validated_data
 
 class OutgoingFundSerializer(serializers.ModelSerializer):
-    expense_type_name = serializers.CharField(
-        source="expense_type.name", read_only=True
-    )
-    person_name = serializers.CharField(source="person.name", read_only=True)
+    payee_name = serializers.CharField(source="payee.name", read_only=True)
     bank_name = serializers.CharField(source="bank.name", read_only=True)
     account_type = serializers.CharField(source="bank.account_type", read_only=True)
     files = OutgoingFundDocumentsSerializer(many=True, required=False)
+    details=OutgoingFundDetailsSerializer(many=True)
 
     class Meta:
         model = OutgoingFund
@@ -238,23 +247,20 @@ class OutgoingFundSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         files_data = validated_data.pop("files", [])
-        amount = validated_data.get("amount", 0)
-        person = validated_data.get("person")
-        person.balance -= amount
-        person.save()
+        detail_data = validated_data.pop("details", [])
+
         outgoing_fund = OutgoingFund.objects.create(**validated_data)
+        
         for file_data in files_data:
-            OutgoingFund.objects.create(outgoing_fund=outgoing_fund, **file_data)
+            OutgoingFundDocuments.objects.create(outgoing_fund=outgoing_fund, **file_data)
+        for data in detail_data:
+            OutgoingFundDetails.objects.create(outgoing_fund=outgoing_fund, **data)
         return outgoing_fund
 
     def update(self, instance, validated_data):
         files_data = validated_data.pop("files", [])
-        amount = validated_data.get("amount")
-        if amount is not None:
-            difference = amount - instance.amount
-            person = instance.person
-            person.balance -= difference
-            person.save()
+        detail_data = validated_data.pop("details", [])
+
 
         for key, value in validated_data.items():
             setattr(instance, key, value)
@@ -602,13 +608,11 @@ class JournalEntrySerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         details_data = validated_data.pop('details')
         files_data = validated_data.pop('files', [])
-
-        instance.project = validated_data.get('project', instance.project)
-        instance.date = validated_data.get('date', instance.date)
-        instance.reference = validated_data.get('reference', instance.reference)
-        instance.description = validated_data.get('description', instance.description)
+        
+        for key, value in validated_data.items():
+            setattr(instance, key, value)
         instance.save()
-
+        
         instance.details.all().delete()
         for detail_data in details_data:
             JournalEntryLine.objects.create(journal_entry=instance, **detail_data)

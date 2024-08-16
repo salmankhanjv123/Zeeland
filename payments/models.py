@@ -102,8 +102,7 @@ class ExpensePerson(models.Model):
 
 class OutgoingFund(models.Model):
     project = models.ForeignKey(Projects, on_delete=models.PROTECT)
-    person = models.ForeignKey(ExpensePerson, on_delete=models.PROTECT)
-    expense_type = models.ForeignKey(ExpenseType, on_delete=models.PROTECT)
+    payee = models.ForeignKey(Customers, on_delete=models.PROTECT)
     date = models.DateField()
     amount = models.FloatField()
     remarks = models.TextField(blank=True, null=True)
@@ -115,6 +114,18 @@ class OutgoingFund(models.Model):
 
     class Meta:
         db_table = "outgoing_funds"
+
+
+class OutgoingFundDetails(models.Model):
+    outgoing_fund = models.ForeignKey(
+        OutgoingFund, related_name="details", on_delete=models.CASCADE
+    )
+    category = models.ForeignKey(
+        Bank, related_name="expenses_details", on_delete=models.PROTECT
+    )
+    description=models.CharField(max_length=100,blank=True,null=True)
+    amount=models.FloatField(default=0)
+    person = models.ForeignKey(Customers, on_delete=models.PROTECT,blank=True,null=True)
 
 
 class OutgoingFundDocuments(models.Model):
@@ -269,7 +280,7 @@ class BankTransfer(models.Model):
     transfer_to = models.ForeignKey(
         Bank, on_delete=models.PROTECT, related_name="bank_received"
     )
-    amount=models.FloatField(default=0)
+    amount = models.FloatField(default=0)
     description = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
