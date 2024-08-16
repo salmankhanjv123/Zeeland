@@ -227,9 +227,6 @@ class DealerPaymentsDocuments(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
 
-
-
-
 class JournalEntry(models.Model):
     project = models.ForeignKey(Projects, on_delete=models.PROTECT)
     date = models.DateField()
@@ -240,12 +237,16 @@ class JournalEntry(models.Model):
 
 
 class JournalEntryLine(models.Model):
-    journal_entry = models.ForeignKey(JournalEntry, related_name='details', on_delete=models.CASCADE)
+    journal_entry = models.ForeignKey(
+        JournalEntry, related_name="details", on_delete=models.CASCADE
+    )
     account = models.ForeignKey(Bank, on_delete=models.CASCADE)
     description = models.CharField(max_length=255, blank=True, null=True)
     debit = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     credit = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    person=models.ForeignKey(Customers,related_name="journal_entries",on_delete=models.PROTECT)
+    person = models.ForeignKey(
+        Customers, related_name="journal_entries", on_delete=models.PROTECT
+    )
 
 
 class JournalEntryDocuments(models.Model):
@@ -258,3 +259,28 @@ class JournalEntryDocuments(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+
+class BankTransfer(models.Model):
+    project = models.ForeignKey(Projects, on_delete=models.PROTECT)
+    date = models.DateField()
+    transfer_from = models.ForeignKey(
+        Bank, on_delete=models.PROTECT, related_name="bank_transfer"
+    )
+    transfer_to = models.ForeignKey(
+        Bank, on_delete=models.PROTECT, related_name="bank_received"
+    )
+    amount=models.FloatField(default=0)
+    description = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
+class BankTransferDocuments(models.Model):
+    bank_transfer = models.ForeignKey(
+        BankTransfer, related_name="files", on_delete=models.CASCADE
+    )
+    file = models.FileField(upload_to="media/bank_transfer_files")
+    description = models.TextField()
+    type = models.CharField(max_length=20)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)

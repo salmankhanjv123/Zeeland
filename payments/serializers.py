@@ -21,7 +21,9 @@ from .models import (
     DealerPaymentsDocuments,
     JournalEntry,
     JournalEntryLine,
-    JournalEntryDocuments
+    JournalEntryDocuments,
+    BankTransfer,
+    BankTransferDocuments,
 )
 import datetime
 from django.db import transaction
@@ -581,7 +583,7 @@ class JournalEntrySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = JournalEntry
-        fields = ['id', 'project', 'date', 'reference', 'description', 'details', 'files']
+        fields = "__all__"
 
     def create(self, validated_data):
         details_data = validated_data.pop('details')
@@ -616,3 +618,55 @@ class JournalEntrySerializer(serializers.ModelSerializer):
             JournalEntryDocuments.objects.create(journal_entry=instance, **file_data)
 
         return instance
+
+
+
+class BankTransferDocumentsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BankTransferDocuments
+        exclude = ["bank_transfer"]
+
+    def to_internal_value(self, data):
+        validated_data = super().to_internal_value(data)
+        validated_data["id"] = data.get("id")
+        return validated_data
+
+
+
+class BankTransferSerializer(serializers.ModelSerializer):
+    files = BankDepositDocumentsSerializer(many=True, required=False)
+
+    class Meta:
+        model = BankTransfer
+        fields = "__all__"
+
+    def create(self, validated_data):
+        files_data = validated_data.pop('files', [])
+        
+        bank_transfer = BankTransfer.objects.create(**validated_data)
+        for file_data in files_data:
+            BankTransferDocuments.objects.create(bank_transfer=bank_transfer, **file_data)
+
+        return bank_transfer
+
+
+    def update(self, instance, validated_data):
+        files_data = validated_data.pop("files", [])
+
+        for key, value in validated_data.items():
+            setattr(instance, key, value)
+        instance.save()
+
+        for file_data in files_data:
+            file_id = file_data.get("id", None)
+            if file_id:
+                file = BankTransferDocuments.objects.get(id=file_id, payment=instance)
+                file.description = file_data.get("description", file.description)
+                file.type = file_data.get("type", file.type)
+                if "file" in file_data:
+                    file.file = file_data.get("file", file.file)
+                file.save()
+            else:
+                BankTransferDocuments.objects.create(payment=instance, **file_data)
+        return instance
+
