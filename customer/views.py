@@ -21,8 +21,11 @@ class CustomersViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         queryset = Customers.objects.all().prefetch_related("files")
         project_id = self.request.query_params.get("project")
+        reference = self.request.query_params.get("reference")
         if project_id:
             queryset = queryset.filter(project_id=project_id)
+        if reference:
+            queryset = queryset.filter(reference=reference)
         return queryset
 
 

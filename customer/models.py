@@ -8,12 +8,16 @@ from django.contrib.auth.models import User
 
 class Customers(models.Model):
     project = models.ForeignKey(Projects, on_delete=models.PROTECT)
+    reference=models.CharField(max_length=15,default='customer')
     name = models.CharField(max_length=30)
     father_name = models.CharField(max_length=30)
     contact = models.CharField(max_length=40)
     cnic = models.CharField(max_length=16, blank=True, null=True)
     address = models.TextField()
     pic = models.ImageField(upload_to="media/customer", blank=True, null=True)
+    gender=models.BooleanField(default=True)
+    remarks=models.TextField(blank=True,null=True)
+    joining_date=models.DateField(blank=True,null=True)
 
     def __str__(self):
         return self.name
