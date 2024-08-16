@@ -225,3 +225,36 @@ class DealerPaymentsDocuments(models.Model):
     type = models.CharField(max_length=20)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+
+
+
+
+class JournalEntry(models.Model):
+    project = models.ForeignKey(Projects, on_delete=models.PROTECT)
+    date = models.DateField()
+    reference = models.CharField(max_length=100, unique=True)
+    description = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
+class JournalEntryLine(models.Model):
+    journal_entry = models.ForeignKey(JournalEntry, related_name='details', on_delete=models.CASCADE)
+    account = models.ForeignKey(Bank, on_delete=models.CASCADE)
+    description = models.CharField(max_length=255, blank=True, null=True)
+    debit = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    credit = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    person=models.ForeignKey(Customers,related_name="journal_entries",on_delete=models.PROTECT)
+
+
+class JournalEntryDocuments(models.Model):
+    journal_entry = models.ForeignKey(
+        JournalEntry, related_name="files", on_delete=models.CASCADE
+    )
+    file = models.FileField(upload_to="media/journal_entries_files")
+    description = models.TextField()
+    type = models.CharField(max_length=20)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+

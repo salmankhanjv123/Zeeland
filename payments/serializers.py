@@ -19,6 +19,9 @@ from .models import (
     BankDepositDocuments,
     DealerPayments,
     DealerPaymentsDocuments,
+    JournalEntry,
+    JournalEntryLine,
+    JournalEntryDocuments
 )
 import datetime
 from django.db import transaction
@@ -386,7 +389,6 @@ class BankDepositSerializer(serializers.ModelSerializer):
                     related_id=bank_deposit.id,
                 )
                 for detail_data in details_data:
-                    print(detail_data)
                     payment = detail_data.get("payment")
                     undeposit_bank = payment.bank
                     payment.is_deposit = True
@@ -432,67 +434,69 @@ class BankDepositSerializer(serializers.ModelSerializer):
         details_data = validated_data.pop("details", [])
         transactions_data = validated_data.pop("transactions", [])
 
+        date = validated_data.get("date", instance.date)
+        amount = validated_data.get("amount", instance.amount)
+        bank = validated_data.get("deposit_to", instance.deposit_to)
+
         try:
             with transaction.atomic():
-                # Update the instance itself
-                for attr, value in validated_data.items():
-                    setattr(instance, attr, value)
+                instance.date = date
+                instance.amount = amount
+                instance.deposit_to = bank
                 instance.save()
 
-                # Update or create details
+                # Update or create BankTransaction
+                BankTransaction.objects.filter(
+                    related_table="bank_deposits", related_id=instance.id
+                ).update(bank=bank, transaction_date=date, deposit=amount)
+
+                # Update or create BankDepositDetails
+                BankDepositDetail.objects.filter(bank_deposit=instance).delete()
                 for detail_data in details_data:
-                    detail_id = detail_data.get("id")
-                    if detail_id:
-                        detail_instance = BankDepositDetail.objects.get(
-                            id=detail_id, bank_deposit=instance
-                        )
-                        for attr, value in detail_data.items():
-                            setattr(detail_instance, attr, value)
-                        detail_instance.save()
-                    else:
-                        payment = detail_data.get("payment")
-                        if payment:
-                            payment.bank = instance.deposit_to
-                            payment.save(update_fields=["bank"])
-                        BankDepositDetail.objects.create(
-                            bank_deposit=instance, **detail_data
-                        )
+                    payment = detail_data.get("payment")
+                    undeposit_bank = payment.bank
+                    payment.is_deposit = True
+                    payment.save()
+                    BankDepositDetail.objects.create(
+                        bank_deposit=instance, **detail_data
+                    )
+                    BankTransaction.objects.create(
+                        bank=undeposit_bank,
+                        transaction_date=date,
+                        deposit=0,
+                        payment=amount,
+                        transaction_type="deposit",
+                        related_table="bank_deposits",
+                        related_id=instance.id,
+                    )
 
-                # Update or create transactions
-                for transaction_data in transactions_data:
-                    transaction_id = transaction_data.get("id")
-                    if transaction_id:
-                        transaction_instance = BankDepositTransactions.objects.get(
-                            id=transaction_id, bank_deposit=instance
-                        )
-                        for attr, value in transaction_data.items():
-                            setattr(transaction_instance, attr, value)
-                        transaction_instance.save()
-                    else:
-                        BankDepositTransactions.objects.create(
-                            bank_deposit=instance, **transaction_data
-                        )
+                # Update or create BankDepositTransactions
+                BankDepositTransactions.objects.filter(bank_deposit=instance).delete()
+                for data in transactions_data:
+                    BankDepositTransactions.objects.create(
+                        bank_deposit=instance, **data
+                    )
+                    BankTransaction.objects.create(
+                        bank=data.get("bank"),
+                        transaction_date=data.get("date"),
+                        payment=abs(data.get("amount")),
+                        deposit=0,
+                        transaction_type="deposit",
+                        related_table="bank_deposits",
+                        related_id=instance.id,
+                    )
 
-                # Update or create files
+                # Update or create BankDepositDocuments
+                BankDepositDocuments.objects.filter(bank_deposit=instance).delete()
                 for file_data in files_data:
-                    file_id = file_data.get("id")
-                    if file_id:
-                        file_instance = BankDepositDocuments.objects.get(
-                            id=file_id, bank_deposit=instance
-                        )
-                        for attr, value in file_data.items():
-                            setattr(file_instance, attr, value)
-                        file_instance.save()
-                    else:
-                        BankDepositDocuments.objects.create(
-                            bank_deposit=instance, **file_data
-                        )
+                    BankDepositDocuments.objects.create(
+                        bank_deposit=instance, **file_data
+                    )
 
                 return instance
+
         except Exception as e:
             raise ValidationError({"error": str(e)})
-
-
 class DealersSerializer(serializers.ModelSerializer):
 
     class Meta:
@@ -547,4 +551,68 @@ class DealerPaymentsSerializer(serializers.ModelSerializer):
                 file.save()
             else:
                 DealerPaymentsDocuments.objects.create(payment=instance, **file_data)
+        return instance
+
+
+class JournalEntryDocumentsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = JournalEntryDocuments
+        exclude = ["journal_entry"]
+
+    def to_internal_value(self, data):
+        validated_data = super().to_internal_value(data)
+        validated_data["id"] = data.get("id")
+        return validated_data
+
+
+class JournalEntryLineSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = JournalEntryLine
+        exclude = ["journal_entry"]
+
+    def to_internal_value(self, data):
+        validated_data = super().to_internal_value(data)
+        validated_data["id"] = data.get("id")
+        return validated_data
+
+class JournalEntrySerializer(serializers.ModelSerializer):
+    details = JournalEntryLineSerializer(many=True)
+    files = JournalEntryDocumentsSerializer(many=True, required=False)
+
+    class Meta:
+        model = JournalEntry
+        fields = ['id', 'project', 'date', 'reference', 'description', 'details', 'files']
+
+    def create(self, validated_data):
+        details_data = validated_data.pop('details')
+        files_data = validated_data.pop('files', [])
+
+        journal_entry = JournalEntry.objects.create(**validated_data)
+
+        for detail_data in details_data:
+            JournalEntryLine.objects.create(journal_entry=journal_entry, **detail_data)
+
+        for file_data in files_data:
+            JournalEntryDocuments.objects.create(journal_entry=journal_entry, **file_data)
+
+        return journal_entry
+
+    def update(self, instance, validated_data):
+        details_data = validated_data.pop('details')
+        files_data = validated_data.pop('files', [])
+
+        instance.project = validated_data.get('project', instance.project)
+        instance.date = validated_data.get('date', instance.date)
+        instance.reference = validated_data.get('reference', instance.reference)
+        instance.description = validated_data.get('description', instance.description)
+        instance.save()
+
+        instance.details.all().delete()
+        for detail_data in details_data:
+            JournalEntryLine.objects.create(journal_entry=instance, **detail_data)
+
+        instance.files.all().delete()
+        for file_data in files_data:
+            JournalEntryDocuments.objects.create(journal_entry=instance, **file_data)
+
         return instance

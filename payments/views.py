@@ -17,6 +17,7 @@ from .serializers import (
     BankTransactionSerializer,
     BankDepositSerializer,
     DealerPaymentsSerializer,
+    JournalEntrySerializer,
 )
 from .models import (
     IncomingFund,
@@ -29,6 +30,7 @@ from .models import (
     BankTransaction,
     BankDeposit,
     DealerPayments,
+    JournalEntry,
 )
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -527,6 +529,30 @@ class DealerPaymentsViewSet(viewsets.ModelViewSet):
             .select_related("booking", "booking__dealer", "booking__plot", "bank")
             .prefetch_related("files")
         )
+        return queryset
+
+
+class JournalEntryViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint that allows IncomingFund to be viewed or edited.
+    """
+
+    serializer_class = JournalEntrySerializer
+
+    def get_queryset(self):
+
+        start_date = self.request.query_params.get("start_date")
+        end_date = self.request.query_params.get("end_date")
+        project_id=self.request.query_params.get("project")
+
+        query_filters = Q()
+
+        if start_date and end_date:
+            query_filters &= Q(date__gte=start_date) & Q(date__lte=end_date)
+        if project_id:
+            query_filters &= Q(project_id=project_id)
+            
+        queryset = JournalEntry.objects.filter(query_filters).prefetch_related("files")
         return queryset
 
 
