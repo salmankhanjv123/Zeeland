@@ -78,7 +78,7 @@ class BankTransactionViewSet(viewsets.ModelViewSet):
         bank_id = self.request.query_params.get("bank_id")
         account_type = self.request.query_params.get("account_type")
         main_type = self.request.query_params.get("main_type")
-        is_deposit=self.request.query_params.get("is_deposit")
+        is_deposit = self.request.query_params.get("is_deposit")
         query_filters = Q()
         if bank_id:
             query_filters &= Q(bank_id=bank_id)
@@ -87,7 +87,7 @@ class BankTransactionViewSet(viewsets.ModelViewSet):
         if main_type:
             query_filters &= Q(bank__main_type=main_type)
         if is_deposit:
-            query_filters &=Q(is_deposit=is_deposit)
+            query_filters &= Q(is_deposit=is_deposit)
         queryset = BankTransaction.objects.filter(query_filters)
         return queryset
 
@@ -238,9 +238,7 @@ class OutgoingFundViewSet(viewsets.ModelViewSet):
     serializer_class = OutgoingFundSerializer
 
     def get_queryset(self):
-        queryset = OutgoingFund.objects.all().select_related(
-            "person", "expense_type", "bank"
-        )
+        queryset = OutgoingFund.objects.all().select_related("bank")
         project_id = self.request.query_params.get("project")
         if project_id:
             queryset = queryset.filter(project_id=project_id)
@@ -472,7 +470,7 @@ class BankDepositViewSet(viewsets.ModelViewSet):
 
         start_date = self.request.query_params.get("start_date")
         end_date = self.request.query_params.get("end_date")
-        bank_id=self.request.query_params.get("bank_id")
+        bank_id = self.request.query_params.get("bank_id")
 
         query_filters = Q()
 
@@ -480,7 +478,7 @@ class BankDepositViewSet(viewsets.ModelViewSet):
             query_filters &= Q(date__gte=start_date) & Q(date__lte=end_date)
         if bank_id:
             query_filters &= Q(deposit_to=bank_id)
-            
+
         queryset = BankDeposit.objects.filter(query_filters).prefetch_related("files")
         return queryset
 
@@ -545,7 +543,7 @@ class JournalEntryViewSet(viewsets.ModelViewSet):
 
         start_date = self.request.query_params.get("start_date")
         end_date = self.request.query_params.get("end_date")
-        project_id=self.request.query_params.get("project")
+        project_id = self.request.query_params.get("project")
 
         query_filters = Q()
 
@@ -553,9 +551,10 @@ class JournalEntryViewSet(viewsets.ModelViewSet):
             query_filters &= Q(date__gte=start_date) & Q(date__lte=end_date)
         if project_id:
             query_filters &= Q(project_id=project_id)
-            
+
         queryset = JournalEntry.objects.filter(query_filters).prefetch_related("files")
         return queryset
+
 
 class BankTransferViewSet(viewsets.ModelViewSet):
     """
@@ -568,7 +567,7 @@ class BankTransferViewSet(viewsets.ModelViewSet):
 
         start_date = self.request.query_params.get("start_date")
         end_date = self.request.query_params.get("end_date")
-        project_id=self.request.query_params.get("project")
+        project_id = self.request.query_params.get("project")
 
         query_filters = Q()
 
@@ -576,9 +575,10 @@ class BankTransferViewSet(viewsets.ModelViewSet):
             query_filters &= Q(date__gte=start_date) & Q(date__lte=end_date)
         if project_id:
             query_filters &= Q(project_id=project_id)
-            
+
         queryset = BankTransfer.objects.filter(query_filters).prefetch_related("files")
         return queryset
+
 
 def create_or_update_transaction(
     instance, related_table, transaction_type, amount_field
@@ -587,7 +587,7 @@ def create_or_update_transaction(
     if bank_field:
         amount = getattr(instance, amount_field, None)
         is_deposit = bank_field.detail_type != "Undeposited_Funds"
-        
+
         try:
             # Try to get the existing transaction
             transaction = BankTransaction.objects.get(
@@ -614,7 +614,7 @@ def create_or_update_transaction(
                     payment=amount,
                     related_table=related_table,
                     related_id=instance.id,
-                    is_deposit=is_deposit
+                    is_deposit=is_deposit,
                 )
             else:
                 BankTransaction.objects.create(
@@ -624,8 +624,9 @@ def create_or_update_transaction(
                     payment=0,
                     related_table=related_table,
                     related_id=instance.id,
-                    is_deposit=is_deposit
+                    is_deposit=is_deposit,
                 )
+
 
 @receiver(post_save, sender=IncomingFund)
 def create_payment_transaction(sender, instance, **kwargs):
@@ -639,13 +640,14 @@ def create_token_transaction(sender, instance, **kwargs):
     create_or_update_transaction(instance, "token", "Token", "amount")
 
 
-
-def create_or_update_expenses_transaction(instance, related_table, transaction_type, amount_field):
+def create_or_update_expenses_transaction(
+    instance, related_table, transaction_type, amount_field
+):
     bank_field = getattr(instance, "bank", None)
     if bank_field:
         amount = getattr(instance, amount_field, None)
         is_deposit = bank_field.detail_type != "Undeposited_Funds"
-        
+
         try:
             # Try to get the existing transaction
             transaction = BankTransaction.objects.get(
@@ -672,7 +674,7 @@ def create_or_update_expenses_transaction(instance, related_table, transaction_t
                     payment=0,
                     related_table=related_table,
                     related_id=instance.id,
-                    is_deposit=is_deposit
+                    is_deposit=is_deposit,
                 )
             else:
                 BankTransaction.objects.create(
@@ -682,8 +684,9 @@ def create_or_update_expenses_transaction(instance, related_table, transaction_t
                     payment=amount,
                     related_table=related_table,
                     related_id=instance.id,
-                    is_deposit=is_deposit
+                    is_deposit=is_deposit,
                 )
+
 
 @receiver(post_save, sender=DealerPayments)
 def create_dealerpayment_transaction(sender, instance, **kwargs):
@@ -694,10 +697,14 @@ def create_dealerpayment_transaction(sender, instance, **kwargs):
         transaction_type = "dealer_refund"
     else:
         transaction_type = instance.reference.lower()  # or set a default value
-    
-    create_or_update_expenses_transaction(instance, "dealer_payments", transaction_type, "amount")
+
+    create_or_update_expenses_transaction(
+        instance, "dealer_payments", transaction_type, "amount"
+    )
 
 
 @receiver(post_save, sender=OutgoingFund)
 def create_expense_transaction(sender, instance, **kwargs):
-    create_or_update_expenses_transaction(instance, "outgoing_funds", "expense", "amount")
+    create_or_update_expenses_transaction(
+        instance, "outgoing_funds", "expense", "amount"
+    )
