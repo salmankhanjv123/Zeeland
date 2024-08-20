@@ -594,6 +594,9 @@ class JournalEntryDocumentsSerializer(serializers.ModelSerializer):
 
 
 class JournalEntryLineSerializer(serializers.ModelSerializer):
+    account_name=serializers.CharField(source="account.name",read_only=True)
+    person_name=serializers.CharField(source="person.name",read_only=True)
+    
     class Meta:
         model = JournalEntryLine
         exclude = ["journal_entry"]
