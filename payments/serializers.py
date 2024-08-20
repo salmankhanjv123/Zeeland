@@ -243,6 +243,8 @@ class OutgoingFundDocumentsSerializer(serializers.ModelSerializer):
         return validated_data
 
 class OutgoingFundDetailsSerializer(serializers.ModelSerializer):
+    category_name=serializers.CharField(source="category.name", read_only=True)
+    person_name=serializers.CharField(source="person.name", read_only=True)
     class Meta:
         model = OutgoingFundDetails
         exclude = ["outgoing_fund"]
