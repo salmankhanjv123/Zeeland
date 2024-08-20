@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from booking.models import Booking,Token
+from plots.models import Plots
 from customer.models import Customers, Dealers
 from payments.models import IncomingFund
 from .models import (
@@ -105,19 +106,28 @@ class MonthField(serializers.Field):
             return value.strftime("%Y-%m")
         return value
 
+class PlotsSerializer(serializers.ModelSerializer):
+    category_name = serializers.SerializerMethodField(read_only=True)
+    plot_size = serializers.SerializerMethodField(read_only=True)
+
+    def get_plot_size(self, instance):
+        # Update this method according to your requirement
+        return instance.get_plot_size()
+
+    def get_category_name(self, instance):
+        category_name = instance.get_type_display()
+        return f"{category_name}"
+
+    class Meta:
+        model = Plots
+        fields = "__all__"  # or specify specific fields
 
 class BookingSerializer(serializers.ModelSerializer):
-    plot_info = serializers.SerializerMethodField(read_only=True)
 
-    def get_plot_info(self, instance):
-        plot_number = instance.plot.plot_number
-        plot_size = instance.plot.get_plot_size()
-        plot_type = instance.plot.get_type_display()
-        return f"{plot_number} || {plot_type} || {plot_size}"
 
     class Meta:
         model = Booking
-        fields = ["plot_info", "total_amount", "remaining", "total_receiving_amount"]
+        fields = ["total_amount", "remaining", "total_receiving_amount"]
         read_only_fields = fields
 
 
@@ -142,6 +152,7 @@ class IncomingFundDocumentsSerializer(serializers.ModelSerializer):
 class IncomingFundSerializer(serializers.ModelSerializer):
     installement_month = MonthField(required=False)
     booking_info = BookingSerializer(source="booking", read_only=True)
+    plot_info = PlotsSerializer(source="booking.plot",read_only=True)
     bank_name = serializers.CharField(source="bank.name", read_only=True)
     account_type = serializers.CharField(source="bank.account_type", read_only=True)
     customer = CustomersSerializer(source="booking.customer", read_only=True)
