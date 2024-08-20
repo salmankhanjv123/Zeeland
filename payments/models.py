@@ -252,8 +252,8 @@ class JournalEntryLine(models.Model):
     )
     account = models.ForeignKey(Bank, on_delete=models.CASCADE)
     description = models.CharField(max_length=255, blank=True, null=True)
-    debit = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    credit = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    debit = models.FloatField(default=0)
+    credit = models.FloatField(default=0)
     person = models.ForeignKey(
         Customers, related_name="journal_entries", on_delete=models.PROTECT
     )
