@@ -301,6 +301,35 @@ class OutgoingFundSerializer(serializers.ModelSerializer):
                 OutgoingFundDocuments.objects.create(
                     outgoing_fund=instance, **file_data
                 )
+                
+        existing_detail_ids = set(instance.details.values_list('id', flat=True))
+        new_detail_ids = set()
+
+        for detail_data in detail_data:
+            detail_id = detail_data.get("id", None)
+
+            try:
+                if detail_id and detail_id in existing_detail_ids:
+                    # Update existing detail
+                    detail = OutgoingFundDetails.objects.get(id=detail_id)
+                    for key, value in detail_data.items():
+                        setattr(detail, key, value)
+                    detail.save()
+                    new_detail_ids.add(detail_id)
+                else:
+                    # Create new detail
+                    new_detail = OutgoingFundDetails.objects.create(outgoing_fund=instance, **detail_data)
+                    new_detail_ids.add(new_detail.id)
+            except OutgoingFundDetails.DoesNotExist:
+                raise serializers.ValidationError(f"Detail with id {detail_id} does not exist.")
+            except Exception as e:
+                raise serializers.ValidationError(f"An error occurred while updating details: {str(e)}")
+
+        # Remove details that are not in the update request
+        details_to_delete = existing_detail_ids - new_detail_ids
+        if details_to_delete:
+            OutgoingFundDetails.objects.filter(id__in=details_to_delete).delete()
+
         return instance
 
 
