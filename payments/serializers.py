@@ -123,11 +123,18 @@ class PlotsSerializer(serializers.ModelSerializer):
         fields = "__all__"  # or specify specific fields
 
 class BookingSerializer(serializers.ModelSerializer):
+    plot_info = serializers.SerializerMethodField(read_only=True)
+
+    def get_plot_info(self, instance):
+        plot_number = instance.plot.plot_number
+        plot_size = instance.plot.get_plot_size()
+        plot_type = instance.plot.get_type_display()
+        return f"{plot_number} || {plot_type} || {plot_size}"
 
 
     class Meta:
         model = Booking
-        fields = ["total_amount", "remaining", "total_receiving_amount"]
+        fields = ["plot_info","total_amount", "remaining", "total_receiving_amount"]
         read_only_fields = fields
 
 
@@ -650,6 +657,8 @@ class BankTransferDocumentsSerializer(serializers.ModelSerializer):
 
 class BankTransferSerializer(serializers.ModelSerializer):
     files = BankDepositDocumentsSerializer(many=True, required=False)
+    transfer_from_name=serializers.CharField(source="transfer_from.name",read_only=True)
+    transfer_to_name=serializers.CharField(source="transfer_to.name",read_only=True)
 
     class Meta:
         model = BankTransfer
