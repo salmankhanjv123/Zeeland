@@ -241,7 +241,6 @@ class DealerPaymentsDocuments(models.Model):
 class JournalEntry(models.Model):
     project = models.ForeignKey(Projects, on_delete=models.PROTECT)
     date = models.DateField()
-    reference = models.CharField(max_length=100, unique=True)
     description = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
