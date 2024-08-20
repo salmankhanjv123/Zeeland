@@ -306,7 +306,8 @@ class OutgoingFundSerializer(serializers.ModelSerializer):
         new_detail_ids = set()
 
         for detail_data in detail_data:
-            detail_id = detail_data.get("id", None)
+            detail_id = int(detail_data.get("id")) if detail_data.get("id") else None
+
 
             try:
                 if detail_id and detail_id in existing_detail_ids:
