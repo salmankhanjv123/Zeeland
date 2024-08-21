@@ -255,7 +255,7 @@ class JournalEntryLine(models.Model):
     debit = models.FloatField(default=0)
     credit = models.FloatField(default=0)
     person = models.ForeignKey(
-        Customers, related_name="journal_entries", on_delete=models.PROTECT
+        Customers, related_name="journal_entries", on_delete=models.PROTECT,blank=True, null=True
     )
 
 
