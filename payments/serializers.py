@@ -259,11 +259,49 @@ class OutgoingFundSerializer(serializers.ModelSerializer):
     bank_name = serializers.CharField(source="bank.name", read_only=True)
     account_type = serializers.CharField(source="bank.account_type", read_only=True)
     files = OutgoingFundDocumentsSerializer(many=True, required=False)
-    details=OutgoingFundDetailsSerializer(many=True)
+    details = OutgoingFundDetailsSerializer(many=True)
 
     class Meta:
         model = OutgoingFund
         fields = "__all__"
+
+    def create_bank_transactions(self, outgoing_fund):
+        # Main transaction for OutgoingFund
+        BankTransaction.objects.create(
+            bank=outgoing_fund.bank,
+            transaction_type='Expenses',
+            payment=outgoing_fund.amount,
+            deposit=0,
+            transaction_date=outgoing_fund.date,
+            related_table='OutgoingFund',
+            related_id=outgoing_fund.id,
+            is_deposit=True
+        )
+
+        # Transactions for each detail in OutgoingFundDetails
+        for detail in outgoing_fund.details.all():
+            BankTransaction.objects.create(
+                bank=detail.category,  # Assuming category is a Bank here
+                transaction_type='Expenses',
+                payment=0,
+                deposit=detail.amount,
+                transaction_date=outgoing_fund.date,
+                related_table='OutgoingFundDetail',
+                related_id=detail.id,
+                is_deposit=True
+            )
+
+    def delete_related_bank_transactions(self, outgoing_fund):
+        BankTransaction.objects.filter(
+            related_table='OutgoingFund',
+            related_id=outgoing_fund.id
+        ).delete()
+
+        for detail in outgoing_fund.details.all():
+            BankTransaction.objects.filter(
+                related_table='OutgoingFundDetail',
+                related_id=detail.id
+            ).delete()
 
     def create(self, validated_data):
         files_data = validated_data.pop("files", [])
@@ -275,22 +313,28 @@ class OutgoingFundSerializer(serializers.ModelSerializer):
             OutgoingFundDocuments.objects.create(outgoing_fund=outgoing_fund, **file_data)
         for data in detail_data:
             OutgoingFundDetails.objects.create(outgoing_fund=outgoing_fund, **data)
+
+        # Create the bank transactions for the outgoing fund
+        self.create_bank_transactions(outgoing_fund)
+
         return outgoing_fund
 
     def update(self, instance, validated_data):
         files_data = validated_data.pop("files", [])
         detail_data = validated_data.pop("details", [])
 
+        # Delete previous related bank transactions before update
+        self.delete_related_bank_transactions(instance)
 
         for key, value in validated_data.items():
             setattr(instance, key, value)
         instance.save()
-
+        
         for file_data in files_data:
             file_id = file_data.get("id", None)
             if file_id:
                 file = OutgoingFundDocuments.objects.get(
-                    id=file_id, outgoing_fund=instance
+                    id=file_id, incoming_fund=instance
                 )
                 file.description = file_data.get("description", file.description)
                 file.type = file_data.get("type", file.type)
@@ -299,15 +343,14 @@ class OutgoingFundSerializer(serializers.ModelSerializer):
                 file.save()
             else:
                 OutgoingFundDocuments.objects.create(
-                    outgoing_fund=instance, **file_data
+                    incoming_fund=instance, **file_data
                 )
-                
+        
         existing_detail_ids = set(instance.details.values_list('id', flat=True))
         new_detail_ids = set()
 
         for detail_data in detail_data:
             detail_id = int(detail_data.get("id")) if detail_data.get("id") else None
-
 
             try:
                 if detail_id and detail_id in existing_detail_ids:
@@ -330,6 +373,9 @@ class OutgoingFundSerializer(serializers.ModelSerializer):
         details_to_delete = existing_detail_ids - new_detail_ids
         if details_to_delete:
             OutgoingFundDetails.objects.filter(id__in=details_to_delete).delete()
+
+        # Create updated bank transactions for the outgoing fund
+        self.create_bank_transactions(instance)
 
         return instance
 
@@ -437,6 +483,7 @@ class BankDepositSerializer(serializers.ModelSerializer):
         try:
             with transaction.atomic():
                 bank_deposit = BankDeposit.objects.create(**validated_data)
+                
                 BankTransaction.objects.create(
                     bank=bank,
                     transaction_date=date,
@@ -446,6 +493,7 @@ class BankDepositSerializer(serializers.ModelSerializer):
                     related_table="bank_deposits",
                     related_id=bank_deposit.id,
                 )
+                
                 for detail_data in details_data:
                     payment = detail_data.get("payment")
                     undeposit_bank = payment.bank
@@ -454,6 +502,7 @@ class BankDepositSerializer(serializers.ModelSerializer):
                     BankDepositDetail.objects.create(
                         bank_deposit=bank_deposit, **detail_data
                     )
+                
                 BankTransaction.objects.create(
                     bank=undeposit_bank,
                     transaction_date=date,
@@ -622,7 +671,6 @@ class JournalEntryDocumentsSerializer(serializers.ModelSerializer):
         validated_data["id"] = data.get("id")
         return validated_data
 
-
 class JournalEntryLineSerializer(serializers.ModelSerializer):
     account_name=serializers.CharField(source="account.name",read_only=True)
     person_name=serializers.CharField(source="person.name",read_only=True)
@@ -644,6 +692,25 @@ class JournalEntrySerializer(serializers.ModelSerializer):
         model = JournalEntry
         fields = "__all__"
 
+    def create_bank_transactions(self, journal_entry, transaction_type):
+        for detail in journal_entry.details.all():
+            BankTransaction.objects.create(
+                bank=detail.account,  # Assuming the detail has a bank field
+                transaction_type=transaction_type,
+                payment=detail.debit,  # Adjust based on your model fields
+                deposit=detail.credit,  # Adjust based on your model fields
+                transaction_date=journal_entry.date,
+                related_table='JournalEntry',
+                related_id=journal_entry.id,
+                is_deposit=True
+            )
+
+    def delete_related_bank_transactions(self, journal_entry):
+        BankTransaction.objects.filter(
+            related_table='JournalEntry',
+            related_id=journal_entry.id
+        ).delete()
+
     def create(self, validated_data):
         details_data = validated_data.pop('details')
         files_data = validated_data.pop('files', [])
@@ -656,11 +723,17 @@ class JournalEntrySerializer(serializers.ModelSerializer):
         for file_data in files_data:
             JournalEntryDocuments.objects.create(journal_entry=journal_entry, **file_data)
 
+        # Create bank transactions for all details
+        self.create_bank_transactions(journal_entry, transaction_type='JournalEntry')
+
         return journal_entry
 
     def update(self, instance, validated_data):
         details_data = validated_data.pop('details')
         files_data = validated_data.pop('files', [])
+        
+        # Delete related bank transactions before updating
+        self.delete_related_bank_transactions(instance)
         
         for key, value in validated_data.items():
             setattr(instance, key, value)
@@ -674,9 +747,10 @@ class JournalEntrySerializer(serializers.ModelSerializer):
         for file_data in files_data:
             JournalEntryDocuments.objects.create(journal_entry=instance, **file_data)
 
+        # Create updated bank transactions for all details
+        self.create_bank_transactions(instance, transaction_type='JournalEntry')
+
         return instance
-
-
 
 class BankTransferDocumentsSerializer(serializers.ModelSerializer):
     class Meta:
@@ -688,16 +762,44 @@ class BankTransferDocumentsSerializer(serializers.ModelSerializer):
         validated_data["id"] = data.get("id")
         return validated_data
 
-
-
 class BankTransferSerializer(serializers.ModelSerializer):
     files = BankDepositDocumentsSerializer(many=True, required=False)
-    transfer_from_name=serializers.CharField(source="transfer_from.name",read_only=True)
-    transfer_to_name=serializers.CharField(source="transfer_to.name",read_only=True)
+    transfer_from_name = serializers.CharField(source="transfer_from.name", read_only=True)
+    transfer_to_name = serializers.CharField(source="transfer_to.name", read_only=True)
 
     class Meta:
         model = BankTransfer
         fields = "__all__"
+
+    def create_bank_transactions(self, bank_transfer):
+        # Create transaction for transfer_from bank
+        BankTransaction.objects.create(
+            bank=bank_transfer.transfer_from,
+            transaction_type='BankTransfer',
+            payment=bank_transfer.amount,
+            deposit=0,
+            transaction_date=bank_transfer.date,
+            related_table='BankTransfer',
+            related_id=bank_transfer.id,
+            is_deposit=True
+        )
+        # Create transaction for transfer_to bank
+        BankTransaction.objects.create(
+            bank=bank_transfer.transfer_to,
+            transaction_type='BankTransfer',
+            payment=0,
+            deposit=bank_transfer.amount,
+            transaction_date=bank_transfer.date,
+            related_table='BankTransfer',
+            related_id=bank_transfer.id,
+            is_deposit=True
+        )
+
+    def delete_related_bank_transactions(self, bank_transfer):
+        BankTransaction.objects.filter(
+            related_table='BankTransfer',
+            related_id=bank_transfer.id
+        ).delete()
 
     def create(self, validated_data):
         files_data = validated_data.pop('files', [])
@@ -706,15 +808,23 @@ class BankTransferSerializer(serializers.ModelSerializer):
         for file_data in files_data:
             BankTransferDocuments.objects.create(bank_transfer=bank_transfer, **file_data)
 
-        return bank_transfer
+        # Create the bank transactions for the transfer
+        self.create_bank_transactions(bank_transfer)
 
+        return bank_transfer
 
     def update(self, instance, validated_data):
         files_data = validated_data.pop("files", [])
 
+        # Delete previous related bank transactions before update
+        self.delete_related_bank_transactions(instance)
+
         for key, value in validated_data.items():
             setattr(instance, key, value)
         instance.save()
+
+        # Create updated bank transactions for the transfer
+        self.create_bank_transactions(instance)
 
         for file_data in files_data:
             file_id = file_data.get("id", None)
@@ -727,5 +837,5 @@ class BankTransferSerializer(serializers.ModelSerializer):
                 file.save()
             else:
                 BankTransferDocuments.objects.create(payment=instance, **file_data)
+                
         return instance
-

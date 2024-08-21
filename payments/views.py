@@ -243,6 +243,22 @@ class OutgoingFundViewSet(viewsets.ModelViewSet):
         if project_id:
             queryset = queryset.filter(project_id=project_id)
         return queryset
+    
+    def perform_destroy(self, instance):
+        # Delete related bank transactions before deleting the OutgoingFund instance
+        BankTransaction.objects.filter(
+            related_table='OutgoingFund',
+            related_id=instance.id
+        ).delete()
+
+        for detail in instance.details.all():
+            BankTransaction.objects.filter(
+                related_table='OutgoingFundDetail',
+                related_id=detail.id
+            ).delete()
+
+        # Now delete the OutgoingFund instance
+        instance.delete()
 
 
 class JournalVoucherViewSet(viewsets.ModelViewSet):
@@ -530,7 +546,16 @@ class DealerPaymentsViewSet(viewsets.ModelViewSet):
             .prefetch_related("files")
         )
         return queryset
+    
+    def perform_destroy(self, instance):
+        # Delete all related bank transactions
+        BankTransaction.objects.filter(
+            related_table='dealer_payments',
+            related_id=instance.id
+        ).delete()
 
+        # Then delete the journal entry
+        instance.delete()
 
 class JournalEntryViewSet(viewsets.ModelViewSet):
     """
@@ -554,7 +579,16 @@ class JournalEntryViewSet(viewsets.ModelViewSet):
 
         queryset = JournalEntry.objects.filter(query_filters).prefetch_related("files")
         return queryset
+    
+    def perform_destroy(self, instance):
+        # Delete all related bank transactions
+        BankTransaction.objects.filter(
+            related_table='JournalEntry',
+            related_id=instance.id
+        ).delete()
 
+        # Then delete the journal entry
+        instance.delete()
 
 class BankTransferViewSet(viewsets.ModelViewSet):
     """
@@ -578,7 +612,16 @@ class BankTransferViewSet(viewsets.ModelViewSet):
 
         queryset = BankTransfer.objects.filter(query_filters).prefetch_related("files")
         return queryset
+   
+    def perform_destroy(self, instance):
+        # Delete all related bank transactions
+        BankTransaction.objects.filter(
+            related_table='BankTransfer',
+            related_id=instance.id
+        ).delete()
 
+        # Then delete the journal entry
+        instance.delete()
 
 def create_or_update_transaction(
     instance, related_table, transaction_type, amount_field
@@ -703,8 +746,3 @@ def create_dealerpayment_transaction(sender, instance, **kwargs):
     )
 
 
-@receiver(post_save, sender=OutgoingFund)
-def create_expense_transaction(sender, instance, **kwargs):
-    create_or_update_expenses_transaction(
-        instance, "outgoing_funds", "expense", "amount"
-    )
