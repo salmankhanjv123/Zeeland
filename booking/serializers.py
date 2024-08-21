@@ -87,18 +87,19 @@ class BookingSerializer(serializers.ModelSerializer):
 
                 booking = Booking.objects.create(**validated_data)
 
-                IncomingFund.objects.create(
-                    project=project,
-                    booking=booking,
-                    date=booking_date,
-                    installement_month=installement_month,
-                    amount=advance_amount,
-                    remarks="advance",
-                    advance_payment=True,
-                    bank=validated_data.get("bank"),
-                    payment_type=validated_data.get("payment_type"),
-                    cheque_number=validated_data.get("cheque_number"),
-                )
+                if advance_amount>0:
+                    IncomingFund.objects.create(
+                        project=project,
+                        booking=booking,
+                        date=booking_date,
+                        installement_month=installement_month,
+                        amount=advance_amount,
+                        remarks="advance",
+                        advance_payment=True,
+                        bank=validated_data.get("bank"),
+                        payment_type=validated_data.get("payment_type"),
+                        cheque_number=validated_data.get("cheque_number"),
+                    )
 
                 existing_resale = PlotResale.objects.filter(
                     Q(booking__plot=plot) | Q(booking__plot=plot.parent_plot)

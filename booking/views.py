@@ -39,7 +39,12 @@ class BookingViewSet(viewsets.ModelViewSet):
             query_filters &= Q(booking_date__gte=start_date) & Q(booking_date__lte=end_date)
         queryset = Booking.objects.filter(query_filters).select_related('customer','dealer', 'plot').prefetch_related("files")
         return queryset
-
+    
+    def perform_destroy(self, instance):
+        plot = instance.plot
+        plot.status = "active"
+        plot.save()
+        super().perform_destroy(instance)
 
 class BookingForPaymentsListView(ListAPIView):
     """
