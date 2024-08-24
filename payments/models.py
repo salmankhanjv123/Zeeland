@@ -181,7 +181,6 @@ class BankDepositTransactions(models.Model):
         BankDeposit, related_name="transactions", on_delete=models.CASCADE
     )
     project = models.ForeignKey(Projects, on_delete=models.PROTECT)
-    reference = models.CharField(max_length=10, default="payment")
     customer = models.ForeignKey(
         Customers, on_delete=models.PROTECT, blank=True, null=True
     )

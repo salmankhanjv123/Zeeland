@@ -3,9 +3,13 @@ from rest_framework import generics
 from payments.models import (
     IncomingFund,
     OutgoingFund,
+    OutgoingFundDetails,
     JournalVoucher,
     BankTransaction,
     DealerPayments,
+    BankDepositTransactions,
+    JournalEntryLine,
+
 )
 from customer.models import Customers, CustomerMessages, Dealers
 from plots.models import Plots
@@ -588,7 +592,34 @@ class CustomerLedgerView(APIView):
                 reference=Value("booking", output_field=CharField()),
             )
         )
-
+        expense_data=(
+            OutgoingFundDetails.objects.filter(person_id=customer_id)
+            .select_related("person")
+            .values(
+                "id",
+                remarks=F("description"),
+                document=F("id"),
+                credit=F("amount"),
+                debit=Value(0.0),
+                date=F("outgoing_fund__date"),
+                customer_name=F("person__name"),
+                reference=Value("Expenses", output_field=CharField()),
+            )
+        )
+        bank_deposit_data=(
+            BankDepositTransactions.objects.filter(customer_id=customer_id)
+            .select_related("customer")
+            .values(
+                "id",
+                "remarks",
+                "date",
+                document=F("id"),
+                credit=F("amount"),
+                debit=Value(0.0),
+                customer_name=F("customer__name"),
+                reference=Value("Deposits", output_field=CharField()),
+            )
+        )
         payment_data = (
             IncomingFund.objects.filter(payment_query_filters, booking__customer_id=customer_id)
             .select_related("booking__customer")
@@ -647,7 +678,9 @@ class CustomerLedgerView(APIView):
             list(booking_data)
             + list(payment_data)
             + list(token_data)
-            + list(resale_data),
+            + list(resale_data)
+            + list(expense_data)
+            + list(bank_deposit_data),
             key=lambda x: x["date"],
         )
 
@@ -795,6 +828,212 @@ class CustomerLedgerView(APIView):
         }
 
         return Response(response_data)
+
+
+class VendorLedgerView(APIView):
+    def get(self, request):
+        project_id = self.request.query_params.get("project_id")
+        vendor_id = self.request.query_params.get("vendor_id")
+        start_date = self.request.query_params.get("start_date")
+        end_date = self.request.query_params.get("end_date")
+        
+
+
+        query_filters = Q()
+
+        
+        if project_id:
+            query_filters&= Q(project_id=project_id)
+
+        
+
+        if start_date and end_date:
+            query_filters &= Q(date__gte=start_date) & Q(date__lte=end_date)
+
+
+        expense_data=(
+            OutgoingFundDetails.objects.filter(person_id=vendor_id)
+            .select_related("person")
+            .values(
+                "id",
+                remarks=F("description"),
+                document=F("id"),
+                credit=F("amount"),
+                debit=Value(0.0),
+                date=F("outgoing_fund__date"),
+                customer_name=F("person__name"),
+                reference=Value("Expenses", output_field=CharField()),
+            )
+        )
+        
+        bank_deposit_data=(
+            BankDepositTransactions.objects.filter(customer_id=vendor_id)
+            .select_related("customer")
+            .values(
+                "id",
+                "remarks",
+                "date",
+                document=F("id"),
+                credit=F("amount"),
+                debit=Value(0.0),
+                customer_name=F("customer__name"),
+                reference=Value("Deposits", output_field=CharField()),
+            )
+        )
+
+        journal_data=(
+            JournalEntryLine.objects.filter(person_id=vendor_id)
+            .select_related("person")
+            .values(
+                "id",
+                "credit",
+                "debit",
+                remarks=F("description"),
+                document=F("journal_entry"),
+                date=F("journal_entry__date"),
+                customer_name=F("person__name"),
+                reference=Value("Journal", output_field=CharField()),
+            )
+        )
+
+
+        # Combine and sort by date
+        combined_data = sorted(
+            list(expense_data)
+            + list(bank_deposit_data)
+            + list(journal_data),
+            key=lambda x: x["date"],
+        )
+
+
+        opening_balance = 0
+        current_balance = opening_balance
+
+        for entry in combined_data:
+            current_balance += entry["credit"] - entry["debit"]
+            entry["balance"] = current_balance
+        # Fetch customer information
+        customer_info = (
+            Customers.objects.filter(id=vendor_id)
+            .values("id", "name", "father_name", "contact", "address")
+            .first()
+        )
+
+
+
+        response_data = {
+            "customer_info": customer_info,
+            "opening_balance": opening_balance,
+            "closing_balance":0,
+            "transactions": combined_data,
+        }
+
+        return Response(response_data)
+
+
+
+class EmployeeLedgerView(APIView):
+    def get(self, request):
+        project_id = self.request.query_params.get("project_id")
+        vendor_id = self.request.query_params.get("employee_id")
+        start_date = self.request.query_params.get("start_date")
+        end_date = self.request.query_params.get("end_date")
+        
+
+
+        query_filters = Q()
+
+        
+        if project_id:
+            query_filters&= Q(project_id=project_id)
+
+        
+
+        if start_date and end_date:
+            query_filters &= Q(date__gte=start_date) & Q(date__lte=end_date)
+
+
+        expense_data=(
+            OutgoingFundDetails.objects.filter(person_id=vendor_id)
+            .select_related("person")
+            .values(
+                "id",
+                remarks=F("description"),
+                document=F("id"),
+                credit=F("amount"),
+                debit=Value(0.0),
+                date=F("outgoing_fund__date"),
+                customer_name=F("person__name"),
+                reference=Value("Expenses", output_field=CharField()),
+            )
+        )
+        
+        bank_deposit_data=(
+            BankDepositTransactions.objects.filter(customer_id=vendor_id)
+            .select_related("customer")
+            .values(
+                "id",
+                "remarks",
+                "date",
+                document=F("id"),
+                credit=F("amount"),
+                debit=Value(0.0),
+                customer_name=F("customer__name"),
+                reference=Value("Deposits", output_field=CharField()),
+            )
+        )
+
+        journal_data=(
+            JournalEntryLine.objects.filter(person_id=vendor_id)
+            .select_related("person")
+            .values(
+                "id",
+                "credit",
+                "debit",
+                remarks=F("description"),
+                document=F("journal_entry"),
+                date=F("journal_entry__date"),
+                customer_name=F("person__name"),
+                reference=Value("Journal", output_field=CharField()),
+            )
+        )
+
+
+        # Combine and sort by date
+        combined_data = sorted(
+            list(expense_data)
+            + list(bank_deposit_data)
+            + list(journal_data),
+            key=lambda x: x["date"],
+        )
+
+
+        opening_balance = 0
+        current_balance = opening_balance
+
+        for entry in combined_data:
+            current_balance += entry["credit"] - entry["debit"]
+            entry["balance"] = current_balance
+        # Fetch customer information
+        customer_info = (
+            Customers.objects.filter(id=vendor_id)
+            .values("id", "name", "father_name", "contact", "address")
+            .first()
+        )
+
+
+
+        response_data = {
+            "customer_info": customer_info,
+            "opening_balance": opening_balance,
+            "closing_balance":0,
+            "transactions": combined_data,
+        }
+
+        return Response(response_data)
+
+
+
 
 class PlotLedgerView(APIView):
     def get(self, request):
