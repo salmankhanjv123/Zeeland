@@ -857,7 +857,7 @@ class VendorLedgerView(APIView):
             .values(
                 "id",
                 remarks=F("description"),
-                document=F("id"),
+                document=F("outgoing_fund"),
                 credit=F("amount"),
                 debit=Value(0.0),
                 date=F("outgoing_fund__date"),
@@ -873,7 +873,7 @@ class VendorLedgerView(APIView):
                 "id",
                 "remarks",
                 "date",
-                document=F("id"),
+                document=F("bank_deposit"),
                 credit=F("amount"),
                 debit=Value(0.0),
                 customer_name=F("customer__name"),
