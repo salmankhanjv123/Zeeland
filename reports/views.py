@@ -36,7 +36,7 @@ from django.db.models import (
     Case,
     When,
 )
-from django.db.models.functions import Coalesce
+from django.db.models.functions import Coalesce,Abs
 from rest_framework.exceptions import ValidationError
 from itertools import groupby
 from operator import itemgetter
@@ -874,7 +874,7 @@ class VendorLedgerView(APIView):
                 "remarks",
                 "date",
                 document=F("bank_deposit"),
-                credit=F("amount"),
+                credit=Abs(F("amount")),
                 debit=Value(0.0),
                 customer_name=F("customer__name"),
                 reference=Value("Deposits", output_field=CharField()),
