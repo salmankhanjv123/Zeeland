@@ -614,7 +614,6 @@ class BankDepositSerializer(serializers.ModelSerializer):
                 BankDepositTransactions.objects.filter(bank_deposit=instance).delete()
 
                 for data in transactions_data:
-                    date = data.get("date")
                     amount = abs(data.get("amount"))
                     bank = data.get("bank")
 
