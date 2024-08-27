@@ -19,6 +19,7 @@ from .serializers import (
     DealerPaymentsSerializer,
     JournalEntrySerializer,
     BankTransferSerializer,
+    ChequeClearanceSerializer,
 )
 from .models import (
     IncomingFund,
@@ -33,9 +34,11 @@ from .models import (
     DealerPayments,
     JournalEntry,
     BankTransfer,
+    ChequeClearance
 )
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework.exceptions import ValidationError
 from datetime import date
 from booking.models import Booking, Token
 from customer.models import Customers
@@ -79,6 +82,7 @@ class BankTransactionViewSet(viewsets.ModelViewSet):
         account_type = self.request.query_params.get("account_type")
         main_type = self.request.query_params.get("main_type")
         is_deposit = self.request.query_params.get("is_deposit")
+        is_cheque_clear= self.request.query_params.get("is_cheque_clear")
         query_filters = Q()
         if bank_id:
             query_filters &= Q(bank_id=bank_id)
@@ -88,6 +92,8 @@ class BankTransactionViewSet(viewsets.ModelViewSet):
             query_filters &= Q(bank__main_type=main_type)
         if is_deposit:
             query_filters &= Q(is_deposit=is_deposit)
+        if is_cheque_clear:
+            query_filters &= Q(is_cheque_clear=is_cheque_clear)
         queryset = BankTransaction.objects.filter(query_filters)
         return queryset
 
@@ -114,7 +120,7 @@ class BankTransactionAPIView(APIView):
             )
 
         # Filter transactions based on bank_id and date range
-        query_filters = Q(bank_id=bank_id)
+        query_filters = Q(bank_id=bank_id,is_cheque_clear=True)
         transactions = BankTransaction.objects.filter(
             query_filters, transaction_date__range=[start_date, end_date]
         ).order_by("transaction_date", "id")
@@ -217,6 +223,23 @@ class IncomingFundViewSet(viewsets.ModelViewSet):
         return queryset
 
     def perform_destroy(self, instance):
+        # Check for existing related bank transaction entries
+        related_bank_transactions = BankTransaction.objects.filter(
+            related_table='incoming_funds',
+            related_id=instance.id,
+            is_deposit=True,
+            bank__detail_type="Undeposited_Funds"
+        )
+        if related_bank_transactions.exists():
+            raise ValidationError(
+                {"error": "Cannot delete this entry as related bank transactions exist."}
+            )
+        
+        BankTransaction.objects.filter(
+            related_table='incoming_funds',
+            related_id=instance.id
+        ).delete()
+        
         amount = instance.amount
         booking = instance.booking
         reference = instance.reference
@@ -497,7 +520,22 @@ class BankDepositViewSet(viewsets.ModelViewSet):
 
         queryset = BankDeposit.objects.filter(query_filters).prefetch_related("files")
         return queryset
+    
+    def perform_destroy(self, instance):
+        # Delete all related bank transactions
+        BankTransaction.objects.filter(
+            related_table='bank_deposits',
+            related_id=instance.id
+        ).delete()
 
+        # Update BankDepositDetail to set is_deposit=False
+        for detail in instance.details.all():
+            payment=detail.payment 
+            payment.is_deposit=False
+            payment.save()
+
+        # Delete the BankDeposit instance
+        super().perform_destroy(instance)
 
 class DealerPaymentsViewSet(viewsets.ModelViewSet):
     """
@@ -624,7 +662,7 @@ class BankTransferViewSet(viewsets.ModelViewSet):
         instance.delete()
 
 def create_or_update_transaction(
-    instance, related_table, transaction_type, amount_field
+    instance, related_table, transaction_type, amount_field,transaction_date
 ):
     bank_field = getattr(instance, "bank", None)
     if bank_field:
@@ -652,6 +690,7 @@ def create_or_update_transaction(
             if transaction_type == "refund":
                 BankTransaction.objects.create(
                     bank=bank_field,
+                    transaction_date=transaction_date,
                     transaction_type=transaction_type,
                     deposit=0,
                     payment=amount,
@@ -663,6 +702,7 @@ def create_or_update_transaction(
                 BankTransaction.objects.create(
                     bank=bank_field,
                     transaction_type=transaction_type,
+                    transaction_date=transaction_date,
                     deposit=amount,
                     payment=0,
                     related_table=related_table,
@@ -671,10 +711,42 @@ def create_or_update_transaction(
                 )
 
 
+class ChequeClearanceViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint that allows IncomingFund to be viewed or edited.
+    """
+
+    serializer_class = ChequeClearanceSerializer
+
+    def get_queryset(self):
+
+        start_date = self.request.query_params.get("start_date")
+        end_date = self.request.query_params.get("end_date")
+        query_filters = Q()
+
+        if start_date and end_date:
+            query_filters &= Q(date__gte=start_date) & Q(date__lte=end_date)
+
+        queryset = ChequeClearance.objects.filter(query_filters).prefetch_related("files")
+        return queryset
+    
+    def perform_destroy(self, instance):
+
+        # Update BankDepositDetail to set is_deposit=False
+        for detail in instance.details.all():
+            expense=detail.expense 
+            expense.is_cheque_clear=False
+            expense.save()
+
+        # Delete the BankDeposit instance
+        super().perform_destroy(instance)
+
+
+
 @receiver(post_save, sender=IncomingFund)
 def create_payment_transaction(sender, instance, **kwargs):
     create_or_update_transaction(
-        instance, "incoming_funds", instance.reference, "amount"
+        instance, "incoming_funds", instance.reference, "amount",instance.date
     )
 
 

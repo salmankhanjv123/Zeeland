@@ -14,6 +14,7 @@ from .views import (
     DealerPaymentsViewSet,
     JournalEntryViewSet,
     BankTransferViewSet,
+    ChequeClearanceViewSet,
 )
 from rest_framework import routers
 
@@ -35,6 +36,7 @@ router.register(
 router.register(r"dealer-payments", DealerPaymentsViewSet, basename="dealer-payments")
 router.register(r"journal-entries", JournalEntryViewSet, basename="journal-entries")
 router.register(r"bank-transfer", BankTransferViewSet, basename="bank-transfer")
+router.register(r"cheque-clearance", ChequeClearanceViewSet, basename="cheque-clearance")
 
 
 urlpatterns = [

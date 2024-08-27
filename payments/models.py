@@ -25,10 +25,11 @@ class BankTransaction(models.Model):
     transaction_type = models.CharField(max_length=50)
     payment = models.DecimalField(max_digits=10, decimal_places=2)
     deposit = models.DecimalField(max_digits=10, decimal_places=2)
-    transaction_date = models.DateField(auto_now_add=True)
+    transaction_date = models.DateField()
     related_table = models.CharField(max_length=50)
     related_id = models.IntegerField()
     is_deposit = models.BooleanField(default=True)
+    is_cheque_clear=models.BooleanField(default=True)
 
 
 class MonthField(models.DateField):
@@ -180,15 +181,11 @@ class BankDepositTransactions(models.Model):
     bank_deposit = models.ForeignKey(
         BankDeposit, related_name="transactions", on_delete=models.CASCADE
     )
-    project = models.ForeignKey(Projects, on_delete=models.PROTECT)
     customer = models.ForeignKey(
         Customers, on_delete=models.PROTECT, blank=True, null=True
     )
-    date = models.DateField()
     amount = models.FloatField()
     remarks = models.TextField(blank=True, null=True)
-    payment_type = models.CharField(max_length=20, default="cash")
-    cheque_number = models.CharField(max_length=50, blank=True, null=True)
     bank = models.ForeignKey(
         Bank, related_name="deposits", on_delete=models.PROTECT, blank=True, null=True
     )
@@ -289,6 +286,32 @@ class BankTransferDocuments(models.Model):
         BankTransfer, related_name="files", on_delete=models.CASCADE
     )
     file = models.FileField(upload_to="media/bank_transfer_files")
+    description = models.TextField()
+    type = models.CharField(max_length=20)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
+
+class ChequeClearance(models.Model):
+    date = models.DateField()
+    description = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+
+
+class ChequeClearanceDetail(models.Model):
+    cheque_clearance = models.ForeignKey(
+        ChequeClearance, related_name="details", on_delete=models.CASCADE
+    )
+    expense = models.ForeignKey(BankTransaction, on_delete=models.PROTECT)
+
+class ChequeClearanceDocuments(models.Model):
+    cheque_clearance = models.ForeignKey(
+        ChequeClearance, related_name="files", on_delete=models.CASCADE
+    )
+    file = models.FileField(upload_to="media/cheque_clearance_files")
     description = models.TextField()
     type = models.CharField(max_length=20)
     created_at = models.DateTimeField(auto_now_add=True)
