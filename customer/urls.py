@@ -5,6 +5,7 @@ from .views import (
     CustomerMessagesDetailView,
     CustomerMessagesReminderViewSet,
     DealerViewSet,
+    DepartmentViewSet,
 )
 from rest_framework import routers
 
@@ -12,6 +13,7 @@ from rest_framework import routers
 router = routers.DefaultRouter()
 router.register(r"customers", CustomersViewSet, basename="customers")
 router.register(r"dealers", DealerViewSet, basename="dealers")
+router.register(r"departments", DepartmentViewSet, basename="departments")
 router.register(
     r"customer-messages-reminder",
     CustomerMessagesReminderViewSet,

@@ -7,10 +7,16 @@ from .models import (
     CustomerMessagesReminder,
     Dealers,
     DealersDocuments,
+    Department,
 )
 from booking.models import Booking
 
 
+class DepartmentSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Department
+        fields = "__all__"  # or specify specific fields
 
 
 class CustomersDocumentsSerializer(serializers.ModelSerializer):
@@ -32,6 +38,7 @@ class CustomersInfoSerializer(serializers.ModelSerializer):
 
 class CustomersSerializer(serializers.ModelSerializer):
     files = CustomersDocumentsSerializer(many=True, required=False)
+    department_name=serializers.CharField(source="department.name",read_only=True)
 
     class Meta:
         model = Customers

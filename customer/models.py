@@ -6,8 +6,13 @@ from django.contrib.auth.models import User
 # Create your models here.
 
 
+class Department(models.Model):
+    name=models.CharField(max_length=15)
+
+
 class Customers(models.Model):
     project = models.ForeignKey(Projects, on_delete=models.PROTECT)
+    department = models.ForeignKey(Department, on_delete=models.PROTECT,blank=True, null=True)
     reference=models.CharField(max_length=15,default='customer')
     name = models.CharField(max_length=30)
     father_name = models.CharField(max_length=30, blank=True, null=True)

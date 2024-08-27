@@ -6,9 +6,16 @@ from .serializers import (
     CustomerMessagesSerializer,
     CustomerMessagesReminderSerializer,
     DealersSerializer,
+    DepartmentSerializer,
 )
-from .models import Customers, CustomerMessages, CustomerMessagesReminder, Dealers
+from .models import Customers, CustomerMessages, CustomerMessagesReminder, Dealers,Department
 from booking.models import Booking
+
+
+class DepartmentViewSet(viewsets.ModelViewSet):
+    queryset = Department.objects.all()
+    serializer_class = DepartmentSerializer
+
 
 
 class CustomersViewSet(viewsets.ModelViewSet):

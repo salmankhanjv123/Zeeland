@@ -48,9 +48,9 @@ class Booking(models.Model):
     total_receiving_amount = models.FloatField()
 
     dealer = models.ForeignKey(
-        Dealers,
+        Customers,
         on_delete=models.PROTECT,
-        related_name="bookings",
+        related_name="dealer_bookings",
         blank=True,
         null=True,
     )

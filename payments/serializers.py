@@ -656,7 +656,7 @@ class BankDepositSerializer(serializers.ModelSerializer):
 class DealersSerializer(serializers.ModelSerializer):
 
     class Meta:
-        model = Dealers
+        model = Customers
         fields = ["name", "contact", "cnic", "address"]
 
 
