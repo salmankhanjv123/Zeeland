@@ -612,7 +612,7 @@ class CustomerLedgerView(APIView):
             .values(
                 "id",
                 "remarks",
-                "date",
+                date=F("bank_deposit__date"),
                 document=F("id"),
                 credit=F("amount"),
                 debit=Value(0.0),
@@ -871,7 +871,7 @@ class VendorLedgerView(APIView):
             .values(
                 "id",
                 "remarks",
-                "date",
+                date=F("bank_deposit__date"),
                 document=F("bank_deposit"),
                 credit=Abs(F("amount")),
                 debit=Value(0.0),
@@ -973,7 +973,7 @@ class EmployeeLedgerView(APIView):
             .values(
                 "id",
                 "remarks",
-                "date",
+                date=F("bank_deposit__date"),
                 document=F("id"),
                 credit=F("amount"),
                 debit=Value(0.0),

@@ -909,6 +909,7 @@ class ChequeClearanceDocumentsSerializer(serializers.ModelSerializer):
 
 
 class ChequeClearanceDetailSerializer(serializers.ModelSerializer):
+    expense_detail = BankTransactionSerializer(source="expense", read_only=True)
     class Meta:
         model = ChequeClearanceDetail
         exclude = ["cheque_clearance"]
