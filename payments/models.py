@@ -19,6 +19,8 @@ class Bank(models.Model):
         related_name="sub_accounts",
     )
 
+    class Meta:
+        db_table = "banks"
 
 class BankTransaction(models.Model):
     bank = models.ForeignKey(Bank, on_delete=models.CASCADE)
@@ -31,6 +33,8 @@ class BankTransaction(models.Model):
     is_deposit = models.BooleanField(default=True)
     is_cheque_clear=models.BooleanField(default=True)
 
+    class Meta:
+        db_table = "bank_transactions"
 
 class MonthField(models.DateField):
     def to_python(self, value):
@@ -78,6 +82,8 @@ class IncomingFundDocuments(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        db_table = "incoming_funds_documents"
 
 class ExpenseType(models.Model):
     name = models.CharField(max_length=50)
@@ -85,8 +91,6 @@ class ExpenseType(models.Model):
     class Meta:
         db_table = "expense_type"
 
-    def __str__(self):
-        return self.name
 
 
 class ExpensePerson(models.Model):
@@ -127,6 +131,8 @@ class OutgoingFundDetails(models.Model):
     description=models.CharField(max_length=100,blank=True,null=True)
     amount=models.FloatField(default=0)
 
+    class Meta:
+        db_table = "outgoing_funds_details"
 
 class OutgoingFundDocuments(models.Model):
     outgoing_fund = models.ForeignKey(
@@ -138,6 +144,8 @@ class OutgoingFundDocuments(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        db_table = "outgoing_funds_documents"
 
 class JournalVoucher(models.Model):
     project = models.ForeignKey(Projects, on_delete=models.PROTECT)
@@ -189,6 +197,8 @@ class BankDepositTransactions(models.Model):
         Bank, related_name="deposits", on_delete=models.PROTECT, blank=True, null=True
     )
 
+    class Meta:
+        db_table = "bank_deposits_details"
 
 class BankDepositDocuments(models.Model):
     bank_deposit = models.ForeignKey(
@@ -200,6 +210,8 @@ class BankDepositDocuments(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        db_table = "bank_deposits_documents"
 
 class DealerPayments(models.Model):
     project = models.ForeignKey(Projects, on_delete=models.PROTECT)
@@ -232,6 +244,8 @@ class DealerPaymentsDocuments(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        db_table = "dealer_payments_documents"
 
 class JournalEntry(models.Model):
     project = models.ForeignKey(Projects, on_delete=models.PROTECT)
@@ -240,6 +254,8 @@ class JournalEntry(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        db_table = "journal_entry"
 
 class JournalEntryLine(models.Model):
     journal_entry = models.ForeignKey(
@@ -253,6 +269,8 @@ class JournalEntryLine(models.Model):
         Customers, related_name="journal_entries", on_delete=models.PROTECT,blank=True, null=True
     )
 
+    class Meta:
+        db_table = "journal_entry_details"
 
 class JournalEntryDocuments(models.Model):
     journal_entry = models.ForeignKey(
@@ -264,6 +282,8 @@ class JournalEntryDocuments(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        db_table = "journal_entry_documents"
 
 class BankTransfer(models.Model):
     project = models.ForeignKey(Projects, on_delete=models.PROTECT)
@@ -279,6 +299,8 @@ class BankTransfer(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        db_table = "bank_transfer"
 
 class BankTransferDocuments(models.Model):
     bank_transfer = models.ForeignKey(
@@ -290,6 +312,8 @@ class BankTransferDocuments(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        db_table = "bank_transfer_documents"
 
 
 class ChequeClearance(models.Model):
@@ -298,13 +322,17 @@ class ChequeClearance(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
-
+    class Meta:
+        db_table = "cheque_clearance"
 
 class ChequeClearanceDetail(models.Model):
     cheque_clearance = models.ForeignKey(
         ChequeClearance, related_name="details", on_delete=models.CASCADE
     )
     expense = models.ForeignKey(BankTransaction, on_delete=models.PROTECT)
+
+    class Meta:
+        db_table = "cheque_clearance_details"
 
 class ChequeClearanceDocuments(models.Model):
     cheque_clearance = models.ForeignKey(
@@ -315,3 +343,6 @@ class ChequeClearanceDocuments(models.Model):
     type = models.CharField(max_length=20)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "cheque_clearance_documents"

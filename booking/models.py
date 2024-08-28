@@ -1,10 +1,9 @@
 from django.db import models
 from projects.models import Projects
 from plots.models import Plots
-from customer.models import Customers, Dealers
+from customer.models import Customers
 from django.contrib.auth.models import User
 
-# Create your models here.
 
 
 class Booking(models.Model):
@@ -78,6 +77,8 @@ class BookingDocuments(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        db_table = "booking_documents"
 
 class Token(models.Model):
     project = models.ForeignKey(Projects, on_delete=models.PROTECT)
@@ -113,7 +114,9 @@ class TokenDocuments(models.Model):
     type = models.CharField(max_length=20)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-
+    
+    class Meta:
+        db_table = "token_documents"
 
 class PlotResale(models.Model):
     date = models.DateField()
@@ -124,3 +127,6 @@ class PlotResale(models.Model):
     customer_profit = models.FloatField(default=0)
     company_profit = models.FloatField(default=0)
     remarks = models.TextField(blank=True, null=True)
+
+    class Meta:
+        db_table = "plot_resale"
