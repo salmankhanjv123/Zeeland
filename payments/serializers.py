@@ -56,6 +56,7 @@ class BankTransactionSerializer(serializers.ModelSerializer):
     bank_name = serializers.CharField(source="bank.name", read_only=True)
     customer_name = serializers.SerializerMethodField()
     plot_number = serializers.SerializerMethodField()
+    cheque_number=serializers.SerializerMethodField()
 
     class Meta:
         model = BankTransaction
@@ -74,7 +75,14 @@ class BankTransactionSerializer(serializers.ModelSerializer):
                 return related_instance.customer.name
             except Token.DoesNotExist:
                 return None
+        elif obj.related_table == "OutgoingFund":
+            try:
+                related_instance = OutgoingFund.objects.get(pk=obj.related_id)
+                return related_instance.payee.name
+            except OutgoingFund.DoesNotExist:
+                return None
         return None
+
 
     def get_plot_number(self, obj):
         if obj.related_table == "incoming_funds":
@@ -92,6 +100,26 @@ class BankTransactionSerializer(serializers.ModelSerializer):
                 return None
         return None
 
+    def get_cheque_number(self, obj):
+        if obj.related_table == "incoming_funds":
+            try:
+                related_instance = IncomingFund.objects.get(pk=obj.related_id)
+                return related_instance.cheque_number
+            except IncomingFund.DoesNotExist:
+                return None
+        elif obj.related_table == "token":
+            try:
+                related_instance = Token.objects.get(pk=obj.related_id)
+                return related_instance.cheque_number
+            except Token.DoesNotExist:
+                return None
+        elif obj.related_table == "OutgoingFund":
+            try:
+                related_instance = OutgoingFund.objects.get(pk=obj.related_id)
+                return related_instance.cheque_number
+            except OutgoingFund.DoesNotExist:
+                return None
+        return None
 
 class MonthField(serializers.Field):
     def to_internal_value(self, data):
@@ -998,5 +1026,6 @@ class ChequeClearanceSerializer(serializers.ModelSerializer):
                         ChequeClearanceDocuments.objects.create(
                             cheque_clearance=instance, **file_data
                         )
+                return instance
         except Exception as e:
             raise ValidationError({"error": str(e)})
