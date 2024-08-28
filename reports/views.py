@@ -593,16 +593,16 @@ class CustomerLedgerView(APIView):
             )
         )
         expense_data=(
-            OutgoingFundDetails.objects.filter(person_id=customer_id)
-            .select_related("person")
+            OutgoingFund.objects.filter(payee=customer_id)
+            .select_related("payee")
             .values(
                 "id",
-                remarks=F("description"),
+                "date",
+                "remarks",
                 document=F("id"),
                 credit=F("amount"),
                 debit=Value(0.0),
-                date=F("outgoing_fund__date"),
-                customer_name=F("person__name"),
+                customer_name=F("payee__name"),
                 reference=Value("Expenses", output_field=CharField()),
             )
         )
@@ -852,20 +852,19 @@ class VendorLedgerView(APIView):
 
 
         expense_data=(
-            OutgoingFundDetails.objects.filter(person_id=vendor_id)
-            .select_related("person")
+            OutgoingFund.objects.filter(payee=vendor_id)
+            .select_related("payee")
             .values(
                 "id",
-                remarks=F("description"),
-                document=F("outgoing_fund"),
+                "date",
+                "remarks",
+                document=F("id"),
                 credit=F("amount"),
                 debit=Value(0.0),
-                date=F("outgoing_fund__date"),
-                customer_name=F("person__name"),
+                customer_name=F("payee__name"),
                 reference=Value("Expenses", output_field=CharField()),
             )
         )
-        
         bank_deposit_data=(
             BankDepositTransactions.objects.filter(customer_id=vendor_id)
             .select_related("customer")
@@ -954,16 +953,16 @@ class EmployeeLedgerView(APIView):
 
 
         expense_data=(
-            OutgoingFundDetails.objects.filter(person_id=vendor_id)
-            .select_related("person")
+            OutgoingFund.objects.filter(payee=vendor_id)
+            .select_related("payee")
             .values(
                 "id",
-                remarks=F("description"),
+                "date",
+                "remarks",
                 document=F("id"),
                 credit=F("amount"),
                 debit=Value(0.0),
-                date=F("outgoing_fund__date"),
-                customer_name=F("person__name"),
+                customer_name=F("payee__name"),
                 reference=Value("Expenses", output_field=CharField()),
             )
         )

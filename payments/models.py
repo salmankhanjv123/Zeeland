@@ -126,7 +126,6 @@ class OutgoingFundDetails(models.Model):
     )
     description=models.CharField(max_length=100,blank=True,null=True)
     amount=models.FloatField(default=0)
-    person = models.ForeignKey(Customers, on_delete=models.PROTECT,blank=True,null=True)
 
 
 class OutgoingFundDocuments(models.Model):
