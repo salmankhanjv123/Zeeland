@@ -184,6 +184,9 @@ class BankDepositDetail(models.Model):
     payment = models.ForeignKey(BankTransaction, on_delete=models.PROTECT)
 
 
+    class Meta:
+        db_table = "bank_deposits_details"
+
 class BankDepositTransactions(models.Model):
     bank_deposit = models.ForeignKey(
         BankDeposit, related_name="transactions", on_delete=models.CASCADE
@@ -198,7 +201,7 @@ class BankDepositTransactions(models.Model):
     )
 
     class Meta:
-        db_table = "bank_deposits_details"
+        db_table = "bank_deposits_transactions"
 
 class BankDepositDocuments(models.Model):
     bank_deposit = models.ForeignKey(
