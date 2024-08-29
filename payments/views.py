@@ -780,7 +780,6 @@ def create_or_update_expenses_transaction(
                 transaction.payment = amount
             transaction.is_deposit = is_deposit
             transaction.is_cheque_clear=is_cheque_clear
-            transaction.transaction_date=instance.date,
             transaction.save()
         except BankTransaction.DoesNotExist:
             # If the transaction doesn't exist, create it
