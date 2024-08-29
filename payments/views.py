@@ -762,6 +762,7 @@ def create_or_update_expenses_transaction(
     if bank_field:
         amount = getattr(instance, amount_field, None)
         is_deposit = bank_field.detail_type != "Undeposited_Funds"
+        is_cheque_clear=instance.payment_type !="Cheque"
 
         try:
             # Try to get the existing transaction
@@ -778,6 +779,7 @@ def create_or_update_expenses_transaction(
                 transaction.deposit = 0
                 transaction.payment = amount
             transaction.is_deposit = is_deposit
+            transaction.is_cheque_clear=is_cheque_clear
             transaction.save()
         except BankTransaction.DoesNotExist:
             # If the transaction doesn't exist, create it
@@ -791,6 +793,7 @@ def create_or_update_expenses_transaction(
                     related_id=instance.id,
                     transaction_date=instance.date,
                     is_deposit=is_deposit,
+                    is_cheque_clear=is_cheque_clear,
                 )
             else:
                 BankTransaction.objects.create(
@@ -802,6 +805,7 @@ def create_or_update_expenses_transaction(
                     related_id=instance.id,
                     transaction_date=instance.date,
                     is_deposit=is_deposit,
+                    is_cheque_clear=is_cheque_clear,
                 )
 
 
