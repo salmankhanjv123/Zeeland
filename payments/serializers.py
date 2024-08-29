@@ -301,6 +301,7 @@ class OutgoingFundSerializer(serializers.ModelSerializer):
 
     def create_bank_transactions(self, outgoing_fund):
         # Main transaction for OutgoingFund
+        is_cheque_clear=outgoing_fund.payment_type!="Cheque"
         BankTransaction.objects.create(
             bank=outgoing_fund.bank,
             transaction_type="Expenses",
@@ -310,7 +311,7 @@ class OutgoingFundSerializer(serializers.ModelSerializer):
             related_table="OutgoingFund",
             related_id=outgoing_fund.id,
             is_deposit=True,
-            is_cheque_clear=False,
+            is_cheque_clear=is_cheque_clear,
         )
 
         # Transactions for each detail in OutgoingFundDetails
