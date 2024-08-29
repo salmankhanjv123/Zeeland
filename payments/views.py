@@ -752,7 +752,7 @@ def create_payment_transaction(sender, instance, **kwargs):
 
 @receiver(post_save, sender=Token)
 def create_token_transaction(sender, instance, **kwargs):
-    create_or_update_transaction(instance, "token", "Token", "amount")
+    create_or_update_transaction(instance, "token", "Token", "amount",instance.date)
 
 
 def create_or_update_expenses_transaction(
