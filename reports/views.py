@@ -469,7 +469,7 @@ class DealerLedgerView(APIView):
                 entry["balance"] = current_balance
 
             dealer_info = (
-                Dealers.objects.filter(id=dealer_id)
+                Customers.objects.filter(id=dealer_id)
                 .values("id", "name", "contact", "address")
                 .first()
             )
