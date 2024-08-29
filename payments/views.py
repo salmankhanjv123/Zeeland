@@ -789,6 +789,7 @@ def create_or_update_expenses_transaction(
                     payment=0,
                     related_table=related_table,
                     related_id=instance.id,
+                    transaction_date=instance.date,
                     is_deposit=is_deposit,
                 )
             else:
@@ -799,6 +800,7 @@ def create_or_update_expenses_transaction(
                     payment=amount,
                     related_table=related_table,
                     related_id=instance.id,
+                    transaction_date=instance.date,
                     is_deposit=is_deposit,
                 )
 
