@@ -81,6 +81,12 @@ class BankTransactionSerializer(serializers.ModelSerializer):
                 return related_instance.payee.name
             except OutgoingFund.DoesNotExist:
                 return None
+        elif obj.related_table == "dealer_payments":
+            try:
+                related_instance = DealerPayments.objects.get(pk=obj.related_id)
+                return related_instance.booking.customer.name
+            except DealerPayments.DoesNotExist:
+                return None
         return None
 
 
@@ -97,6 +103,13 @@ class BankTransactionSerializer(serializers.ModelSerializer):
                 related_instance = Token.objects.get(pk=obj.related_id)
                 return f"{related_instance.plot.plot_number} || {related_instance.plot.get_plot_size()} || {related_instance.plot.get_type_display()}"
             except Token.DoesNotExist:
+                return None
+        elif obj.related_table == "dealer_payments":
+            try:
+                related_instance = DealerPayments.objects.get(pk=obj.related_id)
+                booking = related_instance.booking
+                return f"{booking.plot.plot_number} || {booking.plot.get_plot_size()} || {booking.plot.get_type_display()}"
+            except DealerPayments.DoesNotExist:
                 return None
         return None
 
@@ -118,6 +131,12 @@ class BankTransactionSerializer(serializers.ModelSerializer):
                 related_instance = OutgoingFund.objects.get(pk=obj.related_id)
                 return related_instance.cheque_number
             except OutgoingFund.DoesNotExist:
+                return None
+        elif obj.related_table == "dealer_payments":
+            try:
+                related_instance = DealerPayments.objects.get(pk=obj.related_id)
+                return related_instance.cheque_number
+            except DealerPayments.DoesNotExist:
                 return None
         return None
 
@@ -302,6 +321,8 @@ class OutgoingFundSerializer(serializers.ModelSerializer):
     def create_bank_transactions(self, outgoing_fund):
         # Main transaction for OutgoingFund
         is_cheque_clear=outgoing_fund.payment_type!="Cheque"
+        is_deposit = outgoing_fund.bank.detail_type != "Undeposited_Funds"
+        
         BankTransaction.objects.create(
             bank=outgoing_fund.bank,
             transaction_type="Expenses",
@@ -310,7 +331,7 @@ class OutgoingFundSerializer(serializers.ModelSerializer):
             transaction_date=outgoing_fund.date,
             related_table="OutgoingFund",
             related_id=outgoing_fund.id,
-            is_deposit=True,
+            is_deposit=is_deposit,
             is_cheque_clear=is_cheque_clear,
         )
 
@@ -322,8 +343,8 @@ class OutgoingFundSerializer(serializers.ModelSerializer):
                 payment=0,
                 deposit=detail.amount,
                 transaction_date=outgoing_fund.date,
-                related_table="OutgoingFundDetail",
-                related_id=detail.id,
+                related_table="OutgoingFund",
+                related_id=outgoing_fund.id,
                 is_deposit=True,
             )
 
@@ -332,10 +353,6 @@ class OutgoingFundSerializer(serializers.ModelSerializer):
             related_table="OutgoingFund", related_id=outgoing_fund.id
         ).delete()
 
-        for detail in outgoing_fund.details.all():
-            BankTransaction.objects.filter(
-                related_table="OutgoingFundDetail", related_id=detail.id
-            ).delete()
 
     def create(self, validated_data):
         files_data = validated_data.pop("files", [])
@@ -960,6 +977,7 @@ class ChequeClearanceSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         files_data = validated_data.pop("files", [])
         details_data = validated_data.pop("details", [])
+        date=validated_data.get("date")
 
         try:
             with transaction.atomic():
@@ -968,6 +986,7 @@ class ChequeClearanceSerializer(serializers.ModelSerializer):
                 for detail_data in details_data:
                     expense = detail_data.get("expense")
                     expense.is_cheque_clear = True
+                    expense.transaction_date=date
                     expense.save()
                     ChequeClearanceDetail.objects.create(
                         cheque_clearance=cheque_clearance, **detail_data
@@ -1006,6 +1025,7 @@ class ChequeClearanceSerializer(serializers.ModelSerializer):
                 for detail_data in details_data:
                     expense = detail_data.get("expense")
                     expense.is_cheque_clear = True
+                    expense.transaction_date=date
                     expense.save()
                     ChequeClearanceDetail.objects.create(
                         cheque_clearance=instance, **detail_data

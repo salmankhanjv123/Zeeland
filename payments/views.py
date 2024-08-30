@@ -273,13 +273,6 @@ class OutgoingFundViewSet(viewsets.ModelViewSet):
             related_table='OutgoingFund',
             related_id=instance.id
         ).delete()
-
-        for detail in instance.details.all():
-            BankTransaction.objects.filter(
-                related_table='OutgoingFundDetail',
-                related_id=detail.id
-            ).delete()
-
         # Now delete the OutgoingFund instance
         instance.delete()
 
