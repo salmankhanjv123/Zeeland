@@ -4,8 +4,9 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from .serializers import BookingSerializer, BookingForPaymentsSerializer, TokenSerializer,PlotResaleSerializer
 from .models import Booking, Token,PlotResale
+from payments.models import BankTransaction
 from django.db.models import Q
-
+from rest_framework.views import APIView
 class BookingViewSet(viewsets.ModelViewSet):
     """
     API endpoint that allows Booking to be viewed or edited.
@@ -112,7 +113,15 @@ class TokenViewSet(viewsets.ModelViewSet):
         queryset = Token.objects.filter(query_filters).select_related('customer','bank', 'plot').prefetch_related("files")
         return queryset
 
+    def perform_destroy(self, instance):
+        # Delete all related bank transactions
+        BankTransaction.objects.filter(
+            related_table='token',
+            related_id=instance.id
+        ).delete()
 
+        # Then delete the journal entry
+        instance.delete()
 
 class PlotResaleViewSet(viewsets.ModelViewSet):
     serializer_class = PlotResaleSerializer
@@ -149,7 +158,7 @@ class PlotResaleViewSet(viewsets.ModelViewSet):
         booking.save()
         super().perform_destroy(instance)
 
-from rest_framework.views import APIView
+
 
 
 # Define the allowed statuses
