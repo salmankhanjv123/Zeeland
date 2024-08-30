@@ -9,7 +9,6 @@ from payments.models import (
     DealerPayments,
     BankDepositTransactions,
     JournalEntryLine,
-
 )
 from customer.models import Customers, CustomerMessages, Dealers
 from plots.models import Plots
@@ -36,7 +35,7 @@ from django.db.models import (
     Case,
     When,
 )
-from django.db.models.functions import Coalesce,Abs
+from django.db.models.functions import Coalesce, Abs
 from rest_framework.exceptions import ValidationError
 from itertools import groupby
 from operator import itemgetter
@@ -372,7 +371,7 @@ class DealerLedgerView(APIView):
         if project_id:
             booking_query_filters &= Q(project_id=project_id)
             payment_query_filters &= Q(project_id=project_id)
-        
+
         if start_date and end_date:
             booking_query_filters &= Q(booking_date__gte=start_date) & Q(
                 booking_date__lte=end_date
@@ -384,7 +383,6 @@ class DealerLedgerView(APIView):
                 "id",
                 "status",
                 document=F("booking_id"),
-
             )
 
             booking_data = (
@@ -478,23 +476,17 @@ class DealerLedgerView(APIView):
             plot_serializer = PlotsSerializer(plot_query, many=True)
 
             total_amount = (
-                Booking.objects.filter(
-                    dealer_id=dealer_id
-                ).aggregate(
+                Booking.objects.filter(dealer_id=dealer_id).aggregate(
                     total_amount=Coalesce(
                         Sum("dealer_comission_amount"),
                         Value(0, output_field=FloatField()),
                     )
-                )[
-                    "total_amount"
-                ]
+                )["total_amount"]
                 or 0.0
             )
 
             paid_amount = (
-                DealerPayments.objects.filter(
-                    booking__dealer_id=dealer_id
-                ).aggregate(
+                DealerPayments.objects.filter(booking__dealer_id=dealer_id).aggregate(
                     total_amount=Sum(
                         Case(
                             When(reference="payment", then=F("amount")),
@@ -503,22 +495,20 @@ class DealerLedgerView(APIView):
                             output_field=FloatField(),
                         )
                     )
-                )[
-                    "total_amount"
-                ]
+                )["total_amount"]
                 or 0.0
             )
 
             total_amount = round(total_amount, 2)
-            remaining_amount = round(total_amount-paid_amount,2)
+            remaining_amount = round(total_amount - paid_amount, 2)
             response_data = {
                 "dealer_info": dealer_info,
                 "booking_data": list(bookings),
                 "plot_data": plot_serializer.data,
                 "opening_balance": opening_balance,
                 "closing_balance": current_balance,
-                "total_amount":total_amount,
-                "remaining_amount":remaining_amount,
+                "total_amount": total_amount,
+                "remaining_amount": remaining_amount,
                 "transactions": combined_data,
             }
 
@@ -535,25 +525,25 @@ class CustomerLedgerView(APIView):
         customer_id = self.request.query_params.get("customer_id")
         start_date = self.request.query_params.get("start_date")
         end_date = self.request.query_params.get("end_date")
-        
+
         plot_id = self.request.query_params.get("plot_id")
 
         booking_query_filters = Q()
         token_query_filters = Q()
         payment_query_filters = Q()
-        resale_query_filters =Q()
-        
+        resale_query_filters = Q()
+
         if project_id:
             booking_query_filters &= Q(project_id=project_id)
             token_query_filters &= Q(project_id=project_id)
-            payment_query_filters&= Q(project_id=project_id)
-            resale_query_filters&= Q(project_id=project_id)
-        
+            payment_query_filters &= Q(project_id=project_id)
+            resale_query_filters &= Q(project_id=project_id)
+
         if plot_id:
             booking_query_filters &= Q(plot_id=plot_id)
             token_query_filters &= Q(plot_id=plot_id)
-            payment_query_filters &= Q(booking__plot_id=plot_id) 
-            resale_query_filters &= Q(booking__plot_id=plot_id) 
+            payment_query_filters &= Q(booking__plot_id=plot_id)
+            resale_query_filters &= Q(booking__plot_id=plot_id)
 
         if start_date and end_date:
             booking_query_filters &= Q(booking_date__gte=start_date) & Q(
@@ -563,14 +553,12 @@ class CustomerLedgerView(APIView):
             payment_query_filters &= Q(date__gte=start_date) & Q(date__lte=end_date)
             resale_query_filters &= Q(date__gte=start_date) & Q(date__lte=end_date)
 
-
-
         bookings = Booking.objects.filter(customer_id=customer_id).values(
             "id",
             "status",
             document=F("booking_id"),
         )
-        
+
         dealers = (
             Booking.objects.filter(customer_id=customer_id)
             .exclude(dealer_id__isnull=True)
@@ -592,7 +580,7 @@ class CustomerLedgerView(APIView):
                 reference=Value("booking", output_field=CharField()),
             )
         )
-        expense_data=(
+        expense_data = (
             OutgoingFund.objects.filter(payee=customer_id)
             .select_related("payee")
             .values(
@@ -606,7 +594,7 @@ class CustomerLedgerView(APIView):
                 reference=Value("Expenses", output_field=CharField()),
             )
         )
-        bank_deposit_data=(
+        bank_deposit_data = (
             BankDepositTransactions.objects.filter(customer_id=customer_id)
             .select_related("customer")
             .values(
@@ -621,7 +609,9 @@ class CustomerLedgerView(APIView):
             )
         )
         payment_data = (
-            IncomingFund.objects.filter(payment_query_filters, booking__customer_id=customer_id)
+            IncomingFund.objects.filter(
+                payment_query_filters, booking__customer_id=customer_id
+            )
             .select_related("booking__customer")
             .values(
                 "id",
@@ -643,7 +633,7 @@ class CustomerLedgerView(APIView):
                 customer_name=F("booking__customer__name"),
             )
         )
-        
+
         token_data = (
             Token.objects.filter(token_query_filters, customer_id=customer_id)
             .select_related("customer")
@@ -658,9 +648,11 @@ class CustomerLedgerView(APIView):
                 reference=Value("token", output_field=CharField()),
             )
         )
-        
+
         resale_data = (
-            PlotResale.objects.filter(resale_query_filters,booking__customer_id=customer_id)
+            PlotResale.objects.filter(
+                resale_query_filters, booking__customer_id=customer_id
+            )
             .select_related("customer")
             .values(
                 "id",
@@ -726,7 +718,7 @@ class CustomerLedgerView(APIView):
             or 0.0
         )
 
-        opening_balance = round(booking_amount - paid_amount - token_amount,2)
+        opening_balance = round(booking_amount - paid_amount - token_amount, 2)
         current_balance = opening_balance
 
         for entry in combined_data:
@@ -769,23 +761,16 @@ class CustomerLedgerView(APIView):
             for message in customer_messages
         ]
 
-
         booking_amount = (
-            Booking.objects.filter(
-                customer_id=customer_id
-            ).aggregate(
+            Booking.objects.filter(customer_id=customer_id).aggregate(
                 total_amount=Coalesce(
                     Sum("total_amount"), Value(0, output_field=FloatField())
                 )
-            )[
-                "total_amount"
-            ]
+            )["total_amount"]
             or 0.0
         )
         paid_amount = (
-            IncomingFund.objects.filter(
-                booking__customer_id=customer_id
-            ).aggregate(
+            IncomingFund.objects.filter(booking__customer_id=customer_id).aggregate(
                 total_amount=Sum(
                     Case(
                         When(reference="payment", then=F("amount")),
@@ -794,26 +779,20 @@ class CustomerLedgerView(APIView):
                         output_field=FloatField(),
                     )
                 )
-            )[
-                "total_amount"
-            ]
+            )["total_amount"]
             or 0.0
         )
         token_amount = (
-            Token.objects.filter(
-                customer_id=customer_id
-            ).aggregate(
+            Token.objects.filter(customer_id=customer_id).aggregate(
                 total_amount=Coalesce(
                     Sum("amount"), Value(0, output_field=FloatField())
                 )
-            )[
-                "total_amount"
-            ]
+            )["total_amount"]
             or 0.0
         )
 
-        total_amount = round(booking_amount,2) 
-        remaining_amount = round(booking_amount - paid_amount - token_amount,2)
+        total_amount = round(booking_amount, 2)
+        remaining_amount = round(booking_amount - paid_amount - token_amount, 2)
 
         response_data = {
             "customer_info": customer_info,
@@ -823,7 +802,7 @@ class CustomerLedgerView(APIView):
             "customer_messages": customer_messages_data,
             "opening_balance": opening_balance,
             "total_amount": total_amount,
-            "remaining_amount":remaining_amount,
+            "remaining_amount": remaining_amount,
             "transactions": combined_data,
         }
 
@@ -836,22 +815,16 @@ class VendorLedgerView(APIView):
         vendor_id = self.request.query_params.get("vendor_id")
         start_date = self.request.query_params.get("start_date")
         end_date = self.request.query_params.get("end_date")
-        
-
 
         query_filters = Q()
 
-        
         if project_id:
-            query_filters&= Q(project_id=project_id)
-
-        
+            query_filters &= Q(project_id=project_id)
 
         if start_date and end_date:
             query_filters &= Q(date__gte=start_date) & Q(date__lte=end_date)
 
-
-        expense_data=(
+        expense_data = (
             OutgoingFund.objects.filter(payee=vendor_id)
             .select_related("payee")
             .values(
@@ -865,7 +838,7 @@ class VendorLedgerView(APIView):
                 reference=Value("Expenses", output_field=CharField()),
             )
         )
-        bank_deposit_data=(
+        bank_deposit_data = (
             BankDepositTransactions.objects.filter(customer_id=vendor_id)
             .select_related("customer")
             .values(
@@ -880,7 +853,7 @@ class VendorLedgerView(APIView):
             )
         )
 
-        journal_data=(
+        journal_data = (
             JournalEntryLine.objects.filter(person_id=vendor_id)
             .select_related("person")
             .values(
@@ -895,15 +868,11 @@ class VendorLedgerView(APIView):
             )
         )
 
-
         # Combine and sort by date
         combined_data = sorted(
-            list(expense_data)
-            + list(bank_deposit_data)
-            + list(journal_data),
+            list(expense_data) + list(bank_deposit_data) + list(journal_data),
             key=lambda x: x["date"],
         )
-
 
         opening_balance = 0
         current_balance = opening_balance
@@ -918,17 +887,14 @@ class VendorLedgerView(APIView):
             .first()
         )
 
-
-
         response_data = {
             "customer_info": customer_info,
             "opening_balance": opening_balance,
-            "closing_balance":0,
+            "closing_balance": 0,
             "transactions": combined_data,
         }
 
         return Response(response_data)
-
 
 
 class EmployeeLedgerView(APIView):
@@ -937,22 +903,16 @@ class EmployeeLedgerView(APIView):
         vendor_id = self.request.query_params.get("employee_id")
         start_date = self.request.query_params.get("start_date")
         end_date = self.request.query_params.get("end_date")
-        
-
 
         query_filters = Q()
 
-        
         if project_id:
-            query_filters&= Q(project_id=project_id)
-
-        
+            query_filters &= Q(project_id=project_id)
 
         if start_date and end_date:
             query_filters &= Q(date__gte=start_date) & Q(date__lte=end_date)
 
-
-        expense_data=(
+        expense_data = (
             OutgoingFund.objects.filter(payee=vendor_id)
             .select_related("payee")
             .values(
@@ -966,8 +926,8 @@ class EmployeeLedgerView(APIView):
                 reference=Value("Expenses", output_field=CharField()),
             )
         )
-        
-        bank_deposit_data=(
+
+        bank_deposit_data = (
             BankDepositTransactions.objects.filter(customer_id=vendor_id)
             .select_related("customer")
             .values(
@@ -982,7 +942,7 @@ class EmployeeLedgerView(APIView):
             )
         )
 
-        journal_data=(
+        journal_data = (
             JournalEntryLine.objects.filter(person_id=vendor_id)
             .select_related("person")
             .values(
@@ -997,15 +957,11 @@ class EmployeeLedgerView(APIView):
             )
         )
 
-
         # Combine and sort by date
         combined_data = sorted(
-            list(expense_data)
-            + list(bank_deposit_data)
-            + list(journal_data),
+            list(expense_data) + list(bank_deposit_data) + list(journal_data),
             key=lambda x: x["date"],
         )
-
 
         opening_balance = 0
         current_balance = opening_balance
@@ -1020,18 +976,14 @@ class EmployeeLedgerView(APIView):
             .first()
         )
 
-
-
         response_data = {
             "customer_info": customer_info,
             "opening_balance": opening_balance,
-            "closing_balance":0,
+            "closing_balance": 0,
             "transactions": combined_data,
         }
 
         return Response(response_data)
-
-
 
 
 class PlotLedgerView(APIView):
@@ -1052,108 +1004,186 @@ class PlotLedgerView(APIView):
 
             for plot_id in plot_ids:
                 bookings = Booking.objects.filter(plot_id=plot_id)
-                
+
                 if bookings.exists():
                     for booking in bookings:
                         booking_id = booking.id
 
-                        booking_data = Booking.objects.filter(id=booking_id,booking_date__gte=start_date,booking_date__lte=end_date).select_related("customer").values(
-                            "id",
-                            "remarks",
-                            "status",
-                            document=F("booking_id"),
-                            credit=F("total_amount"),
-                            debit=Value(0.0),
-                            date=F("booking_date"),
-                            customer_name=F("customer__name"),
-                            reference=Value("booking", output_field=CharField()),
+                        booking_data = (
+                            Booking.objects.filter(
+                                id=booking_id,
+                                booking_date__gte=start_date,
+                                booking_date__lte=end_date,
+                            )
+                            .select_related("customer")
+                            .values(
+                                "id",
+                                "remarks",
+                                "status",
+                                document=F("booking_id"),
+                                credit=F("total_amount"),
+                                debit=Value(0.0),
+                                date=F("booking_date"),
+                                customer_name=F("customer__name"),
+                                reference=Value("booking", output_field=CharField()),
+                            )
                         )
 
-                        payment_data = IncomingFund.objects.filter(booking_id=booking_id,date__gte=start_date,date__lte=end_date).select_related("booking__customer").values(
-                            "id",
-                            "date",
-                            "remarks",
-                            "reference",
-                            "booking_id",
-                            credit=Case(
-                                When(reference="refund", then=F("amount")),
-                                default=Value(0),
-                                output_field=FloatField(),
-                            ),
-                            debit=Case(
-                                When(reference="payment", then=F("amount")),
-                                default=Value(0),
-                                output_field=FloatField(),
-                            ),
-                            document=F("id"),
-                            customer_name=F("booking__customer__name"),
+                        payment_data = (
+                            IncomingFund.objects.filter(
+                                booking_id=booking_id,
+                                date__gte=start_date,
+                                date__lte=end_date,
+                            )
+                            .select_related("booking__customer")
+                            .values(
+                                "id",
+                                "date",
+                                "remarks",
+                                "reference",
+                                "booking_id",
+                                credit=Case(
+                                    When(reference="refund", then=F("amount")),
+                                    default=Value(0),
+                                    output_field=FloatField(),
+                                ),
+                                debit=Case(
+                                    When(reference="payment", then=F("amount")),
+                                    default=Value(0),
+                                    output_field=FloatField(),
+                                ),
+                                document=F("id"),
+                                customer_name=F("booking__customer__name"),
+                            )
                         )
 
-                        token_data = Token.objects.filter(plot_id=plot_id, booking=booking_id,date__gte=start_date,date__lte=end_date).select_related("customer").values(
-                            "id",
-                            "date",
-                            "remarks",
-                            debit=F("amount"),
-                            credit=Value(0.0),
-                            document=F("id"),
-                            customer_name=F("customer__name"),
-                            reference=Value("token", output_field=CharField()),
+                        token_data = (
+                            Token.objects.filter(
+                                plot_id=plot_id,
+                                booking=booking_id,
+                                date__gte=start_date,
+                                date__lte=end_date,
+                            )
+                            .select_related("customer")
+                            .values(
+                                "id",
+                                "date",
+                                "remarks",
+                                debit=F("amount"),
+                                credit=Value(0.0),
+                                document=F("id"),
+                                customer_name=F("customer__name"),
+                                reference=Value("token", output_field=CharField()),
+                            )
                         )
 
-                        resale_data = PlotResale.objects.filter(booking=booking_id,date__gte=start_date,date__lte=end_date).select_related("customer").values(
-                            "id",
-                            "date",
-                            "remarks",
-                            debit=F("company_amount_paid"),
-                            credit=Value(0.0),
-                            document=F("id"),
-                            customer_name=F("booking__customer__name"),
-                            reference=Value("close booking", output_field=CharField()),
+                        resale_data = (
+                            PlotResale.objects.filter(
+                                booking=booking_id,
+                                date__gte=start_date,
+                                date__lte=end_date,
+                            )
+                            .select_related("customer")
+                            .values(
+                                "id",
+                                "date",
+                                "remarks",
+                                debit=F("company_amount_paid"),
+                                credit=Value(0.0),
+                                document=F("id"),
+                                customer_name=F("booking__customer__name"),
+                                reference=Value(
+                                    "close booking", output_field=CharField()
+                                ),
+                            )
                         )
 
-                        combined_data = sorted(list(token_data) +
-                            list(booking_data) + list(payment_data) +  list(resale_data),
+                        combined_data = sorted(
+                            list(token_data)
+                            + list(booking_data)
+                            + list(payment_data)
+                            + list(resale_data),
                             key=lambda x: x["date"],
                         )
 
-                        booking_amount = Booking.objects.filter(id=booking_id, booking_date__lt=start_date).aggregate(
-                            total_amount=Coalesce(Sum("total_amount"), Value(0, output_field=FloatField()))
-                        )["total_amount"] or 0.0
-
-                        paid_amount = IncomingFund.objects.filter(booking_id=booking_id, date__lt=start_date).aggregate(
-                            total_amount=Sum(
-                                Case(
-                                    When(reference="payment", then=F("amount")),
-                                    When(reference="refund", then=-F("amount")),
-                                    default=Value(0),
-                                    output_field=FloatField(),
+                        booking_amount = (
+                            Booking.objects.filter(
+                                id=booking_id, booking_date__lt=start_date
+                            ).aggregate(
+                                total_amount=Coalesce(
+                                    Sum("total_amount"),
+                                    Value(0, output_field=FloatField()),
                                 )
-                            )
-                        )["total_amount"] or 0.0
+                            )[
+                                "total_amount"
+                            ]
+                            or 0.0
+                        )
 
-                        token_amount = Token.objects.filter(booking=booking_id, date__lt=start_date).aggregate(
-                            total_amount=Coalesce(Sum("amount"), Value(0, output_field=FloatField()))
-                        )["total_amount"] or 0.0
+                        paid_amount = (
+                            IncomingFund.objects.filter(
+                                booking_id=booking_id, date__lt=start_date
+                            ).aggregate(
+                                total_amount=Sum(
+                                    Case(
+                                        When(reference="payment", then=F("amount")),
+                                        When(reference="refund", then=-F("amount")),
+                                        default=Value(0),
+                                        output_field=FloatField(),
+                                    )
+                                )
+                            )[
+                                "total_amount"
+                            ]
+                            or 0.0
+                        )
 
-                        resale_amount = PlotResale.objects.filter(booking=booking_id, date__lt=start_date).aggregate(
-                            total_amount=Coalesce(Sum("company_amount_paid"), Value(0, output_field=FloatField()))
-                        )["total_amount"] or 0.0
+                        token_amount = (
+                            Token.objects.filter(
+                                booking=booking_id, date__lt=start_date
+                            ).aggregate(
+                                total_amount=Coalesce(
+                                    Sum("amount"), Value(0, output_field=FloatField())
+                                )
+                            )[
+                                "total_amount"
+                            ]
+                            or 0.0
+                        )
 
-                        opening_balance = booking_amount - paid_amount - token_amount - resale_amount
+                        resale_amount = (
+                            PlotResale.objects.filter(
+                                booking=booking_id, date__lt=start_date
+                            ).aggregate(
+                                total_amount=Coalesce(
+                                    Sum("company_amount_paid"),
+                                    Value(0, output_field=FloatField()),
+                                )
+                            )[
+                                "total_amount"
+                            ]
+                            or 0.0
+                        )
+
+                        opening_balance = (
+                            booking_amount - paid_amount - token_amount - resale_amount
+                        )
                         current_balance = opening_balance
 
                         for entry in combined_data:
                             current_balance += entry["credit"] - entry["debit"]
                             entry["balance"] = current_balance
 
-                        customer_info = Customers.objects.filter(bookings__id=booking_id).values(
-                            "id", "name", "father_name", "contact", "address"
-                        )
+                        customer_info = Customers.objects.filter(
+                            bookings__id=booking_id
+                        ).values("id", "name", "father_name", "contact", "address")
 
                         plot_query = Plots.objects.get(id=plot_id)
                         plot_serializer = PlotsSerializer(plot_query)
 
-                        customer_messages = CustomerMessages.objects.filter(booking_id=booking_id).prefetch_related("files")
+                        customer_messages = CustomerMessages.objects.filter(
+                            booking_id=booking_id
+                        ).prefetch_related("files")
                         customer_messages_data = [
                             {
                                 "id": message.id,
@@ -1180,16 +1210,27 @@ class PlotLedgerView(APIView):
                             for message in customer_messages
                         ]
 
-                        dealer_info = Booking.objects.filter(id=booking_id).exclude(dealer_id__isnull=True).select_related("dealer").values(
-                            "dealer_id", "dealer__name"
+                        dealer_info = (
+                            Booking.objects.filter(id=booking_id)
+                            .exclude(dealer_id__isnull=True)
+                            .select_related("dealer")
+                            .values("dealer_id", "dealer__name")
                         )
 
                         plot_data = plot_serializer.data
-                        plot_amount = Booking.objects.filter(id=booking_id).aggregate(
-                            total_amount=Coalesce(Sum("total_amount"), Value(0, output_field=FloatField()))
-                        )["total_amount"] or 0.0
+                        plot_amount = (
+                            Booking.objects.filter(id=booking_id).aggregate(
+                                total_amount=Coalesce(
+                                    Sum("total_amount"),
+                                    Value(0, output_field=FloatField()),
+                                )
+                            )["total_amount"]
+                            or 0.0
+                        )
                         paid_amount = (
-                            IncomingFund.objects.filter(booking_id=booking_id).aggregate(
+                            IncomingFund.objects.filter(
+                                booking_id=booking_id
+                            ).aggregate(
                                 total_amount=Sum(
                                     Case(
                                         When(reference="payment", then=F("amount")),
@@ -1198,25 +1239,34 @@ class PlotLedgerView(APIView):
                                         output_field=FloatField(),
                                     )
                                 )
-                            )["total_amount"]
+                            )[
+                                "total_amount"
+                            ]
                             or 0.0
                         )
 
                         token_amount = (
                             Token.objects.filter(booking=booking_id).aggregate(
-                                total_amount=Coalesce(Sum("amount"), Value(0, output_field=FloatField()))
+                                total_amount=Coalesce(
+                                    Sum("amount"), Value(0, output_field=FloatField())
+                                )
                             )["total_amount"]
                             or 0.0
                         )
 
                         resale_amount = (
                             PlotResale.objects.filter(booking=booking_id).aggregate(
-                                total_amount=Coalesce(Sum("company_amount_paid"), Value(0, output_field=FloatField()))
+                                total_amount=Coalesce(
+                                    Sum("company_amount_paid"),
+                                    Value(0, output_field=FloatField()),
+                                )
                             )["total_amount"]
                             or 0.0
                         )
 
-                        remaining_amount = plot_amount - token_amount - paid_amount - resale_amount
+                        remaining_amount = (
+                            plot_amount - token_amount - paid_amount - resale_amount
+                        )
 
                         response_data = {
                             "plot_data": plot_data,
@@ -1231,19 +1281,22 @@ class PlotLedgerView(APIView):
                             "transactions": combined_data,
                         }
                         result.append(response_data)
-                
 
-                token_data_no_booking = Token.objects.filter(plot_id=plot_id, booking__isnull=True).select_related("customer").values(
-                    "id",
-                    "date",
-                    "remarks",
-                    debit=F("amount"),
-                    credit=Value(0.0),
-                    document=F("id"),
-                    customer_name=F("customer__name"),
-                    reference=Value("token", output_field=CharField()),
+                token_data_no_booking = (
+                    Token.objects.filter(plot_id=plot_id, booking__isnull=True)
+                    .select_related("customer")
+                    .values(
+                        "id",
+                        "date",
+                        "remarks",
+                        debit=F("amount"),
+                        credit=Value(0.0),
+                        document=F("id"),
+                        customer_name=F("customer__name"),
+                        reference=Value("token", output_field=CharField()),
+                    )
                 )
-                
+
                 if token_data_no_booking.exists():
                     for token in token_data_no_booking:
                         token_id = token["id"]
@@ -1251,27 +1304,35 @@ class PlotLedgerView(APIView):
                         plot_serializer = PlotsSerializer(plot_query)
                         plot_data = plot_serializer.data
                         plot_amount = plot_data.get("total")
-                        
+
                         token_amount = (
                             Token.objects.filter(id=token_id).aggregate(
-                                total_amount=Coalesce(Sum("amount"), Value(0, output_field=FloatField()))
+                                total_amount=Coalesce(
+                                    Sum("amount"), Value(0, output_field=FloatField())
+                                )
                             )["total_amount"]
                             or 0.0
-                        )                            
-                        remaining_amount = plot_amount - token_amount 
-                        
-                        token_data = Token.objects.filter(id=token_id).select_related("customer").values(
-                            "id",
-                            "date",
-                            "remarks",
-                            debit=F("amount"),
-                            credit=Value(0.0),
-                            document=F("id"),
-                            customer_name=F("customer__name"),
-                            reference=Value("token", output_field=CharField()),
+                        )
+                        remaining_amount = plot_amount - token_amount
+
+                        token_data = (
+                            Token.objects.filter(id=token_id)
+                            .select_related("customer")
+                            .values(
+                                "id",
+                                "date",
+                                "remarks",
+                                debit=F("amount"),
+                                credit=Value(0.0),
+                                document=F("id"),
+                                customer_name=F("customer__name"),
+                                reference=Value("token", output_field=CharField()),
+                            )
                         )
 
-                        combined_data = sorted(list(token_data), key=lambda x: x["date"]  )
+                        combined_data = sorted(
+                            list(token_data), key=lambda x: x["date"]
+                        )
 
                         opening_balance = plot_amount
                         current_balance = opening_balance
@@ -1280,10 +1341,9 @@ class PlotLedgerView(APIView):
                             current_balance += entry["credit"] - entry["debit"]
                             entry["balance"] = current_balance
 
-                        customer_info = Customers.objects.filter(token__id=token_id).values(
-                            "id", "name", "father_name", "contact", "address"
-                        )
-
+                        customer_info = Customers.objects.filter(
+                            token__id=token_id
+                        ).values("id", "name", "father_name", "contact", "address")
 
                         response_data = {
                             "plot_data": plot_data,
@@ -1298,14 +1358,12 @@ class PlotLedgerView(APIView):
                             "transactions": combined_data,
                         }
                         result.append(response_data)
-                
-                
+
                 if not result:
                     plot_query = Plots.objects.get(id=plot_id)
                     plot_serializer = PlotsSerializer(plot_query)
                     plot_data = plot_serializer.data
                     plot_amount = plot_data.get("total")
-
 
                     response_data = {
                         "plot_data": plot_data,
@@ -1325,6 +1383,7 @@ class PlotLedgerView(APIView):
 
         except ValidationError as e:
             return Response({"error": str(e)}, status=400)
+
 
 class BalanceSheetView(APIView):
 
@@ -1444,7 +1503,7 @@ class IncomingPaymentsReport(APIView):
 
         if start_date and end_date:
             query_filters &= Q(date__gte=start_date) & Q(date__lte=end_date)
-       
+
         booking_payments = IncomingFund.objects.filter(
             query_filters, reference="payment"
         ).select_related("booking__customer", "booking__plot", "bank")
@@ -1487,7 +1546,6 @@ class IncomingPaymentsReport(APIView):
         return Response(response_data)
 
 
-
 class OutgoingPaymentsReport(APIView):
     def get(self, request):
         project_id = self.request.query_params.get("project_id")
@@ -1504,19 +1562,16 @@ class OutgoingPaymentsReport(APIView):
 
         if start_date and end_date:
             query_filters &= Q(date__gte=start_date) & Q(date__lte=end_date)
-       
+
         booking_payments = IncomingFund.objects.filter(
             query_filters, reference="refund"
         ).select_related("booking__customer", "booking__plot", "bank")
-        expense_payments=OutgoingFund.objects.filter(query_filters).select_related(
-            "expense_type","bank"
-        )
-
+        expense_payments = OutgoingFund.objects.filter(query_filters).select_related( "bank" )
 
         booking_payments_serialized = BookingPaymentsSerializer(
             booking_payments, many=True
         ).data
-       
+
         expense_payment_serialized = OutgoingFundReportSerializer(
             expense_payments, many=True
         ).data
@@ -1554,13 +1609,12 @@ class IncomingChequeReport(APIView):
         project_id = self.request.query_params.get("project_id")
         start_date = self.request.query_params.get("start_date")
         end_date = self.request.query_params.get("end_date")
-        bank_id=self.request.query_params.get("bank_id")
-        plot_id=self.request.query_params.get("plot_id")
-        customer_id=self.request.query_params.get("customer_id")
-
+        bank_id = self.request.query_params.get("bank_id")
+        plot_id = self.request.query_params.get("plot_id")
+        customer_id = self.request.query_params.get("customer_id")
 
         payment_filters = Q()
-        token_filters =Q()
+        token_filters = Q()
         if project_id:
             token_filters &= Q(project_id=project_id)
             payment_filters &= Q(project_id=project_id)
@@ -1576,14 +1630,14 @@ class IncomingChequeReport(APIView):
 
         if start_date and end_date:
             token_filters &= Q(date__gte=start_date) & Q(date__lte=end_date)
-        
+
         booking_payments = IncomingFund.objects.filter(
-            payment_filters, reference="payment",payment_type="Cheque"
+            payment_filters, reference="payment", payment_type="Cheque"
         ).select_related("booking__customer", "booking__plot", "bank")
-        
-        token_payments = Token.objects.filter(token_filters,payment_type="Cheque").select_related(
-            "customer", "plot", "bank"
-        )
+
+        token_payments = Token.objects.filter(
+            token_filters, payment_type="Cheque"
+        ).select_related("customer", "plot", "bank")
 
         booking_payments_serialized = BookingPaymentsSerializer(
             booking_payments, many=True
@@ -1597,10 +1651,7 @@ class IncomingChequeReport(APIView):
             key=lambda x: x["date"],
         )
 
-
-
         return Response(combined_payments)
-
 
 
 class OutgoingChequeReport(APIView):
@@ -1608,16 +1659,14 @@ class OutgoingChequeReport(APIView):
         project_id = self.request.query_params.get("project_id")
         start_date = self.request.query_params.get("start_date")
         end_date = self.request.query_params.get("end_date")
-        bank_id=self.request.query_params.get("bank_id")
-
-
+        bank_id = self.request.query_params.get("bank_id")
 
         payment_filters = Q()
-        expense_filters =Q()
+        expense_filters = Q()
         if project_id:
             expense_filters &= Q(project_id=project_id)
             payment_filters &= Q(project_id=project_id)
-        
+
         if bank_id:
             expense_filters &= Q(bank_id=bank_id)
             payment_filters &= Q(bank_id=bank_id)
@@ -1625,19 +1674,19 @@ class OutgoingChequeReport(APIView):
         if start_date and end_date:
             expense_filters &= Q(date__gte=start_date) & Q(date__lte=end_date)
             payment_filters &= Q(date__gte=start_date) & Q(date__lte=end_date)
-        
+
         booking_payments = IncomingFund.objects.filter(
-            payment_filters, reference="refund",payment_type="Cheque"
+            payment_filters, reference="refund", payment_type="Cheque"
         ).select_related("booking__customer", "booking__plot", "bank")
-        
-        outgoing_payments = OutgoingFund.objects.filter(expense_filters,payment_type="Cheque").select_related(
-            "expense_type", "bank"
-        )
+
+        outgoing_payments = OutgoingFund.objects.filter(
+            expense_filters, payment_type="Cheque"
+        ).select_related("bank")
 
         booking_payments_serialized = BookingPaymentsSerializer(
             booking_payments, many=True
         ).data
-        
+
         outgoing_payments_serialized = OutgoingFundReportSerializer(
             outgoing_payments, many=True
         ).data
@@ -1647,7 +1696,4 @@ class OutgoingChequeReport(APIView):
             key=lambda x: x["date"],
         )
 
-
-
         return Response(combined_payments)
-
