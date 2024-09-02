@@ -29,13 +29,19 @@ class CustomersViewSet(viewsets.ModelViewSet):
         queryset = Customers.objects.all().prefetch_related("files")
         project_id = self.request.query_params.get("project")
         department_id = self.request.query_params.get("department_id")
-        reference = self.request.query_params.get("reference")
+        reference_string = self.request.query_params.get("reference")
+        reference = (
+            [str for str in reference_string.split(",")]
+            if reference_string
+            else []
+        )
+        print(reference)
         if project_id:
             queryset = queryset.filter(project_id=project_id)
         if department_id:
             queryset = queryset.filter(department_id=department_id)
         if reference:
-            queryset = queryset.filter(reference=reference)
+            queryset = queryset.filter(reference__in=reference)
         return queryset
 
 
