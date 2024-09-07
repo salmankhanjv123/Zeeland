@@ -1566,7 +1566,9 @@ class OutgoingPaymentsReport(APIView):
         booking_payments = IncomingFund.objects.filter(
             query_filters, reference="refund"
         ).select_related("booking__customer", "booking__plot", "bank")
-        expense_payments = OutgoingFund.objects.filter(query_filters).select_related( "bank" )
+        expense_payments = OutgoingFund.objects.filter(query_filters).select_related(
+            "bank"
+        )
 
         booking_payments_serialized = BookingPaymentsSerializer(
             booking_payments, many=True

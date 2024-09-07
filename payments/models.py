@@ -107,7 +107,7 @@ class ExpensePerson(models.Model):
 
 class OutgoingFund(models.Model):
     project = models.ForeignKey(Projects, on_delete=models.PROTECT)
-    payee = models.ForeignKey(Customers, on_delete=models.PROTECT)
+    payee = models.ForeignKey(Customers, on_delete=models.PROTECT,blank=True, null=True)
     date = models.DateField()
     amount = models.FloatField()
     remarks = models.TextField(blank=True, null=True)
