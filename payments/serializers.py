@@ -790,11 +790,19 @@ class JournalEntrySerializer(serializers.ModelSerializer):
 
     def create_bank_transactions(self, journal_entry, transaction_type):
         for detail in journal_entry.details.all():
+            bank = detail.account
+            main_type = bank.main_type
+            payment = detail.debit
+            deposit = detail.credit
+
+            if main_type in ['asset', 'expenses']:
+                payment, deposit = deposit, payment
+
             BankTransaction.objects.create(
-                bank=detail.account,  # Assuming the detail has a bank field
+                bank=bank,
                 transaction_type=transaction_type,
-                payment=detail.debit,  # Adjust based on your model fields
-                deposit=detail.credit,  # Adjust based on your model fields
+                payment=payment,
+                deposit=deposit,
                 transaction_date=journal_entry.date,
                 related_table="JournalEntry",
                 related_id=journal_entry.id,
