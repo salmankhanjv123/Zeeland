@@ -795,7 +795,7 @@ class JournalEntrySerializer(serializers.ModelSerializer):
             payment = detail.debit
             deposit = detail.credit
 
-            if main_type in ['asset', 'expenses']:
+            if main_type in ['Asset', 'Expense']:
                 payment, deposit = deposit, payment
 
             BankTransaction.objects.create(
