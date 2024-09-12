@@ -25,8 +25,8 @@ class Bank(models.Model):
 class BankTransaction(models.Model):
     bank = models.ForeignKey(Bank, on_delete=models.CASCADE)
     transaction_type = models.CharField(max_length=50)
-    payment = models.DecimalField(max_digits=10, decimal_places=2)
-    deposit = models.DecimalField(max_digits=10, decimal_places=2)
+    payment = models.FloatField(default=0)
+    deposit = models.FloatField(default=0)
     transaction_date = models.DateField()
     related_table = models.CharField(max_length=50)
     related_id = models.IntegerField()
