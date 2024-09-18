@@ -578,16 +578,29 @@ class BankDepositSerializer(serializers.ModelSerializer):
                     BankDepositTransactions.objects.create(
                         bank_deposit=bank_deposit, **data
                     )
-                    BankTransaction.objects.create(
-                        bank=bank,
-                        transaction_date=date,
-                        payment=amount,
-                        deposit=0,
-                        transaction_type="deposit",
-                        related_table="bank_deposits",
-                        related_id=bank_deposit.id,
-                    )
-
+                    #  expense account deposit hence increase
+                    if bank.main_type in ["asset", "expense"]:
+                        # If it's an asset or expense, record it as a deposit
+                        BankTransaction.objects.create(
+                            bank=bank,
+                            transaction_date=date,
+                            payment=0,  # No payment
+                            deposit=amount,  # Increase deposit
+                            transaction_type="deposit",
+                            related_table="bank_deposits",
+                            related_id=bank_deposit.id,
+                        )
+                    else:
+                        # For other main types, record it as a payment
+                        BankTransaction.objects.create(
+                            bank=bank,
+                            transaction_date=date,
+                            payment=amount,  # Payment recorded
+                            deposit=0,  # No deposit
+                            transaction_type="payment",
+                            related_table="bank_deposits",
+                            related_id=bank_deposit.id,
+                        )
                 for file_data in files_data:
                     BankDepositDocuments.objects.create(
                         bank_deposit=bank_deposit, **file_data
@@ -666,15 +679,28 @@ class BankDepositSerializer(serializers.ModelSerializer):
                     BankDepositTransactions.objects.create(
                         bank_deposit=instance, **data
                     )
-                    BankTransaction.objects.create(
-                        bank=bank,
-                        transaction_date=date,
-                        payment=amount,
-                        deposit=0,
-                        transaction_type="deposit",
-                        related_table="bank_deposits",
-                        related_id=instance.id,
-                    )
+                    if bank.main_type in ["asset", "expense"]:
+                        # If it's an asset or expense, record it as a deposit
+                        BankTransaction.objects.create(
+                            bank=bank,
+                            transaction_date=date,
+                            payment=0,  # No payment
+                            deposit=amount,  # Increase deposit
+                            transaction_type="deposit",
+                            related_table="bank_deposits",
+                            related_id=instance.id,
+                        )
+                    else:
+                        # For other main types, record it as a payment
+                        BankTransaction.objects.create(
+                            bank=bank,
+                            transaction_date=date,
+                            payment=amount,  # Payment recorded
+                            deposit=0,  # No deposit
+                            transaction_type="payment",
+                            related_table="bank_deposits",
+                            related_id=instance.id,
+                        )
                 for file_data in files_data:
                     file_id = file_data.get("id", None)
                     if file_id:
