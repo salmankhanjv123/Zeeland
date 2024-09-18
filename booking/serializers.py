@@ -122,6 +122,10 @@ class BookingSerializer(serializers.ModelSerializer):
         files_data = validated_data.pop("files", [])
         token = validated_data.get("token", instance.token)
         token_amount = token.amount if token else 0
+        booking_date = validated_data.get("booking_date",instance.booking_date)
+        installement_month = datetime.datetime(
+            booking_date.year, booking_date.month, 1
+        ).date()
 
         try:
             with transaction.atomic():
@@ -138,6 +142,21 @@ class BookingSerializer(serializers.ModelSerializer):
                 if advance_payment_obj:
                     advance_payment_obj.amount = advance_amount
                     advance_payment_obj.save()
+                else:
+                    # If no advance payment exists, and advance_amount > 0, create a new IncomingFund
+                    if advance_amount > 0:
+                        IncomingFund.objects.create(
+                            project=instance.project,
+                            booking=instance,
+                            date=booking_date,
+                            installement_month=installement_month,
+                            amount=advance_amount,
+                            remarks="advance",
+                            advance_payment=True,
+                            bank=validated_data.get("bank"),
+                            payment_type=validated_data.get("payment_type"),
+                            cheque_number=validated_data.get("cheque_number"),
+                        )
 
                 payments = (
                     IncomingFund.objects.filter(booking=instance.id).aggregate(
