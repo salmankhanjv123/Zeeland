@@ -5,6 +5,7 @@ from customer.models import Customers
 
 
 class Bank(models.Model):
+    project = models.ForeignKey(Projects, on_delete=models.PROTECT)
     name = models.CharField(max_length=50)
     main_type = models.CharField(max_length=100, default="asset")
     account_type = models.CharField(max_length=100)
@@ -23,6 +24,7 @@ class Bank(models.Model):
         db_table = "banks"
 
 class BankTransaction(models.Model):
+    project = models.ForeignKey(Projects, on_delete=models.PROTECT)
     bank = models.ForeignKey(Bank, on_delete=models.CASCADE)
     transaction_type = models.CharField(max_length=50)
     payment = models.FloatField(default=0)
@@ -169,6 +171,7 @@ class PaymentReminder(models.Model):
 
 
 class BankDeposit(models.Model):
+    project = models.ForeignKey(Projects, on_delete=models.PROTECT)
     deposit_to = models.ForeignKey(Bank, on_delete=models.PROTECT)
     amount = models.FloatField(default=0)
     date = models.DateField()
@@ -320,6 +323,7 @@ class BankTransferDocuments(models.Model):
 
 
 class ChequeClearance(models.Model):
+    project = models.ForeignKey(Projects, on_delete=models.PROTECT)
     date = models.DateField()
     description = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
