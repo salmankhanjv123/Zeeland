@@ -52,15 +52,19 @@ class BankViewSet(viewsets.ModelViewSet):
     serializer_class = BankSerializer
 
     def get_queryset(self):
-
+        project_id = self.request.query_params.get("project")
         account_type_string = self.request.query_params.get("account_type")
         parent_account = self.request.query_params.get("parent_account")
         query_filters = Q()
+        
         account_type = (
             [str for str in account_type_string.split(",")]
             if account_type_string
             else None
         )
+        
+        if project_id:
+            query_filters &= Q(project_id=project_id)
         if account_type:
             query_filters &= Q(account_type__in=account_type)
         if parent_account == "null":
@@ -78,12 +82,16 @@ class BankTransactionViewSet(viewsets.ModelViewSet):
     serializer_class = BankTransactionSerializer
 
     def get_queryset(self):
+        project_id = self.request.query_params.get("project")
         bank_id = self.request.query_params.get("bank_id")
         account_type = self.request.query_params.get("account_type")
         main_type = self.request.query_params.get("main_type")
         is_deposit = self.request.query_params.get("is_deposit")
         is_cheque_clear= self.request.query_params.get("is_cheque_clear")
+        
         query_filters = Q()
+        if project_id:
+            query_filters &= Q(project_id=project_id)
         if bank_id:
             query_filters &= Q(bank_id=bank_id)
         if account_type:
@@ -100,13 +108,14 @@ class BankTransactionViewSet(viewsets.ModelViewSet):
 
 class BankTransactionAPIView(APIView):
     def get(self, request, *args, **kwargs):
+        project_id = self.request.query_params.get("project")
         bank_id = request.query_params.get("bank_id")
         start_date = request.query_params.get("start_date")
         end_date = request.query_params.get("end_date")
 
-        if not bank_id or not start_date or not end_date:
+        if not bank_id or not start_date or not end_date or not project_id:
             return Response(
-                {"error": "bank_id, start_date, and end_date are required"},
+                {"error": "bank_id, start_date, and end_date,project_id are required"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -120,7 +129,7 @@ class BankTransactionAPIView(APIView):
             )
 
         # Filter transactions based on bank_id and date range
-        query_filters = Q(bank_id=bank_id,is_cheque_clear=True)
+        query_filters = Q(bank_id=bank_id,project_id=project_id,is_cheque_clear=True)        
         transactions = BankTransaction.objects.filter(
             query_filters, transaction_date__range=[start_date, end_date]
         ).order_by("transaction_date", "id")
@@ -415,82 +424,6 @@ class DuePaymentsView(APIView):
         return Response({"due_payments": due_payments})
 
 
-class BankTransactionsAPIView(APIView):
-
-    def get(self, request):
-        bank_id = request.query_params.get("bank_id")
-        start_date = request.query_params.get("start_date")
-        end_date = request.query_params.get("end_date")
-
-        if not bank_id:
-            return Response(
-                {"error": "bank_id query parameter is required"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        bank = get_object_or_404(Bank, pk=bank_id)
-
-        date_filter = Q()
-
-        if start_date:
-            start_date = datetime.strptime(start_date, "%Y-%m-%d")
-            date_filter &= Q(date__gte=start_date)
-
-        if end_date:
-            end_date = datetime.strptime(end_date, "%Y-%m-%d")
-            date_filter &= Q(date__lte=end_date)
-
-        payments = bank.payments.filter(date_filter)
-        expenses = bank.expenses.filter(date_filter)
-        deposits = bank.deposits.filter(date_filter)
-
-        combined = []
-
-        for payment in payments:
-            combined.append(
-                {
-                    "date": payment.date,
-                    "reference": "payment",
-                    "remarks": payment.remarks,
-                    "id": payment.id,
-                    "payment": 0,
-                    "deposit": payment.amount,
-                }
-            )
-        for payment in deposits:
-            combined.append(
-                {
-                    "date": payment.date,
-                    "reference": "deposits",
-                    "remarks": payment.remarks,
-                    "id": payment.bank_deposit_id,
-                    "payment": 0,
-                    "deposit": payment.amount,
-                }
-            )
-
-        for expense in expenses:
-            combined.append(
-                {
-                    "date": expense.date,
-                    "reference": "expense",
-                    "remarks": expense.remarks,
-                    "id": expense.id,
-                    "payment": expense.amount,
-                    "deposit": 0,
-                }
-            )
-
-        combined.sort(key=lambda x: x["date"])
-
-        balance = 0
-        for entry in combined:
-            balance += entry["deposit"] - entry["payment"]
-            entry["balance"] = balance
-
-        return Response(combined, status=status.HTTP_200_OK)
-
-
 class BankDepositViewSet(viewsets.ModelViewSet):
     """
     API endpoint that allows IncomingFund to be viewed or edited.
@@ -503,6 +436,7 @@ class BankDepositViewSet(viewsets.ModelViewSet):
         start_date = self.request.query_params.get("start_date")
         end_date = self.request.query_params.get("end_date")
         bank_id = self.request.query_params.get("bank_id")
+        project_id = self.request.query_params.get("project")
 
         query_filters = Q()
 
@@ -510,6 +444,8 @@ class BankDepositViewSet(viewsets.ModelViewSet):
             query_filters &= Q(date__gte=start_date) & Q(date__lte=end_date)
         if bank_id:
             query_filters &= Q(deposit_to=bank_id)
+        if project_id:
+            query_filters &= Q(project_id=project_id)
 
         queryset = BankDeposit.objects.filter(query_filters).prefetch_related("files")
         return queryset
@@ -654,6 +590,40 @@ class BankTransferViewSet(viewsets.ModelViewSet):
         # Then delete the journal entry
         instance.delete()
 
+class ChequeClearanceViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint that allows IncomingFund to be viewed or edited.
+    """
+
+    serializer_class = ChequeClearanceSerializer
+
+    def get_queryset(self):
+
+        start_date = self.request.query_params.get("start_date")
+        end_date = self.request.query_params.get("end_date")
+        project_id = self.request.query_params.get("project")
+        query_filters = Q()
+
+        if start_date and end_date:
+            query_filters &= Q(date__gte=start_date) & Q(date__lte=end_date)
+        if project_id:
+            query_filters &= Q(project_id=project_id)
+        queryset = ChequeClearance.objects.filter(query_filters).prefetch_related("files")
+        return queryset
+    
+    def perform_destroy(self, instance):
+
+        # Update BankDepositDetail to set is_deposit=False
+        for detail in instance.details.all():
+            expense=detail.expense 
+            expense.is_cheque_clear=False
+            expense.save()
+
+        # Delete the BankDeposit instance
+        super().perform_destroy(instance)
+
+
+
 def create_or_update_transaction(
     instance, related_table, transaction_type, amount_field,transaction_date
 ):
@@ -703,36 +673,6 @@ def create_or_update_transaction(
                     is_deposit=is_deposit,
                 )
 
-
-class ChequeClearanceViewSet(viewsets.ModelViewSet):
-    """
-    API endpoint that allows IncomingFund to be viewed or edited.
-    """
-
-    serializer_class = ChequeClearanceSerializer
-
-    def get_queryset(self):
-
-        start_date = self.request.query_params.get("start_date")
-        end_date = self.request.query_params.get("end_date")
-        query_filters = Q()
-
-        if start_date and end_date:
-            query_filters &= Q(date__gte=start_date) & Q(date__lte=end_date)
-
-        queryset = ChequeClearance.objects.filter(query_filters).prefetch_related("files")
-        return queryset
-    
-    def perform_destroy(self, instance):
-
-        # Update BankDepositDetail to set is_deposit=False
-        for detail in instance.details.all():
-            expense=detail.expense 
-            expense.is_cheque_clear=False
-            expense.save()
-
-        # Delete the BankDeposit instance
-        super().perform_destroy(instance)
 
 
 
