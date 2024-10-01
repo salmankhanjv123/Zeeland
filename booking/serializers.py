@@ -41,7 +41,7 @@ class BookingSerializer(serializers.ModelSerializer):
     customer_info = CustomersInfoSerializer(source="customer", read_only=True)
     dealer_name = serializers.CharField(source="dealer.name", read_only=True)
     bank_name = serializers.CharField(source="bank.name", read_only=True)
-    plot_info = PlotsSerializer(source="plot", read_only=True)
+    plot_info = PlotsSerializer(source="plots",many=True, read_only=True)
     files = BookingDocumentsSerializer(many=True, required=False)
 
     class Meta:
@@ -51,7 +51,9 @@ class BookingSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         files_data = validated_data.pop("files", [])
+        plots_data = validated_data.get("plots", [])
         booking_date = validated_data.get("booking_date")
+        
         installement_month = datetime.datetime(
             booking_date.year, booking_date.month, 1
         ).date()
@@ -73,13 +75,14 @@ class BookingSerializer(serializers.ModelSerializer):
                 validated_data["booking_id"] = booking_id_str
 
                 advance_amount = validated_data.get("advance", 0)
+                
                 token = validated_data.get("token")
                 token_amount = token.amount if token else 0
                 validated_data["total_receiving_amount"] = advance_amount + token_amount
 
-                plot = validated_data["plot"]
-                plot.status = "sold"
-                plot.save()
+                for plot in plots_data:
+                    plot.status = "sold"
+                    plot.save()
 
                 if token:
                     token.status = "accepted"
@@ -101,15 +104,15 @@ class BookingSerializer(serializers.ModelSerializer):
                         cheque_number=validated_data.get("cheque_number"),
                     )
 
-                existing_resale = PlotResale.objects.filter(
-                    Q(booking__plot=plot) | Q(booking__plot=plot.parent_plot)
-                ).last()
+                # existing_resale = PlotResale.objects.filter(
+                #     Q(booking__plot=plot) | Q(booking__plot=plot.parent_plot)
+                # ).last()
 
-                if existing_resale:
-                    existing_resale.company_profit = (
-                        existing_resale.remaining + existing_resale.company_amount_paid
-                    )
-                    existing_resale.save()
+                # if existing_resale:
+                #     existing_resale.company_profit = (
+                #         existing_resale.remaining + existing_resale.company_amount_paid
+                #     )
+                #     existing_resale.save()
 
                 for file_data in files_data:
                     BookingDocuments.objects.create(booking=booking, **file_data)
@@ -211,6 +214,7 @@ class BookingForPaymentsSerializer(serializers.ModelSerializer):
             return f"{instance.booking_id} || {dealer.name} ||  {instance.plot.plot_number} -- {instance.plot.get_plot_size()}"
         else:
             return None
+    
     class Meta:
         model = Booking
         fields = [
