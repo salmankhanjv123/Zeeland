@@ -131,7 +131,7 @@ class TotalCountView(APIView):
         ).count()
         resale_plots_count = (
             Plots.objects.filter(project_id=project_id)
-            .annotate(booking_count=Count("booking_details"))
+            .annotate(booking_count=Count("booking"))
             .filter(booking_count__gt=1)
             .count()
         )

@@ -652,6 +652,7 @@ def create_or_update_transaction(
             # If the transaction doesn't exist, create it
             if transaction_type == "refund":
                 BankTransaction.objects.create(
+                    project=instance.project,
                     bank=bank_field,
                     transaction_date=transaction_date,
                     transaction_type=transaction_type,
@@ -663,6 +664,7 @@ def create_or_update_transaction(
                 )
             else:
                 BankTransaction.objects.create(
+                    project=instance.project,
                     bank=bank_field,
                     transaction_type=transaction_type,
                     transaction_date=transaction_date,
