@@ -269,7 +269,6 @@ class TokenSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         files_data = validated_data.pop("files", [])
         plots_data = validated_data.pop("plot", [])
-
         token = Token.objects.create(**validated_data)
         if plots_data:
             token.plot.set([plot['id'] for plot in plots_data]) 
@@ -284,9 +283,8 @@ class TokenSerializer(serializers.ModelSerializer):
         for key, value in validated_data.items():
             setattr(instance, key, value)
         instance.save()
-        
         if plots_data:
-            instance.plot.set(plots_data)
+            instance.plot.set([plot['id'] for plot in plots_data])
         
         for file_data in files_data:
             file_id = file_data.get("id", None)
