@@ -111,7 +111,7 @@ class TokenViewSet(viewsets.ModelViewSet):
             query_filters &= Q(customer_id=customer_id)
         if start_date and end_date:
             query_filters &= Q(date__gte=start_date) & Q(date__lte=end_date)
-        queryset = Token.objects.filter(query_filters).select_related('customer','bank', 'plot').prefetch_related("files")
+        queryset = Token.objects.filter(query_filters).select_related('customer','bank').prefetch_related("files",'plot')
         return queryset
 
     def perform_destroy(self, instance):

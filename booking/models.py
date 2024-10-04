@@ -80,8 +80,7 @@ class BookingDocuments(models.Model):
 class Token(models.Model):
     project = models.ForeignKey(Projects, on_delete=models.PROTECT)
     user = models.ForeignKey(User, on_delete=models.PROTECT)
-    plot = models.ForeignKey(Plots, on_delete=models.PROTECT)
-    new_plot=models.ManyToManyField(Plots,related_name="tokens")
+    plot=models.ManyToManyField(Plots,related_name="tokens")
     plot_amount=models.FloatField(default=0)
     customer = models.ForeignKey(Customers, related_name="token", on_delete=models.PROTECT)
     date = models.DateField()

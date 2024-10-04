@@ -240,7 +240,7 @@ class TokenDocumentsSerializer(serializers.ModelSerializer):
 
 class TokenSerializer(serializers.ModelSerializer):
     customer_info = CustomersInfoSerializer(source="customer", read_only=True)
-    plot_info = PlotsSerializer(source="plot", read_only=True)
+    plot_info = PlotsSerializer(source="plot",many=True, read_only=True)
     bank_name = serializers.CharField(source="bank.name", read_only=True)
     files = TokenDocumentsSerializer(many=True, required=False)
 
@@ -256,17 +256,25 @@ class TokenSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         files_data = validated_data.pop("files", [])
-
+        plots_data = validated_data.pop("plot", [])
+        
         token = Token.objects.create(**validated_data)
+        token.plot.set(plots_data)
         for file_data in files_data:
             TokenDocuments.objects.create(token=token, **file_data)
         return token
 
     def update(self, instance, validated_data):
         files_data = validated_data.pop("files", [])
+        plots_data = validated_data.pop("plot", [])
+        
         for key, value in validated_data.items():
             setattr(instance, key, value)
         instance.save()
+        
+        if plots_data:
+            instance.plot.set(plots_data)
+        
         for file_data in files_data:
             file_id = file_data.get("id", None)
             if file_id:
@@ -278,7 +286,6 @@ class TokenSerializer(serializers.ModelSerializer):
                 file.save()
             else:
                 TokenDocuments.objects.create(token=instance, **file_data)
-
         return instance
 
 
