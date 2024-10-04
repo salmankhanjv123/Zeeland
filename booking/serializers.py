@@ -63,82 +63,77 @@ class BookingSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         files_data = validated_data.pop("files", [])
-        plots_data = validated_data.get("plots", [])
+        plots_data = validated_data.pop("plots", [])
         booking_date = validated_data.get("booking_date")
         
         installement_month = datetime.datetime(
             booking_date.year, booking_date.month, 1
         ).date()
 
+
+        project = validated_data.get("project")
         try:
-            with transaction.atomic():
-                project = validated_data.get("project")
-                try:
-                    latest_booking = Booking.objects.filter(project=project).latest(
-                        "created_at"
-                    )
-                    latest_booking_number = (
-                        int(latest_booking.booking_id.split("-")[1]) + 1
-                    )
-                except Booking.DoesNotExist:
-                    latest_booking_number = 1
+            latest_booking = Booking.objects.filter(project=project).latest(
+                "created_at"
+            )
+            latest_booking_number = (
+                int(latest_booking.booking_id.split("-")[1]) + 1
+            )
+        except Booking.DoesNotExist:
+            latest_booking_number = 1
 
-                booking_id_str = f"{project.id}-{str(latest_booking_number).zfill(3)}"
-                validated_data["booking_id"] = booking_id_str
+        booking_id_str = f"{project.id}-{str(latest_booking_number).zfill(3)}"
+        validated_data["booking_id"] = booking_id_str
 
-                advance_amount = validated_data.get("advance", 0)
-                
-                token = validated_data.get("token")
-                token_amount = token.amount if token else 0
-                validated_data["total_receiving_amount"] = advance_amount + token_amount
+        advance_amount = validated_data.get("advance", 0)
+        
+        token = validated_data.get("token")
+        token_amount = token.amount if token else 0
+        validated_data["total_receiving_amount"] = advance_amount + token_amount
 
-                for plot in plots_data:
-                    plot.status = "sold"
-                    plot.save()
 
-                if token:
-                    token.status = "accepted"
-                    token.save()
+        if token:
+            token.status = "accepted"
+            token.save()
 
-                booking = Booking.objects.create(**validated_data)
+        booking = Booking.objects.create(**validated_data)
 
-                if plots_data:
-                    booking.plots.set([plot['id'] for plot in plots_data]) 
+        if plots_data:
+            booking.plots.set([plot['id'] for plot in plots_data]) 
 
-                if advance_amount>0:
-                    IncomingFund.objects.create(
-                        project=project,
-                        booking=booking,
-                        date=booking_date,
-                        installement_month=installement_month,
-                        amount=advance_amount,
-                        remarks="advance",
-                        advance_payment=True,
-                        bank=validated_data.get("bank"),
-                        payment_type=validated_data.get("payment_type"),
-                        cheque_number=validated_data.get("cheque_number"),
-                    )
+        if advance_amount>0:
+            IncomingFund.objects.create(
+                project=project,
+                booking=booking,
+                date=booking_date,
+                installement_month=installement_month,
+                amount=advance_amount,
+                remarks="advance",
+                advance_payment=True,
+                bank=validated_data.get("bank"),
+                payment_type=validated_data.get("payment_type"),
+                cheque_number=validated_data.get("cheque_number"),
+            )
 
-                # existing_resale = PlotResale.objects.filter(
-                #     Q(booking__plot=plot) | Q(booking__plot=plot.parent_plot)
-                # ).last()
+        # existing_resale = PlotResale.objects.filter(
+        #     Q(booking__plot=plot) | Q(booking__plot=plot.parent_plot)
+        # ).last()
 
-                # if existing_resale:
-                #     existing_resale.company_profit = (
-                #         existing_resale.remaining + existing_resale.company_amount_paid
-                #     )
-                #     existing_resale.save()
+        # if existing_resale:
+        #     existing_resale.company_profit = (
+        #         existing_resale.remaining + existing_resale.company_amount_paid
+        #     )
+        #     existing_resale.save()
 
-                for file_data in files_data:
-                    BookingDocuments.objects.create(booking=booking, **file_data)
+        for file_data in files_data:
+            BookingDocuments.objects.create(booking=booking, **file_data)
 
-                return booking
-        except Exception as e:
-            raise serializers.ValidationError(f"Error creating booking: {e}")
+        return booking
+
 
     def update(self, instance, validated_data):
         files_data = validated_data.pop("files", [])
-        plots_data = validated_data.get("plots", [])
+        plots_data = validated_data.pop("plots", [])
         token = validated_data.get("token", instance.token)
         token_amount = token.amount if token else 0
         booking_date = validated_data.get("booking_date",instance.booking_date)
