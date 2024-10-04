@@ -65,13 +65,13 @@ class BookingSerializer(serializers.ModelSerializer):
         files_data = validated_data.pop("files", [])
         plots_data = validated_data.pop("plots", [])
         booking_date = validated_data.get("booking_date")
-        
+        advance_amount = validated_data.get("advance", 0)
+        project = validated_data.get("project")
+        token = validated_data.get("token")
         installement_month = datetime.datetime(
             booking_date.year, booking_date.month, 1
         ).date()
-
-
-        project = validated_data.get("project")
+        
         try:
             latest_booking = Booking.objects.filter(project=project).latest(
                 "created_at"
@@ -84,13 +84,8 @@ class BookingSerializer(serializers.ModelSerializer):
 
         booking_id_str = f"{project.id}-{str(latest_booking_number).zfill(3)}"
         validated_data["booking_id"] = booking_id_str
-
-        advance_amount = validated_data.get("advance", 0)
-        
-        token = validated_data.get("token")
         token_amount = token.amount if token else 0
         validated_data["total_receiving_amount"] = advance_amount + token_amount
-
 
         if token:
             token.status = "accepted"
@@ -100,7 +95,12 @@ class BookingSerializer(serializers.ModelSerializer):
 
         if plots_data:
             booking.plots.set([plot['id'] for plot in plots_data]) 
-
+            for plot_data in plots_data:
+                plot_id = plot_data['id']
+                plot = Plots.objects.get(id=plot_id) 
+                plot.status = 'sold' 
+                plot.save()
+    
         if advance_amount>0:
             IncomingFund.objects.create(
                 project=project,
@@ -114,16 +114,6 @@ class BookingSerializer(serializers.ModelSerializer):
                 payment_type=validated_data.get("payment_type"),
                 cheque_number=validated_data.get("cheque_number"),
             )
-
-        # existing_resale = PlotResale.objects.filter(
-        #     Q(booking__plot=plot) | Q(booking__plot=plot.parent_plot)
-        # ).last()
-
-        # if existing_resale:
-        #     existing_resale.company_profit = (
-        #         existing_resale.remaining + existing_resale.company_amount_paid
-        #     )
-        #     existing_resale.save()
 
         for file_data in files_data:
             BookingDocuments.objects.create(booking=booking, **file_data)
