@@ -26,6 +26,17 @@ class PlotsSerializer(serializers.ModelSerializer):
         fields = "__all__"  # or specify specific fields
 
 
+class CreatePlotsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Plots
+        fields = ['id'] # or specify specific fields
+
+    def to_internal_value(self, data):
+        validated_data = super().to_internal_value(data)
+        validated_data["id"] = data.get("id")
+        return validated_data
+    
+
 class BookingDocumentsSerializer(serializers.ModelSerializer):
     class Meta:
         model = BookingDocuments
@@ -43,6 +54,7 @@ class BookingSerializer(serializers.ModelSerializer):
     bank_name = serializers.CharField(source="bank.name", read_only=True)
     plot_info = PlotsSerializer(source="plots",many=True, read_only=True)
     files = BookingDocumentsSerializer(many=True, required=False)
+    plots = CreatePlotsSerializer(many=True)
 
     class Meta:
         model = Booking
@@ -89,6 +101,9 @@ class BookingSerializer(serializers.ModelSerializer):
                     token.save()
 
                 booking = Booking.objects.create(**validated_data)
+
+                if plots_data:
+                    booking.plots.set([plot['id'] for plot in plots_data]) 
 
                 if advance_amount>0:
                     IncomingFund.objects.create(
@@ -238,17 +253,6 @@ class TokenDocumentsSerializer(serializers.ModelSerializer):
         return validated_data
 
 
-
-class CreatePlotsSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Plots
-        fields = ['id'] # or specify specific fields
-
-    def to_internal_value(self, data):
-        validated_data = super().to_internal_value(data)
-        validated_data["id"] = data.get("id")
-        return validated_data
-    
 class TokenSerializer(serializers.ModelSerializer):
     customer_info = CustomersInfoSerializer(source="customer", read_only=True)
     plot_info = PlotsSerializer(source="plot",many=True, read_only=True)
@@ -283,6 +287,7 @@ class TokenSerializer(serializers.ModelSerializer):
         for key, value in validated_data.items():
             setattr(instance, key, value)
         instance.save()
+        
         if plots_data:
             instance.plot.set([plot['id'] for plot in plots_data])
         
