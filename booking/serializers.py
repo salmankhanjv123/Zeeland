@@ -206,12 +206,12 @@ class BookingForPaymentsSerializer(serializers.ModelSerializer):
 
     def get_booking_details(self, instance):
 
-        return f"{instance.booking_id} || {instance.customer.name} ||  {instance.plot.plot_number} -- {instance.plot.get_plot_size()}"
+        return f"{instance.booking_id} || {instance.customer.name}"
 
     def get_dealer_details(self, instance):
         dealer=instance.dealer
         if dealer:
-            return f"{instance.booking_id} || {dealer.name} ||  {instance.plot.plot_number} -- {instance.plot.get_plot_size()}"
+            return f"{instance.booking_id} || {dealer.name}"
         else:
             return None
     
@@ -301,10 +301,12 @@ class PlotResaleSerializer(serializers.ModelSerializer):
     plot_info = serializers.SerializerMethodField(read_only=True)
 
     def get_plot_info(self, instance):
-        plot_number = instance.booking.plot.plot_number
-        plot_size = instance.booking.plot.get_plot_size()
-        plot_type = instance.booking.plot.get_type_display()
-        return f"{plot_number} || {plot_type} || {plot_size}"
+        plots = instance.booking.plots.all()
+        plot_info = [
+            f"{plot.plot_number} || {plot.get_type_display()} || {plot.get_plot_size()}"
+            for plot in plots
+        ]
+        return plot_info
 
     class Meta:
         model = PlotResale

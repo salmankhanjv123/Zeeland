@@ -80,11 +80,12 @@ class CustomerMessagesReminderSerializer(serializers.ModelSerializer):
     def get_plot_info(self, instance):
         booking = instance.message.booking
         if booking:
-            plot = booking.plot
-            plot_number = plot.plot_number
-            plot_size = plot.get_plot_size()
-            plot_type = plot.get_type_display()
-            return f"{plot_number} || {plot_type} || {plot_size}"
+            plots = booking.plots.all()
+            plot_info = [
+                f"{plot.plot_number} || {plot.get_type_display()} || {plot.get_plot_size()}"
+                for plot in plots
+            ]
+            return plot_info
         return None
 
     class Meta:
@@ -110,7 +111,7 @@ class CustomerMessagesSerializer(serializers.ModelSerializer):
 
     def get_booking_details(self, instance):
         if instance.booking:
-            return f"{instance.booking.booking_id} || {instance.booking.customer.name} ||  {instance.booking.plot.plot_number} -- {instance.booking.plot.get_plot_size()}"
+            return f"{instance.booking.booking_id} || {instance.booking.customer.name}"
         else:
             return "Booking details not available."
 

@@ -77,10 +77,12 @@ class BookingPaymentsSerializer(serializers.ModelSerializer):
     plot = serializers.SerializerMethodField(read_only=True)
 
     def get_plot(self, instance):
-        plot = instance.booking.plot
-        return (
+        plots = instance.booking.plots.all()
+        plot_info = [
             f"{plot.plot_number} || {plot.get_type_display()} || {plot.get_plot_size()}"
-        )
+            for plot in plots
+        ]
+        return plot_info
 
     class Meta:
         model = IncomingFund
@@ -96,10 +98,12 @@ class TokenPaymentsSerializer(serializers.ModelSerializer):
     reference=serializers.SerializerMethodField(read_only=True)
 
     def get_plot(self, instance):
-        plot = instance.plot
-        return (
+        plots = instance.plot.all()
+        plot_info = [
             f"{plot.plot_number} || {plot.get_type_display()} || {plot.get_plot_size()}"
-        )
+            for plot in plots
+        ]
+        return plot_info
 
     def get_reference(self, instance):
         return "token"

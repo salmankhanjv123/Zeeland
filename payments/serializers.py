@@ -94,21 +94,34 @@ class BankTransactionSerializer(serializers.ModelSerializer):
         if obj.related_table == "incoming_funds":
             try:
                 related_instance = IncomingFund.objects.get(pk=obj.related_id)
-                booking = related_instance.booking
-                return f"{booking.plot.plot_number} || {booking.plot.get_plot_size()} || {booking.plot.get_type_display()}"
+                plots = related_instance.booking.plots.all()
+                plot_info = [
+                    f"{plot.plot_number} || {plot.get_type_display()} || {plot.get_plot_size()}"
+                    for plot in plots
+                ]
+                return plot_info
             except IncomingFund.DoesNotExist:
                 return None
         elif obj.related_table == "token":
             try:
                 related_instance = Token.objects.get(pk=obj.related_id)
-                return f"{related_instance.plot.plot_number} || {related_instance.plot.get_plot_size()} || {related_instance.plot.get_type_display()}"
+                plots = related_instance.plot.all()
+                plot_info = [
+                    f"{plot.plot_number} || {plot.get_type_display()} || {plot.get_plot_size()}"
+                    for plot in plots
+                ]
+                return plot_info
             except Token.DoesNotExist:
                 return None
         elif obj.related_table == "dealer_payments":
             try:
                 related_instance = DealerPayments.objects.get(pk=obj.related_id)
-                booking = related_instance.booking
-                return f"{booking.plot.plot_number} || {booking.plot.get_plot_size()} || {booking.plot.get_type_display()}"
+                plots = related_instance.booking.plots.all()
+                plot_info = [
+                    f"{plot.plot_number} || {plot.get_type_display()} || {plot.get_plot_size()}"
+                    for plot in plots
+                ]
+                return plot_info
             except DealerPayments.DoesNotExist:
                 return None
         return None
@@ -177,10 +190,12 @@ class BookingSerializer(serializers.ModelSerializer):
     plot_info = serializers.SerializerMethodField(read_only=True)
 
     def get_plot_info(self, instance):
-        plot_number = instance.plot.plot_number
-        plot_size = instance.plot.get_plot_size()
-        plot_type = instance.plot.get_type_display()
-        return f"{plot_number} || {plot_type} || {plot_size}"
+        plots = instance.plots.all()
+        plot_info = [
+            f"{plot.plot_number} || {plot.get_type_display()} || {plot.get_plot_size()}"
+            for plot in plots
+        ]
+        return plot_info
 
     class Meta:
         model = Booking
@@ -209,7 +224,7 @@ class IncomingFundDocumentsSerializer(serializers.ModelSerializer):
 class IncomingFundSerializer(serializers.ModelSerializer):
     installement_month = MonthField(required=False)
     booking_info = BookingSerializer(source="booking", read_only=True)
-    plot_info = PlotsSerializer(source="booking.plot", read_only=True)
+    plot_info = PlotsSerializer(source="booking.plot",many=True, read_only=True)
     bank_name = serializers.CharField(source="bank.name", read_only=True)
     account_type = serializers.CharField(source="bank.account_type", read_only=True)
     customer = CustomersSerializer(source="booking.customer", read_only=True)
@@ -457,10 +472,12 @@ class PaymentReminderSerializer(serializers.ModelSerializer):
     customer_info = CustomersSerializer(source="booking.customer", read_only=True)
 
     def get_plot_info(self, instance):
-        plot_number = instance.booking.plot.plot_number
-        plot_size = instance.booking.plot.get_plot_size()
-        plot_type = instance.booking.plot.get_type_display()
-        return f"{plot_number} || {plot_type} || {plot_size}"
+        plots = instance.booking.plots.all()
+        plot_info = [
+            f"{plot.plot_number} || {plot.get_type_display()} || {plot.get_plot_size()}"
+            for plot in plots
+        ]
+        return plot_info
 
     class Meta:
         model = PaymentReminder

@@ -66,7 +66,7 @@ class CustomerMessagesReminderViewSet(viewsets.ModelViewSet):
 
         queryset = CustomerMessagesReminder.objects.filter(
             query_filters
-        ).select_related("message__booking__plot", "message__booking__customer")
+        ).select_related("message__booking__customer").prefetch_related("message__booking__plots")
         return queryset
 
 
@@ -89,7 +89,7 @@ class CustomerMessagesListCreateView(generics.ListCreateAPIView):
         query_filters &= Q(booking__isnull=False)
         queryset = (
             CustomerMessages.objects.filter(query_filters)
-            .select_related("booking__customer", "booking__plot", "user")
+            .select_related("booking__customer", "user")
             .prefetch_related("files")
         )
 

@@ -29,7 +29,7 @@ class PlotsViewSet(viewsets.ModelViewSet):
         if project_id:
             queryset = queryset.filter(project_id=project_id)
         if customer_id:
-            queryset = queryset.filter(booking_details__customer_id=customer_id)
+            queryset = queryset.filter(booking__customer_id=customer_id)
         if plot_type:
             queryset = queryset.filter(type=plot_type)
         return queryset

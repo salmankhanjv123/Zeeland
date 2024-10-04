@@ -226,7 +226,7 @@ class IncomingFundViewSet(viewsets.ModelViewSet):
             query_filters &= Q(date__gte=start_date) & Q(date__lte=end_date)
         queryset = (
             IncomingFund.objects.filter(query_filters)
-            .select_related("booking", "booking__customer", "booking__plot", "bank")
+            .select_related("booking", "booking__customer", "bank")
             .prefetch_related("files")
         )
         return queryset
@@ -509,8 +509,8 @@ class DealerPaymentsViewSet(viewsets.ModelViewSet):
             query_filters &= Q(date__gte=start_date) & Q(date__lte=end_date)
         queryset = (
             DealerPayments.objects.filter(query_filters)
-            .select_related("booking", "booking__dealer", "booking__plot", "bank")
-            .prefetch_related("files")
+            .select_related("booking", "booking__dealer", "bank")
+            .prefetch_related("files","booking__plots")
         )
         return queryset
     

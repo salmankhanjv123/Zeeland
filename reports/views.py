@@ -472,7 +472,7 @@ class DealerLedgerView(APIView):
                 .first()
             )
 
-            plot_query = Plots.objects.filter(booking_details__dealer_id=dealer_id)
+            plot_query = Plots.objects.filter(booking__dealer=dealer_id)
             plot_serializer = PlotsSerializer(plot_query, many=True)
 
             total_amount = (
@@ -730,7 +730,7 @@ class CustomerLedgerView(APIView):
             .values("id", "name", "father_name", "contact", "address")
             .first()
         )
-        plot_query = Plots.objects.filter(booking_details__customer_id=customer_id)
+        plot_query = Plots.objects.filter(booking__customer_id=customer_id)
         plot_serializer = PlotsSerializer(plot_query, many=True)
         customer_messages = CustomerMessages.objects.filter(
             booking__customer_id=customer_id
@@ -1003,7 +1003,7 @@ class PlotLedgerView(APIView):
             result = []
 
             for plot_id in plot_ids:
-                bookings = Booking.objects.filter(plot_id=plot_id)
+                bookings = Booking.objects.filter(plots=plot_id)
 
                 if bookings.exists():
                     for booking in bookings:
@@ -1059,7 +1059,7 @@ class PlotLedgerView(APIView):
 
                         token_data = (
                             Token.objects.filter(
-                                plot_id=plot_id,
+                                plot=plot_id,
                                 booking=booking_id,
                                 date__gte=start_date,
                                 date__lte=end_date,
@@ -1283,7 +1283,7 @@ class PlotLedgerView(APIView):
                         result.append(response_data)
 
                 token_data_no_booking = (
-                    Token.objects.filter(plot_id=plot_id, booking__isnull=True)
+                    Token.objects.filter(plot=plot_id, booking__isnull=True)
                     .select_related("customer")
                     .values(
                         "id",
@@ -1506,10 +1506,10 @@ class IncomingPaymentsReport(APIView):
 
         booking_payments = IncomingFund.objects.filter(
             query_filters, reference="payment"
-        ).select_related("booking__customer", "booking__plot", "bank")
+        ).select_related("booking__customer", "bank").prefetch_related("booking__plots")
         token_payments = Token.objects.filter(query_filters).select_related(
-            "customer", "plot", "bank"
-        )
+            "customer", "bank"
+        ).prefetch_related("plot")
 
         booking_payments_serialized = BookingPaymentsSerializer(
             booking_payments, many=True
@@ -1565,7 +1565,7 @@ class OutgoingPaymentsReport(APIView):
 
         booking_payments = IncomingFund.objects.filter(
             query_filters, reference="refund"
-        ).select_related("booking__customer", "booking__plot", "bank")
+        ).select_related("booking__customer",  "bank").prefetch_related("booking__plots")
         expense_payments = OutgoingFund.objects.filter(query_filters).select_related(
             "bank"
         )
@@ -1635,11 +1635,11 @@ class IncomingChequeReport(APIView):
 
         booking_payments = IncomingFund.objects.filter(
             payment_filters, reference="payment", payment_type="Cheque"
-        ).select_related("booking__customer", "booking__plot", "bank")
+        ).select_related("booking__customer", "bank").prefetch_related("booking__plots")
 
         token_payments = Token.objects.filter(
             token_filters, payment_type="Cheque"
-        ).select_related("customer", "plot", "bank")
+        ).select_related("customer", "bank").prefetch_related("plot")
 
         booking_payments_serialized = BookingPaymentsSerializer(
             booking_payments, many=True
@@ -1679,7 +1679,7 @@ class OutgoingChequeReport(APIView):
 
         booking_payments = IncomingFund.objects.filter(
             payment_filters, reference="refund", payment_type="Cheque"
-        ).select_related("booking__customer", "booking__plot", "bank")
+        ).select_related("booking__customer", "bank").prefetch_related("booking__plot")
 
         outgoing_payments = OutgoingFund.objects.filter(
             expense_filters, payment_type="Cheque"

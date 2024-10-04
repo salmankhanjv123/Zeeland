@@ -65,7 +65,7 @@ class BookingForPaymentsListView(ListAPIView):
             query_filters &= Q(customer_id=customer_id)
         if dealer_id:
             query_filters &= Q(dealer_id=dealer_id)
-        queryset = Booking.objects.filter(query_filters).select_related('customer', 'plot','dealer')
+        queryset = Booking.objects.filter(query_filters).select_related('customer','dealer').prefetch_related("plots")
         return queryset
 
 
