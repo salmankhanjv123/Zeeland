@@ -115,13 +115,10 @@ class TokenViewSet(viewsets.ModelViewSet):
         return queryset
 
     def perform_destroy(self, instance):
-        # Delete all related bank transactions
         BankTransaction.objects.filter(
             related_table='token',
             related_id=instance.id
         ).delete()
-
-        # Then delete the journal entry
         instance.delete()
 
 class PlotResaleViewSet(viewsets.ModelViewSet):

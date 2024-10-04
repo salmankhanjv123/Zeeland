@@ -238,9 +238,21 @@ class TokenDocumentsSerializer(serializers.ModelSerializer):
         return validated_data
 
 
+
+class CreatePlotsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Plots
+        fields = ['id'] # or specify specific fields
+
+    def to_internal_value(self, data):
+        validated_data = super().to_internal_value(data)
+        validated_data["id"] = data.get("id")
+        return validated_data
+    
 class TokenSerializer(serializers.ModelSerializer):
     customer_info = CustomersInfoSerializer(source="customer", read_only=True)
     plot_info = PlotsSerializer(source="plot",many=True, read_only=True)
+    plot = CreatePlotsSerializer(many=True)
     bank_name = serializers.CharField(source="bank.name", read_only=True)
     files = TokenDocumentsSerializer(many=True, required=False)
 
@@ -257,9 +269,10 @@ class TokenSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         files_data = validated_data.pop("files", [])
         plots_data = validated_data.pop("plot", [])
-        
+
         token = Token.objects.create(**validated_data)
-        token.plot.set(plots_data)
+        if plots_data:
+            token.plot.set([plot['id'] for plot in plots_data]) 
         for file_data in files_data:
             TokenDocuments.objects.create(token=token, **file_data)
         return token
