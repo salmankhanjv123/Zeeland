@@ -138,6 +138,7 @@ class BookingSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         files_data = validated_data.pop("files", [])
+        plots_data = validated_data.get("plots", [])
         token = validated_data.get("token", instance.token)
         token_amount = token.amount if token else 0
         booking_date = validated_data.get("booking_date",instance.booking_date)
@@ -151,7 +152,9 @@ class BookingSerializer(serializers.ModelSerializer):
                     setattr(instance, key, value)
 
                 instance.save()
-
+                if plots_data:
+                    instance.plots.set([plot['id'] for plot in plots_data]) 
+                    
                 advance_amount = validated_data.get("advance", instance.advance)
                 advance_payment_obj = IncomingFund.objects.filter(
                     booking=instance, advance_payment=True
