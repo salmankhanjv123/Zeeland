@@ -262,8 +262,10 @@ class TokenSerializer(serializers.ModelSerializer):
         files_data = validated_data.pop("files", [])
         plots_data = validated_data.pop("plot", [])
         token = Token.objects.create(**validated_data)
+        
         if plots_data:
             token.plot.set([plot['id'] for plot in plots_data]) 
+        
         for file_data in files_data:
             TokenDocuments.objects.create(token=token, **file_data)
         return token
@@ -315,12 +317,3 @@ class PlotResaleSerializer(serializers.ModelSerializer):
     class Meta:
         model = PlotResale
         fields = "__all__"
-
-    def create(self, validated_data):
-        booking_instance = validated_data.get("booking")
-        if booking_instance:
-            booking_instance.status = "close"
-            booking_instance.plot.status = "active"
-            booking_instance.plot.save()
-            booking_instance.save()
-        return PlotResale.objects.create(**validated_data)

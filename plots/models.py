@@ -18,6 +18,7 @@ class Plots(models.Model):
     rate = models.FloatField(default=0)
     rate_marla = models.FloatField(default=0)
     total=models.FloatField(default=0)
+    cost_price=models.FloatField(default=0)
     status = models.CharField(max_length=10, default='active')
     parent_plot = models.ForeignKey('self', on_delete=models.CASCADE, blank=True, null=True, related_name='sub_plots')
 

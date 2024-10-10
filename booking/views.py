@@ -140,9 +140,11 @@ class PlotResaleViewSet(viewsets.ModelViewSet):
             try:
                 booking = Booking.objects.get(pk=booking_id)
                 booking.status = "close"
-                booking.plot.status="active"
-                booking.plot.save()
                 booking.save()
+                plots=booking.plots.all()
+                for plot in plots:
+                    plot.status="active"
+                    plot.save()
             except Booking.DoesNotExist:
                 return Response({"booking": ["Booking not found."]}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -151,9 +153,11 @@ class PlotResaleViewSet(viewsets.ModelViewSet):
     def perform_destroy(self, instance):
         booking = instance.booking
         booking.status = "active"
-        booking.plot.status = "sold"
-        booking.plot.save()
         booking.save()
+        plots=booking.plots.all()
+        for plot in plots:
+            plot.status="active"
+            plot.save()
         super().perform_destroy(instance)
 
 

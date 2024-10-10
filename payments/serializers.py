@@ -337,8 +337,10 @@ class OutgoingFundSerializer(serializers.ModelSerializer):
         # Main transaction for OutgoingFund
         is_cheque_clear=outgoing_fund.payment_type!="Cheque"
         is_deposit = outgoing_fund.bank.detail_type != "Undeposited_Funds"
+        project_id=outgoing_fund.project_id
         
         BankTransaction.objects.create(
+            project_id=project_id,
             bank=outgoing_fund.bank,
             transaction_type="Expenses",
             payment=outgoing_fund.amount,
@@ -353,6 +355,7 @@ class OutgoingFundSerializer(serializers.ModelSerializer):
         # Transactions for each detail in OutgoingFundDetails
         for detail in outgoing_fund.details.all():
             BankTransaction.objects.create(
+                project_id=project_id,
                 bank=detail.category,  # Assuming category is a Bank here
                 transaction_type="Expenses",
                 payment=0,
@@ -555,12 +558,14 @@ class BankDepositSerializer(serializers.ModelSerializer):
         date = validated_data.get("date")
         amount = validated_data.get("amount")
         bank = validated_data.get("deposit_to")
+        project=validated_data.get("project")
 
         try:
             with transaction.atomic():
                 bank_deposit = BankDeposit.objects.create(**validated_data)
 
                 BankTransaction.objects.create(
+                    project=project,
                     bank=bank,
                     transaction_date=date,
                     deposit=amount,
@@ -580,6 +585,7 @@ class BankDepositSerializer(serializers.ModelSerializer):
                     )
 
                 BankTransaction.objects.create(
+                    project=project,
                     bank=undeposit_bank,
                     transaction_date=date,
                     deposit=0,
@@ -599,6 +605,7 @@ class BankDepositSerializer(serializers.ModelSerializer):
                     if bank.main_type in ["asset", "expense"]:
                         # If it's an asset or expense, record it as a deposit
                         BankTransaction.objects.create(
+                            project=project,
                             bank=bank,
                             transaction_date=date,
                             payment=0,  # No payment
@@ -610,6 +617,7 @@ class BankDepositSerializer(serializers.ModelSerializer):
                     else:
                         # For other main types, record it as a payment
                         BankTransaction.objects.create(
+                            project=project,
                             bank=bank,
                             transaction_date=date,
                             payment=amount,  # Payment recorded
@@ -634,6 +642,7 @@ class BankDepositSerializer(serializers.ModelSerializer):
         date = validated_data.get("date", instance.date)
         amount = validated_data.get("amount", instance.amount)
         bank = validated_data.get("deposit_to", instance.deposit_to)
+        project = validated_data.get("project", instance.project)
 
         try:
             with transaction.atomic():
@@ -648,6 +657,7 @@ class BankDepositSerializer(serializers.ModelSerializer):
                 ).delete()
 
                 BankTransaction.objects.create(
+                    project=project,
                     bank=bank,
                     transaction_date=date,
                     deposit=amount,
@@ -677,6 +687,7 @@ class BankDepositSerializer(serializers.ModelSerializer):
                     )
 
                 BankTransaction.objects.create(
+                    project=project,
                     bank=undeposit_bank,
                     transaction_date=date,
                     deposit=0,
@@ -699,6 +710,7 @@ class BankDepositSerializer(serializers.ModelSerializer):
                     if bank.main_type in ["asset", "expense"]:
                         # If it's an asset or expense, record it as a deposit
                         BankTransaction.objects.create(
+                            project=project,
                             bank=bank,
                             transaction_date=date,
                             payment=0,  # No payment
@@ -710,6 +722,7 @@ class BankDepositSerializer(serializers.ModelSerializer):
                     else:
                         # For other main types, record it as a payment
                         BankTransaction.objects.create(
+                            project=project,
                             bank=bank,
                             transaction_date=date,
                             payment=amount,  # Payment recorded
@@ -842,6 +855,7 @@ class JournalEntrySerializer(serializers.ModelSerializer):
                 payment, deposit = deposit, payment
 
             BankTransaction.objects.create(
+                project_id=journal_entry.project_id,
                 bank=bank,
                 transaction_type=transaction_type,
                 payment=payment,
@@ -926,6 +940,7 @@ class BankTransferSerializer(serializers.ModelSerializer):
     def create_bank_transactions(self, bank_transfer):
         # Create transaction for transfer_from bank
         BankTransaction.objects.create(
+            project_id=bank_transfer.project_id,
             bank=bank_transfer.transfer_from,
             transaction_type="BankTransfer",
             payment=bank_transfer.amount,
@@ -937,6 +952,7 @@ class BankTransferSerializer(serializers.ModelSerializer):
         )
         # Create transaction for transfer_to bank
         BankTransaction.objects.create(
+            project_id=bank_transfer.project_id,
             bank=bank_transfer.transfer_to,
             transaction_type="BankTransfer",
             payment=0,

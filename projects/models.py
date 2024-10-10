@@ -13,6 +13,7 @@ class Projects(models.Model):
     address = models.TextField(blank=True, null=True)
     social_links = models.TextField(blank=True, null=True)
     logo = models.ImageField(upload_to='media/projects', blank=True, null=True)
+    cost_per_marla=models.FloatField(default=0)
 
     def __str__(self):
         return self.name
