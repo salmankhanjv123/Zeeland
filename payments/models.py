@@ -10,6 +10,7 @@ class Bank(models.Model):
     main_type = models.CharField(max_length=100, default="asset")
     account_type = models.CharField(max_length=100)
     detail_type = models.CharField(max_length=100)
+    used_for = models.CharField(max_length=100,blank=True, null=True)
     description = models.TextField(blank=True, null=True)
     balance = models.FloatField(default=0)
     parent_account = models.ForeignKey(
