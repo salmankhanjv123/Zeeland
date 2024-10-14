@@ -34,7 +34,7 @@ from .models import (
     DealerPayments,
     JournalEntry,
     BankTransfer,
-    ChequeClearance
+    ChequeClearance,
 )
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -56,13 +56,13 @@ class BankViewSet(viewsets.ModelViewSet):
         account_type_string = self.request.query_params.get("account_type")
         parent_account = self.request.query_params.get("parent_account")
         query_filters = Q()
-        
+
         account_type = (
             [str for str in account_type_string.split(",")]
             if account_type_string
             else None
         )
-        
+
         if project_id:
             query_filters &= Q(project_id=project_id)
         if account_type:
@@ -87,8 +87,8 @@ class BankTransactionViewSet(viewsets.ModelViewSet):
         account_type = self.request.query_params.get("account_type")
         main_type = self.request.query_params.get("main_type")
         is_deposit = self.request.query_params.get("is_deposit")
-        is_cheque_clear= self.request.query_params.get("is_cheque_clear")
-        
+        is_cheque_clear = self.request.query_params.get("is_cheque_clear")
+
         query_filters = Q()
         if project_id:
             query_filters &= Q(project_id=project_id)
@@ -129,7 +129,7 @@ class BankTransactionAPIView(APIView):
             )
 
         # Filter transactions based on bank_id and date range
-        query_filters = Q(bank_id=bank_id,project_id=project_id,is_cheque_clear=True)        
+        query_filters = Q(bank_id=bank_id, project_id=project_id, is_cheque_clear=True)
         transactions = BankTransaction.objects.filter(
             query_filters, transaction_date__range=[start_date, end_date]
         ).order_by("transaction_date", "id")
@@ -234,21 +234,22 @@ class IncomingFundViewSet(viewsets.ModelViewSet):
     def perform_destroy(self, instance):
         # Check for existing related bank transaction entries
         related_bank_transactions = BankTransaction.objects.filter(
-            related_table='incoming_funds',
+            related_table="incoming_funds",
             related_id=instance.id,
             is_deposit=True,
-            bank__detail_type="Undeposited_Funds"
+            bank__detail_type="Undeposited_Funds",
         )
         if related_bank_transactions.exists():
             raise ValidationError(
-                {"error": "Cannot delete this entry as related bank transactions exist."}
+                {
+                    "error": "Cannot delete this entry as related bank transactions exist."
+                }
             )
-        
+
         BankTransaction.objects.filter(
-            related_table='incoming_funds',
-            related_id=instance.id
+            related_table="incoming_funds", related_id=instance.id
         ).delete()
-        
+
         amount = instance.amount
         booking = instance.booking
         reference = instance.reference
@@ -275,12 +276,11 @@ class OutgoingFundViewSet(viewsets.ModelViewSet):
         if project_id:
             queryset = queryset.filter(project_id=project_id)
         return queryset
-    
+
     def perform_destroy(self, instance):
         # Delete related bank transactions before deleting the OutgoingFund instance
         BankTransaction.objects.filter(
-            related_table='OutgoingFund',
-            related_id=instance.id
+            related_table="OutgoingFund", related_id=instance.id
         ).delete()
         # Now delete the OutgoingFund instance
         instance.delete()
@@ -449,22 +449,22 @@ class BankDepositViewSet(viewsets.ModelViewSet):
 
         queryset = BankDeposit.objects.filter(query_filters).prefetch_related("files")
         return queryset
-    
+
     def perform_destroy(self, instance):
         # Delete all related bank transactions
         BankTransaction.objects.filter(
-            related_table='bank_deposits',
-            related_id=instance.id
+            related_table="bank_deposits", related_id=instance.id
         ).delete()
 
         # Update BankDepositDetail to set is_deposit=False
         for detail in instance.details.all():
-            payment=detail.payment 
-            payment.is_deposit=False
+            payment = detail.payment
+            payment.is_deposit = False
             payment.save()
 
         # Delete the BankDeposit instance
         super().perform_destroy(instance)
+
 
 class DealerPaymentsViewSet(viewsets.ModelViewSet):
     """
@@ -510,19 +510,19 @@ class DealerPaymentsViewSet(viewsets.ModelViewSet):
         queryset = (
             DealerPayments.objects.filter(query_filters)
             .select_related("booking", "booking__dealer", "bank")
-            .prefetch_related("files","booking__plots")
+            .prefetch_related("files", "booking__plots")
         )
         return queryset
-    
+
     def perform_destroy(self, instance):
         # Delete all related bank transactions
         BankTransaction.objects.filter(
-            related_table='dealer_payments',
-            related_id=instance.id
+            related_table="dealer_payments", related_id=instance.id
         ).delete()
 
         # Then delete the journal entry
         instance.delete()
+
 
 class JournalEntryViewSet(viewsets.ModelViewSet):
     """
@@ -546,16 +546,16 @@ class JournalEntryViewSet(viewsets.ModelViewSet):
 
         queryset = JournalEntry.objects.filter(query_filters).prefetch_related("files")
         return queryset
-    
+
     def perform_destroy(self, instance):
         # Delete all related bank transactions
         BankTransaction.objects.filter(
-            related_table='JournalEntry',
-            related_id=instance.id
+            related_table="JournalEntry", related_id=instance.id
         ).delete()
 
         # Then delete the journal entry
         instance.delete()
+
 
 class BankTransferViewSet(viewsets.ModelViewSet):
     """
@@ -579,16 +579,16 @@ class BankTransferViewSet(viewsets.ModelViewSet):
 
         queryset = BankTransfer.objects.filter(query_filters).prefetch_related("files")
         return queryset
-   
+
     def perform_destroy(self, instance):
         # Delete all related bank transactions
         BankTransaction.objects.filter(
-            related_table='BankTransfer',
-            related_id=instance.id
+            related_table="BankTransfer", related_id=instance.id
         ).delete()
 
         # Then delete the journal entry
         instance.delete()
+
 
 class ChequeClearanceViewSet(viewsets.ModelViewSet):
     """
@@ -608,18 +608,18 @@ class ChequeClearanceViewSet(viewsets.ModelViewSet):
             query_filters &= Q(date__gte=start_date) & Q(date__lte=end_date)
         if project_id:
             query_filters &= Q(project_id=project_id)
-        queryset = ChequeClearance.objects.filter(query_filters).prefetch_related("files")
+        queryset = ChequeClearance.objects.filter(query_filters).prefetch_related(
+            "files"
+        )
         return queryset
-    
+
     def perform_destroy(self, instance):
 
         # Update BankDepositDetail to set is_deposit=False
         for detail in instance.details.all():
-            expense=detail.expense 
-            expense.is_cheque_clear=False
+            expense = detail.expense
+            expense.is_cheque_clear = False
             expense.save()
 
         # Delete the BankDeposit instance
         super().perform_destroy(instance)
-
-
