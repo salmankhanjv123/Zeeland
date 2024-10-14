@@ -46,6 +46,9 @@ class BookingViewSet(viewsets.ModelViewSet):
         for plot in plots:
             plot.status = "active"
             plot.save()
+        BankTransaction.objects.filter(
+            related_id=instance.id
+        ).delete()
         super().perform_destroy(instance)
 
 class BookingForPaymentsListView(ListAPIView):
@@ -134,21 +137,7 @@ class PlotResaleViewSet(viewsets.ModelViewSet):
             queryset=queryset.filter(plot_id=plot_id)
         return queryset
     
-    def create(self, request, *args, **kwargs):
-        booking_id = request.data.get("booking")
-        if booking_id:
-            try:
-                booking = Booking.objects.get(pk=booking_id)
-                booking.status = "close"
-                booking.save()
-                plots=booking.plots.all()
-                for plot in plots:
-                    plot.status="active"
-                    plot.save()
-            except Booking.DoesNotExist:
-                return Response({"booking": ["Booking not found."]}, status=status.HTTP_400_BAD_REQUEST)
 
-        return super().create(request, *args, **kwargs)
 
     def perform_destroy(self, instance):
         booking = instance.booking
@@ -158,6 +147,10 @@ class PlotResaleViewSet(viewsets.ModelViewSet):
         for plot in plots:
             plot.status="active"
             plot.save()
+        BankTransaction.objects.filter(
+            related_id=instance.id
+        ).delete()
+
         super().perform_destroy(instance)
 
 

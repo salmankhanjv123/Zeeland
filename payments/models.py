@@ -28,8 +28,8 @@ class BankTransaction(models.Model):
     project = models.ForeignKey(Projects, on_delete=models.PROTECT)
     bank = models.ForeignKey(Bank, on_delete=models.CASCADE)
     transaction_type = models.CharField(max_length=50)
-    payment = models.FloatField(default=0)
-    deposit = models.FloatField(default=0)
+    payment = models.FloatField(default=0) #decrease
+    deposit = models.FloatField(default=0) #increase
     transaction_date = models.DateField()
     related_table = models.CharField(max_length=50)
     related_id = models.IntegerField()

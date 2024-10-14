@@ -230,6 +230,11 @@ class IncomingFundSerializer(serializers.ModelSerializer):
     customer = CustomersSerializer(source="booking.customer", read_only=True)
     files = IncomingFundDocumentsSerializer(many=True, required=False)
 
+    class Meta:
+        model = IncomingFund
+        fields = "__all__"
+
+
     def create(self, validated_data):
         files_data = validated_data.pop("files", [])
         reference = validated_data["reference"]
@@ -250,7 +255,54 @@ class IncomingFundSerializer(serializers.ModelSerializer):
             IncomingFundDocuments.objects.create(
                 incoming_fund=incoming_fund, **file_data
             )
+        self.create_bank_transactions(incoming_fund, validated_data)
         return incoming_fund
+
+    def create_bank_transactions(self, payment, validated_data):
+        """Create multiple bank transactions for different accounts."""
+        project = validated_data.get("project")
+        date = validated_data.get("date")
+        reference=validated_data.get("reference")
+        amount = validated_data.get("amount", 0)
+        bank = validated_data.get("bank")
+        payment_type=validated_data.get("payment_type")
+        is_deposit = bank.detail_type != "Undeposited_Funds"
+        is_cheque_clear=payment_type !="Cheque"
+
+        if reference == "refund":
+                transaction_type = "Customer_Refund"
+                payment_amount = 0
+                deposit_amount = amount
+        else:
+            transaction_type = "Customer_Payment"
+            payment_amount = amount
+            deposit_amount = 0
+        
+        account_receivable_bank = Bank.objects.filter(used_for="Account_Receivable", project=project).first()
+
+        BankTransaction.objects.create(
+            project=project,
+            bank=account_receivable_bank,
+            transaction_type=transaction_type,
+            payment=payment_amount,
+            deposit=deposit_amount,
+            transaction_date=date,
+            related_table="incoming_funds",
+            related_id=payment.id,
+        )
+        
+        BankTransaction.objects.create(
+            project=project,
+            bank=bank,
+            transaction_type=transaction_type,
+            payment=deposit_amount,
+            deposit=payment_amount,
+            transaction_date=date,
+            related_table="incoming_funds",
+            related_id=payment.id,
+            is_deposit=is_deposit,
+            is_cheque_clear=is_cheque_clear,
+        )
 
     def update(self, instance, validated_data):
         files_data = validated_data.pop("files", [])
@@ -270,10 +322,19 @@ class IncomingFundSerializer(serializers.ModelSerializer):
                 booking.save()
             else:
                 raise ValueError(f"Invalid reference type: {reference}")
-
+        self.update_bank_transactions(instance, validated_data)
         for key, value in validated_data.items():
             setattr(instance, key, value)
         instance.save()
+    
+        # Handle file updates and deletions
+        existing_files = IncomingFundDocuments.objects.filter(incoming_fund=instance)
+        updated_file_ids = {file_data.get("id") for file_data in files_data if "id" in file_data}
+
+        # Delete files that are not in t  he updated files_data
+        files_to_delete = existing_files.exclude(id__in=updated_file_ids)
+        for file in files_to_delete:
+            file.delete()
 
         for file_data in files_data:
             file_id = file_data.get("id", None)
@@ -292,9 +353,61 @@ class IncomingFundSerializer(serializers.ModelSerializer):
                 )
         return instance
 
-    class Meta:
-        model = IncomingFund
-        fields = "__all__"
+    def update_bank_transactions(self, payment, validated_data):
+        """Update bank transactions for the given payment."""
+        project = validated_data.get("project", payment.project)
+        date = validated_data.get("date", payment.date)
+        reference = validated_data.get("reference", payment.reference)
+        amount = validated_data.get("amount", payment.amount)
+        bank = validated_data.get("bank")
+        payment_type = validated_data.get("payment_type", payment.payment_type)
+        is_deposit = bank.detail_type != "Undeposited_Funds"
+        is_cheque_clear = payment_type != "Cheque"
+
+        # Determine transaction type and payment/deposit amounts
+        if reference == "refund":
+            transaction_type = "Customer_Refund"
+            payment_amount = 0
+            deposit_amount = amount
+        else:
+            transaction_type = "Customer_Payment"
+            payment_amount = amount
+            deposit_amount = 0
+
+        account_receivable_bank = Bank.objects.filter(used_for="Account_Receivable", project=project).first()
+
+
+        BankTransaction.objects.filter(
+            project=project,
+            bank=account_receivable_bank,
+            transaction_type=transaction_type,
+            related_table="incoming_funds",
+            related_id=payment.id,
+        ).update(
+            payment=payment_amount,
+            deposit=deposit_amount,
+            transaction_date=date,
+        )
+
+    
+        # Update transaction for the specified bank
+        BankTransaction.objects.filter(
+            project=project,
+            bank=payment.bank,
+            transaction_type=transaction_type,
+            related_table="incoming_funds",
+            related_id=payment.id,
+        ).update(
+            bank=bank,
+            payment=deposit_amount,
+            deposit=payment_amount,
+            transaction_date=date,
+            is_deposit=is_deposit,
+            is_cheque_clear=is_cheque_clear,
+        )
+
+
+
 
 
 class OutgoingFundDocumentsSerializer(serializers.ModelSerializer):
@@ -401,11 +514,19 @@ class OutgoingFundSerializer(serializers.ModelSerializer):
             setattr(instance, key, value)
         instance.save()
 
+        # Handle file updates and deletions
+        existing_files = OutgoingFundDocuments.objects.filter(outgoing_fund=instance)
+        updated_file_ids = {file_data.get("id") for file_data in files_data if "id" in file_data}
+
+        # Delete files that are not in t  he updated files_data
+        files_to_delete = existing_files.exclude(id__in=updated_file_ids)
+        for file in files_to_delete:
+            file.delete()
         for file_data in files_data:
             file_id = file_data.get("id", None)
             if file_id:
                 file = OutgoingFundDocuments.objects.get(
-                    id=file_id, incoming_fund=instance
+                    id=file_id, outgoing_fund=instance
                 )
                 file.description = file_data.get("description", file.description)
                 file.type = file_data.get("type", file.type)
@@ -414,7 +535,7 @@ class OutgoingFundSerializer(serializers.ModelSerializer):
                 file.save()
             else:
                 OutgoingFundDocuments.objects.create(
-                    incoming_fund=instance, **file_data
+                    outgoing_fund=instance, **file_data
                 )
 
         existing_detail_ids = set(instance.details.values_list("id", flat=True))
@@ -563,7 +684,8 @@ class BankDepositSerializer(serializers.ModelSerializer):
         try:
             with transaction.atomic():
                 bank_deposit = BankDeposit.objects.create(**validated_data)
-
+                
+                # debit in bank
                 BankTransaction.objects.create(
                     project=project,
                     bank=bank,
@@ -583,7 +705,8 @@ class BankDepositSerializer(serializers.ModelSerializer):
                     BankDepositDetail.objects.create(
                         bank_deposit=bank_deposit, **detail_data
                     )
-
+                
+                #  credit in undeposit fund
                 BankTransaction.objects.create(
                     project=project,
                     bank=undeposit_bank,
@@ -602,30 +725,17 @@ class BankDepositSerializer(serializers.ModelSerializer):
                         bank_deposit=bank_deposit, **data
                     )
                     #  expense account deposit hence increase
-                    if bank.main_type in ["asset", "expense"]:
-                        # If it's an asset or expense, record it as a deposit
-                        BankTransaction.objects.create(
-                            project=project,
-                            bank=bank,
-                            transaction_date=date,
-                            payment=0,  # No payment
-                            deposit=amount,  # Increase deposit
-                            transaction_type="deposit",
-                            related_table="bank_deposits",
-                            related_id=bank_deposit.id,
-                        )
-                    else:
-                        # For other main types, record it as a payment
-                        BankTransaction.objects.create(
-                            project=project,
-                            bank=bank,
-                            transaction_date=date,
-                            payment=amount,  # Payment recorded
-                            deposit=0,  # No deposit
-                            transaction_type="payment",
-                            related_table="bank_deposits",
-                            related_id=bank_deposit.id,
-                        )
+                    BankTransaction.objects.create(
+                        project=project,
+                        bank=bank,
+                        transaction_date=date,
+                        payment=0,  # No payment
+                        deposit=amount,  # Increase deposit
+                        transaction_type="deposit",
+                        related_table="bank_deposits",
+                        related_id=bank_deposit.id,
+                    )
+
                 for file_data in files_data:
                     BankDepositDocuments.objects.create(
                         bank_deposit=bank_deposit, **file_data
@@ -656,6 +766,7 @@ class BankDepositSerializer(serializers.ModelSerializer):
                     related_table="bank_deposits", related_id=instance.id
                 ).delete()
 
+                # debit in bank
                 BankTransaction.objects.create(
                     project=project,
                     bank=bank,
@@ -685,7 +796,7 @@ class BankDepositSerializer(serializers.ModelSerializer):
                     BankDepositDetail.objects.create(
                         bank_deposit=instance, **detail_data
                     )
-
+                # credit in cash undeposit
                 BankTransaction.objects.create(
                     project=project,
                     bank=undeposit_bank,
@@ -703,34 +814,22 @@ class BankDepositSerializer(serializers.ModelSerializer):
                 for data in transactions_data:
                     amount = abs(data.get("amount"))
                     bank = data.get("bank")
-
                     BankDepositTransactions.objects.create(
                         bank_deposit=instance, **data
                     )
-                    if bank.main_type in ["asset", "expense"]:
-                        # If it's an asset or expense, record it as a deposit
-                        BankTransaction.objects.create(
-                            project=project,
-                            bank=bank,
-                            transaction_date=date,
-                            payment=0,  # No payment
-                            deposit=amount,  # Increase deposit
-                            transaction_type="deposit",
-                            related_table="bank_deposits",
-                            related_id=instance.id,
-                        )
-                    else:
-                        # For other main types, record it as a payment
-                        BankTransaction.objects.create(
-                            project=project,
-                            bank=bank,
-                            transaction_date=date,
-                            payment=amount,  # Payment recorded
-                            deposit=0,  # No deposit
-                            transaction_type="payment",
-                            related_table="bank_deposits",
-                            related_id=instance.id,
-                        )
+
+                    # debit in expense
+                    BankTransaction.objects.create(
+                        project=project,
+                        bank=bank,
+                        transaction_date=date,
+                        payment=0,  # No payment
+                        deposit=amount,  # Increase deposit
+                        transaction_type="deposit",
+                        related_table="bank_deposits",
+                        related_id=instance.id,
+                    )
+
                 for file_data in files_data:
                     file_id = file_data.get("id", None)
                     if file_id:
@@ -788,14 +887,71 @@ class DealerPaymentsSerializer(serializers.ModelSerializer):
         payment = DealerPayments.objects.create(**validated_data)
         for file_data in files_data:
             DealerPaymentsDocuments.objects.create(payment=payment, **file_data)
+
+        self.create_bank_transactions(payment, validated_data)
         return payment
+
+    def create_bank_transactions(self, payment, validated_data):
+        """Create multiple bank transactions for different accounts."""
+        project = validated_data.get("project")
+        date = validated_data.get("date")
+        reference=validated_data.get("reference")
+        amount = validated_data.get("amount", 0)
+        bank = validated_data.get("bank")
+        payment_type=validated_data.get("payment_type")
+        is_deposit = bank.detail_type != "Undeposited_Funds"
+        is_cheque_clear=payment_type !="Cheque"
+
+        if reference == "refund":
+                transaction_type = "Dealer_Refund"
+                payment_amount = 0
+                deposit_amount = amount
+        else:
+            transaction_type = "Dealer_Payment"
+            payment_amount = amount
+            deposit_amount = 0
+        
+        account_payable_bank = Bank.objects.filter(used_for="Account_Payable", project=project).first()
+
+        BankTransaction.objects.create(
+            project=project,
+            bank=account_payable_bank,
+            transaction_type=transaction_type,
+            payment=payment_amount,
+            deposit=deposit_amount,
+            transaction_date=date,
+            related_table="dealer_payments",
+            related_id=payment.id,
+        )
+        
+        BankTransaction.objects.create(
+            project=project,
+            bank=bank,
+            transaction_type=transaction_type,
+            payment=payment_amount,
+            deposit=deposit_amount,
+            transaction_date=date,
+            related_table="dealer_payments",
+            related_id=payment.id,
+            is_deposit=is_deposit,
+            is_cheque_clear=is_cheque_clear,
+        )
 
     def update(self, instance, validated_data):
         files_data = validated_data.pop("files", [])
-
+        self.update_bank_transactions(instance, validated_data)
         for key, value in validated_data.items():
             setattr(instance, key, value)
         instance.save()
+
+        # Handle file updates and deletions
+        existing_files = DealerPaymentsDocuments.objects.filter(payment=instance)
+        updated_file_ids = {file_data.get("id") for file_data in files_data if "id" in file_data}
+
+        # Delete files that are not in the updated files_data
+        files_to_delete = existing_files.exclude(id__in=updated_file_ids)
+        for file in files_to_delete:
+            file.delete()
 
         for file_data in files_data:
             file_id = file_data.get("id", None)
@@ -808,7 +964,63 @@ class DealerPaymentsSerializer(serializers.ModelSerializer):
                 file.save()
             else:
                 DealerPaymentsDocuments.objects.create(payment=instance, **file_data)
+        
         return instance
+
+    def update_bank_transactions(self, payment, validated_data):
+        """Update bank transactions for the given payment."""
+        project = validated_data.get("project", payment.project)
+        date = validated_data.get("date", payment.date)
+        reference = validated_data.get("reference", payment.reference)
+        amount = validated_data.get("amount", payment.amount)
+        bank = validated_data.get("bank")
+        payment_type = validated_data.get("payment_type", payment.payment_type)
+        is_deposit = bank.detail_type != "Undeposited_Funds"
+        is_cheque_clear = payment_type != "Cheque"
+
+        # Determine transaction type and payment/deposit amounts
+        if reference == "refund":
+            transaction_type = "Dealer_Refund"
+            payment_amount = 0
+            deposit_amount = amount
+        else:
+            transaction_type = "Dealer_Payment"
+            payment_amount = amount
+            deposit_amount = 0
+
+        account_payable_bank = Bank.objects.filter(used_for="Account_Payable", project=project).first()
+
+
+        BankTransaction.objects.filter(
+            project=project,
+            bank=account_payable_bank,
+            transaction_type=transaction_type,
+            related_table="dealer_payments",
+            related_id=payment.id,
+        ).update(
+            payment=payment_amount,
+            deposit=deposit_amount,
+            transaction_date=date,
+        )
+
+    
+        # Update transaction for the specified bank
+        BankTransaction.objects.filter(
+            project=project,
+            bank=payment.bank,
+            transaction_type=transaction_type,
+            related_table="dealer_payments",
+            related_id=payment.id,
+        ).update(
+            bank=bank,
+            payment=payment_amount,
+            deposit=deposit_amount,
+            transaction_date=date,
+            is_deposit=is_deposit,
+            is_cheque_clear=is_cheque_clear,
+        )
+        print("here")
+
 
 
 class JournalEntryDocumentsSerializer(serializers.ModelSerializer):
