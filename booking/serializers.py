@@ -73,50 +73,54 @@ class BookingSerializer(serializers.ModelSerializer):
         ).date()
 
         try:
-            latest_booking = Booking.objects.filter(project=project).latest(
-                "created_at"
-            )
-            latest_booking_number = int(latest_booking.booking_id.split("-")[1]) + 1
-        except Booking.DoesNotExist:
-            latest_booking_number = 1
+            with transaction.atomic():
+                try:
+                    latest_booking = Booking.objects.filter(project=project).latest(
+                        "created_at"
+                    )
+                    latest_booking_number = int(latest_booking.booking_id.split("-")[1]) + 1
+                except Booking.DoesNotExist:
+                    latest_booking_number = 1
 
-        booking_id_str = f"{project.id}-{str(latest_booking_number).zfill(3)}"
-        validated_data["booking_id"] = booking_id_str
-        token_amount = token.amount if token else 0
-        validated_data["total_receiving_amount"] = advance_amount + token_amount
+                booking_id_str = f"{project.id}-{str(latest_booking_number).zfill(3)}"
+                validated_data["booking_id"] = booking_id_str
+                token_amount = token.amount if token else 0
+                validated_data["total_receiving_amount"] = advance_amount + token_amount
 
-        if token:
-            token.status = "accepted"
-            token.save()
+                if token:
+                    token.status = "accepted"
+                    token.save()
 
-        booking = Booking.objects.create(**validated_data)
+                booking = Booking.objects.create(**validated_data)
 
-        if plots_data:
-            booking.plots.set([plot["id"] for plot in plots_data])
-            for plot_data in plots_data:
-                plot_id = plot_data["id"]
-                plot = Plots.objects.get(id=plot_id)
-                plot.status = "sold"
-                plot.save()
+                if plots_data:
+                    booking.plots.set([plot["id"] for plot in plots_data])
+                    for plot_data in plots_data:
+                        plot_id = plot_data["id"]
+                        plot = Plots.objects.get(id=plot_id)
+                        plot.status = "sold"
+                        plot.save()
 
-        for file_data in files_data:
-            BookingDocuments.objects.create(booking=booking, **file_data)
+                for file_data in files_data:
+                    BookingDocuments.objects.create(booking=booking, **file_data)
 
-        if advance_amount > 0:
-            IncomingFund.objects.create(
-                project=project,
-                booking=booking,
-                date=booking_date,
-                installement_month=installement_month,
-                amount=advance_amount,
-                remarks="advance",
-                advance_payment=True,
-                bank=validated_data.get("bank"),
-                payment_type=validated_data.get("payment_type"),
-                cheque_number=validated_data.get("cheque_number"),
-            )
-        self.create_bank_transactions(booking, validated_data)
-        return booking
+                if advance_amount > 0:
+                    IncomingFund.objects.create(
+                        project=project,
+                        booking=booking,
+                        date=booking_date,
+                        installement_month=installement_month,
+                        amount=advance_amount,
+                        remarks="advance",
+                        advance_payment=True,
+                        bank=validated_data.get("bank"),
+                        payment_type=validated_data.get("payment_type"),
+                        cheque_number=validated_data.get("cheque_number"),
+                    )
+                self.create_bank_transactions(booking, validated_data)
+                return booking
+        except Exception as e:
+            raise serializers.ValidationError(f"Error creating booking: {e}")
 
     def create_bank_transactions(self, booking, validated_data):
         """Create multiple bank transactions for different accounts."""
@@ -531,7 +535,8 @@ class TokenSerializer(serializers.ModelSerializer):
     class Meta:
         model = Token
         fields = "__all__"
-
+    
+    @transaction.atomic
     def create(self, validated_data):
         files_data = validated_data.pop("files", [])
         plots_data = validated_data.pop("plot", [])
@@ -583,6 +588,7 @@ class TokenSerializer(serializers.ModelSerializer):
             is_cheque_clear=is_cheque_clear,
         )
 
+    @transaction.atomic
     def update(self, instance, validated_data):
         files_data = validated_data.pop("files", [])
         plots_data = validated_data.pop("plot", [])
@@ -679,6 +685,7 @@ class PlotResaleSerializer(serializers.ModelSerializer):
         model = PlotResale
         fields = "__all__"
 
+    @transaction.atomic
     def create(self, validated_data):
         booking = validated_data.get("booking")
         booking.status = "close"
@@ -812,6 +819,7 @@ class PlotResaleSerializer(serializers.ModelSerializer):
                 related_id=plot_resale.id,
             )
 
+    @transaction.atomic
     def update(self, instance, validated_data):
         self.update_bank_transactions(instance, validated_data)
         for key, value in validated_data.items():

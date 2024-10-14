@@ -234,6 +234,7 @@ class IncomingFundSerializer(serializers.ModelSerializer):
         model = IncomingFund
         fields = "__all__"
 
+    @transaction.atomic
     def create(self, validated_data):
         files_data = validated_data.pop("files", [])
         reference = validated_data["reference"]
@@ -305,6 +306,7 @@ class IncomingFundSerializer(serializers.ModelSerializer):
             is_cheque_clear=is_cheque_clear,
         )
 
+    @transaction.atomic
     def update(self, instance, validated_data):
         files_data = validated_data.pop("files", [])
         reference = validated_data.get("reference", instance.reference)
@@ -484,6 +486,7 @@ class OutgoingFundSerializer(serializers.ModelSerializer):
             related_table="OutgoingFund", related_id=outgoing_fund.id
         ).delete()
 
+    @transaction.atomic
     def create(self, validated_data):
         files_data = validated_data.pop("files", [])
         detail_data = validated_data.pop("details", [])
@@ -502,6 +505,7 @@ class OutgoingFundSerializer(serializers.ModelSerializer):
 
         return outgoing_fund
 
+    @transaction.atomic
     def update(self, instance, validated_data):
         files_data = validated_data.pop("files", [])
         detail_data = validated_data.pop("details", [])
@@ -883,6 +887,7 @@ class DealerPaymentsSerializer(serializers.ModelSerializer):
         model = DealerPayments
         fields = "__all__"
 
+    @transaction.atomic
     def create(self, validated_data):
         files_data = validated_data.pop("files", [])
         payment = DealerPayments.objects.create(**validated_data)
@@ -940,6 +945,7 @@ class DealerPaymentsSerializer(serializers.ModelSerializer):
             is_cheque_clear=is_cheque_clear,
         )
 
+    @transaction.atomic
     def update(self, instance, validated_data):
         files_data = validated_data.pop("files", [])
         self.update_bank_transactions(instance, validated_data)
@@ -1024,7 +1030,6 @@ class DealerPaymentsSerializer(serializers.ModelSerializer):
             is_deposit=is_deposit,
             is_cheque_clear=is_cheque_clear,
         )
-        print("here")
 
 
 class JournalEntryDocumentsSerializer(serializers.ModelSerializer):
@@ -1087,6 +1092,7 @@ class JournalEntrySerializer(serializers.ModelSerializer):
             related_table="JournalEntry", related_id=journal_entry.id
         ).delete()
 
+    @transaction.atomic
     def create(self, validated_data):
         details_data = validated_data.pop("details")
         files_data = validated_data.pop("files", [])
@@ -1106,6 +1112,7 @@ class JournalEntrySerializer(serializers.ModelSerializer):
 
         return journal_entry
 
+    @transaction.atomic
     def update(self, instance, validated_data):
         details_data = validated_data.pop("details")
         files_data = validated_data.pop("files", [])
@@ -1184,6 +1191,7 @@ class BankTransferSerializer(serializers.ModelSerializer):
             related_table="BankTransfer", related_id=bank_transfer.id
         ).delete()
 
+    @transaction.atomic
     def create(self, validated_data):
         files_data = validated_data.pop("files", [])
 
@@ -1198,6 +1206,7 @@ class BankTransferSerializer(serializers.ModelSerializer):
 
         return bank_transfer
 
+    @transaction.atomic
     def update(self, instance, validated_data):
         files_data = validated_data.pop("files", [])
 
@@ -1258,6 +1267,7 @@ class ChequeClearanceSerializer(serializers.ModelSerializer):
         model = ChequeClearance
         fields = "__all__"
 
+    
     def create(self, validated_data):
         files_data = validated_data.pop("files", [])
         details_data = validated_data.pop("details", [])
