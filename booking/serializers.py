@@ -822,7 +822,7 @@ class PlotResaleSerializer(serializers.ModelSerializer):
     def update_bank_transactions(self, plot_resale, validated_data):
         """Update bank transactions for different accounts when a booking is updated."""
         project = plot_resale.booking.project
-        booking_date = validated_data.get("booking_date", plot_resale.booking_date)
+        booking_date = validated_data.get("date", plot_resale.date)
         remaining = validated_data.get("remaining", plot_resale.remaining)
         company_amount_paid = validated_data.get(
             "company_amount_paid", plot_resale.company_amount_paid
@@ -830,8 +830,8 @@ class PlotResaleSerializer(serializers.ModelSerializer):
         amount_received = validated_data.get(
             "amount_received", plot_resale.amount_received
         )
-        plot_cost = sum(plot.cost_price for plot in plot_resale.plots.all())
-        booking_amount = validated_data.get("total_amount", plot_resale.total_amount)
+        plot_cost = sum(plot.cost_price for plot in plot_resale.booking.plots.all())
+        booking_amount = validated_data.get("total_amount", plot_resale.booking.total_amount)
 
         # Handle extra refund logic
         if company_amount_paid > amount_received:
