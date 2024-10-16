@@ -19,6 +19,7 @@ class Customers(models.Model):
         Department, on_delete=models.PROTECT, blank=True, null=True
     )
     reference = models.CharField(max_length=15, default="customer")
+    designation = models.CharField(max_length=50, blank=True, null=True)
     name = models.CharField(max_length=30)
     father_name = models.CharField(max_length=30, blank=True, null=True)
     contact = models.CharField(max_length=40)
@@ -28,6 +29,7 @@ class Customers(models.Model):
     gender = models.BooleanField(default=True)
     remarks = models.TextField(blank=True, null=True)
     joining_date = models.DateField(blank=True, null=True)
+
 
     def __str__(self):
         return self.name
