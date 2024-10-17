@@ -35,7 +35,6 @@ class CustomersViewSet(viewsets.ModelViewSet):
             if reference_string
             else []
         )
-        print(reference)
         if project_id:
             queryset = queryset.filter(project_id=project_id)
         if department_id:

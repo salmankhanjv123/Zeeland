@@ -95,11 +95,11 @@ class BookingSerializer(serializers.ModelSerializer):
 
                 if plots_data:
                     booking.plots.set([plot["id"] for plot in plots_data])
-                    for plot_data in plots_data:
-                        plot_id = plot_data["id"]
-                        plot = Plots.objects.get(id=plot_id)
-                        plot.status = "sold"
-                        plot.save()
+                    # for plot_data in plots_data:
+                    #     plot_id = plot_data["id"]
+                    #     plot = Plots.objects.get(id=plot_id)
+                    #     plot.status = "sold"
+                    #     plot.save()
 
                 for file_data in files_data:
                     BookingDocuments.objects.create(booking=booking, **file_data)
@@ -269,10 +269,10 @@ class BookingSerializer(serializers.ModelSerializer):
         try:
             with transaction.atomic():
                 self.update_bank_transactions(instance, validated_data)
-                if instance.plots.exists():
-                    for existing_plot in instance.plots.all():
-                        existing_plot.status = "active"
-                        existing_plot.save()
+                # if instance.plots.exists():
+                #     for existing_plot in instance.plots.all():
+                #         existing_plot.status = "active"
+                #         existing_plot.save()
 
                 for key, value in validated_data.items():
                     setattr(instance, key, value)
@@ -280,11 +280,11 @@ class BookingSerializer(serializers.ModelSerializer):
 
                 if plots_data:
                     instance.plots.set([plot["id"] for plot in plots_data])
-                    for plot_data in plots_data:
-                        plot_id = plot_data["id"]
-                        plot = Plots.objects.get(id=plot_id)
-                        plot.status = "sold"
-                        plot.save()
+                    # for plot_data in plots_data:
+                    #     plot_id = plot_data["id"]
+                    #     plot = Plots.objects.get(id=plot_id)
+                    #     plot.status = "sold"
+                    #     plot.save()
 
                 advance_amount = validated_data.get("advance", instance.advance)
                 advance_payment_obj = IncomingFund.objects.filter(
