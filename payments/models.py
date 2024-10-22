@@ -195,6 +195,7 @@ class BankDepositTransactions(models.Model):
     bank_deposit = models.ForeignKey(
         BankDeposit, related_name="transactions", on_delete=models.CASCADE
     )
+    date = models.DateField()
     customer = models.ForeignKey(
         Customers, on_delete=models.PROTECT, blank=True, null=True
     )

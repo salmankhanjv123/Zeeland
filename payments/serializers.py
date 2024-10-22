@@ -726,6 +726,7 @@ class BankDepositSerializer(serializers.ModelSerializer):
                 for data in transactions_data:
                     amount = abs(data.get("amount"))
                     bank = data.get("bank")
+                    date=data.get("date")
                     BankDepositTransactions.objects.create(
                         bank_deposit=bank_deposit, **data
                     )
@@ -819,6 +820,7 @@ class BankDepositSerializer(serializers.ModelSerializer):
                 for data in transactions_data:
                     amount = abs(data.get("amount"))
                     bank = data.get("bank")
+                    date=data.get("date")
                     BankDepositTransactions.objects.create(
                         bank_deposit=instance, **data
                     )
