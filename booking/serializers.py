@@ -373,7 +373,7 @@ class BookingSerializer(serializers.ModelSerializer):
         payment_type = validated_data.get("payment_type", booking.payment_type)
         is_deposit = advance_bank.detail_type != "Undeposited_Funds"
         is_cheque_clear = payment_type != "Cheque"
-
+        print(is_cheque_clear)
         # Account receivable (Debit)
         account_receivable_bank = Bank.objects.filter(
             used_for="Account_Receivable", project=project

@@ -32,6 +32,7 @@ from .models import (
 )
 import datetime
 from django.db import transaction
+from django.db.models import Sum
 from rest_framework.exceptions import ValidationError
 
 
@@ -69,6 +70,12 @@ class BankTransactionSerializer(serializers.ModelSerializer):
                 return related_instance.booking.customer.name
             except IncomingFund.DoesNotExist:
                 return None
+        elif obj.related_table == "Booking":
+            try:
+                related_instance = Booking.objects.get(pk=obj.related_id)
+                return related_instance.customer.name
+            except Booking.DoesNotExist:
+                return None
         elif obj.related_table == "token":
             try:
                 related_instance = Token.objects.get(pk=obj.related_id)
@@ -101,6 +108,17 @@ class BankTransactionSerializer(serializers.ModelSerializer):
                 return plot_info
             except IncomingFund.DoesNotExist:
                 return None
+        elif obj.related_table == "Booking":
+            try:
+                related_instance = Booking.objects.get(pk=obj.related_id)
+                plots = related_instance.plots.all()
+                plot_info = [
+                    f"{plot.plot_number} || {plot.get_type_display()} || {plot.get_plot_size()}"
+                    for plot in plots
+                ]
+                return plot_info
+            except Booking.DoesNotExist:
+                return None
         elif obj.related_table == "token":
             try:
                 related_instance = Token.objects.get(pk=obj.related_id)
@@ -131,6 +149,12 @@ class BankTransactionSerializer(serializers.ModelSerializer):
                 related_instance = IncomingFund.objects.get(pk=obj.related_id)
                 return related_instance.cheque_number
             except IncomingFund.DoesNotExist:
+                return None
+        elif obj.related_table == "Booking":
+            try:
+                related_instance = Booking.objects.get(pk=obj.related_id)
+                return related_instance.cheque_number
+            except Booking.DoesNotExist:
                 return None
         elif obj.related_table == "token":
             try:
@@ -675,7 +699,8 @@ class BankDepositSerializer(serializers.ModelSerializer):
     class Meta:
         model = BankDeposit
         fields = "__all__"
-
+    
+    @transaction.atomic
     def create(self, validated_data):
         files_data = validated_data.pop("files", [])
         details_data = validated_data.pop("details", [])
@@ -687,69 +712,69 @@ class BankDepositSerializer(serializers.ModelSerializer):
         project = validated_data.get("project")
 
         try:
-            with transaction.atomic():
-                bank_deposit = BankDeposit.objects.create(**validated_data)
+            bank_deposit = BankDeposit.objects.create(**validated_data)
 
-                # debit in bank
+            # debit in bank
+            BankTransaction.objects.create(
+                project=project,
+                bank=bank,
+                transaction_date=date,
+                deposit=amount,
+                payment=0,
+                transaction_type="deposit",
+                related_table="bank_deposits",
+                related_id=bank_deposit.id,
+            )
+
+            for detail_data in details_data:
+                payment = detail_data.get("payment")
+                undeposit_bank = payment.bank
+                payment.is_deposit = True
+                payment.save()
+                BankDepositDetail.objects.create(
+                    bank_deposit=bank_deposit, **detail_data
+                )
+
+            #  credit in undeposit fund
+            BankTransaction.objects.create(
+                project=project,
+                bank=undeposit_bank,
+                transaction_date=date,
+                deposit=0,
+                payment=amount,
+                transaction_type="deposit",
+                related_table="bank_deposits",
+                related_id=bank_deposit.id,
+            )
+
+            for data in transactions_data:
+                amount = abs(data.get("amount"))
+                bank = data.get("bank")
+                date=data.get("date")
+                BankDepositTransactions.objects.create(
+                    bank_deposit=bank_deposit, **data
+                )
+                #  expense account deposit hence increase
                 BankTransaction.objects.create(
                     project=project,
                     bank=bank,
                     transaction_date=date,
-                    deposit=amount,
-                    payment=0,
+                    payment=0,  # No payment
+                    deposit=amount,  # Increase deposit
                     transaction_type="deposit",
                     related_table="bank_deposits",
                     related_id=bank_deposit.id,
                 )
 
-                for detail_data in details_data:
-                    payment = detail_data.get("payment")
-                    undeposit_bank = payment.bank
-                    payment.is_deposit = True
-                    payment.save()
-                    BankDepositDetail.objects.create(
-                        bank_deposit=bank_deposit, **detail_data
-                    )
-
-                #  credit in undeposit fund
-                BankTransaction.objects.create(
-                    project=project,
-                    bank=undeposit_bank,
-                    transaction_date=date,
-                    deposit=0,
-                    payment=amount,
-                    transaction_type="deposit",
-                    related_table="bank_deposits",
-                    related_id=bank_deposit.id,
+            for file_data in files_data:
+                BankDepositDocuments.objects.create(
+                    bank_deposit=bank_deposit, **file_data
                 )
-
-                for data in transactions_data:
-                    amount = abs(data.get("amount"))
-                    bank = data.get("bank")
-                    date=data.get("date")
-                    BankDepositTransactions.objects.create(
-                        bank_deposit=bank_deposit, **data
-                    )
-                    #  expense account deposit hence increase
-                    BankTransaction.objects.create(
-                        project=project,
-                        bank=bank,
-                        transaction_date=date,
-                        payment=0,  # No payment
-                        deposit=amount,  # Increase deposit
-                        transaction_type="deposit",
-                        related_table="bank_deposits",
-                        related_id=bank_deposit.id,
-                    )
-
-                for file_data in files_data:
-                    BankDepositDocuments.objects.create(
-                        bank_deposit=bank_deposit, **file_data
-                    )
-                return bank_deposit
+            return bank_deposit
         except Exception as e:
             raise ValidationError({"error": str(e)})
 
+    @transaction.atomic
     def update(self, instance, validated_data):
         files_data = validated_data.pop("files", [])
         details_data = validated_data.pop("details", [])
@@ -761,100 +786,100 @@ class BankDepositSerializer(serializers.ModelSerializer):
         project = validated_data.get("project", instance.project)
 
         try:
-            with transaction.atomic():
-                instance.date = date
-                instance.amount = amount
-                instance.deposit_to = bank
-                instance.save()
 
-                # remove related all BankTransaction
-                BankTransaction.objects.filter(
-                    related_table="bank_deposits", related_id=instance.id
-                ).delete()
+            instance.date = date
+            instance.amount = amount
+            instance.deposit_to = bank
+            instance.save()
 
-                # debit in bank
+            # remove related all BankTransaction
+            BankTransaction.objects.filter(
+                related_table="bank_deposits", related_id=instance.id
+            ).delete()
+
+            # debit in bank
+            BankTransaction.objects.create(
+                project=project,
+                bank=bank,
+                transaction_date=date,
+                deposit=amount,
+                payment=0,
+                transaction_type="deposit",
+                related_table="bank_deposits",
+                related_id=instance.id,
+            )
+
+            # Update or create BankDepositDetails
+            previous_detail_entries = BankDepositDetail.objects.filter(
+                bank_deposit=instance
+            )
+            for detail in previous_detail_entries:
+                transaction_entry = detail.payment
+                transaction_entry.is_deposit = False
+                transaction_entry.save()
+                detail.delete()
+
+            for detail_data in details_data:
+                payment = detail_data.get("payment")
+                undeposit_bank = payment.bank
+                payment.is_deposit = True
+                payment.save()
+                BankDepositDetail.objects.create(
+                    bank_deposit=instance, **detail_data
+                )
+            # credit in cash undeposit
+            BankTransaction.objects.create(
+                project=project,
+                bank=undeposit_bank,
+                transaction_date=date,
+                deposit=0,
+                payment=amount,
+                transaction_type="deposit",
+                related_table="bank_deposits",
+                related_id=instance.id,
+            )
+
+            # Update or create BankDepositTransactions
+            BankDepositTransactions.objects.filter(bank_deposit=instance).delete()
+
+            for data in transactions_data:
+                amount = abs(data.get("amount"))
+                bank = data.get("bank")
+                date=data.get("date")
+                BankDepositTransactions.objects.create(
+                    bank_deposit=instance, **data
+                )
+
+                # debit in expense
                 BankTransaction.objects.create(
                     project=project,
                     bank=bank,
                     transaction_date=date,
-                    deposit=amount,
-                    payment=0,
+                    payment=0,  # No payment
+                    deposit=amount,  # Increase deposit
                     transaction_type="deposit",
                     related_table="bank_deposits",
                     related_id=instance.id,
                 )
 
-                # Update or create BankDepositDetails
-                previous_detail_entries = BankDepositDetail.objects.filter(
-                    bank_deposit=instance
-                )
-                for detail in previous_detail_entries:
-                    transaction_entry = detail.payment
-                    transaction_entry.is_deposit = False
-                    transaction_entry.save()
-                    detail.delete()
-
-                for detail_data in details_data:
-                    payment = detail_data.get("payment")
-                    undeposit_bank = payment.bank
-                    payment.is_deposit = True
-                    payment.save()
-                    BankDepositDetail.objects.create(
-                        bank_deposit=instance, **detail_data
+            for file_data in files_data:
+                file_id = file_data.get("id", None)
+                if file_id:
+                    file = BankDepositDocuments.objects.get(
+                        id=file_id, bank_deposit=instance
                     )
-                # credit in cash undeposit
-                BankTransaction.objects.create(
-                    project=project,
-                    bank=undeposit_bank,
-                    transaction_date=date,
-                    deposit=0,
-                    payment=amount,
-                    transaction_type="deposit",
-                    related_table="bank_deposits",
-                    related_id=instance.id,
-                )
-
-                # Update or create BankDepositTransactions
-                BankDepositTransactions.objects.filter(bank_deposit=instance).delete()
-
-                for data in transactions_data:
-                    amount = abs(data.get("amount"))
-                    bank = data.get("bank")
-                    date=data.get("date")
-                    BankDepositTransactions.objects.create(
-                        bank_deposit=instance, **data
+                    file.description = file_data.get(
+                        "description", file.description
                     )
-
-                    # debit in expense
-                    BankTransaction.objects.create(
-                        project=project,
-                        bank=bank,
-                        transaction_date=date,
-                        payment=0,  # No payment
-                        deposit=amount,  # Increase deposit
-                        transaction_type="deposit",
-                        related_table="bank_deposits",
-                        related_id=instance.id,
+                    file.type = file_data.get("type", file.type)
+                    if "file" in file_data:
+                        file.file = file_data.get("file", file.file)
+                    file.save()
+                else:
+                    BankDepositDocuments.objects.create(
+                        bank_deposit=instance, **file_data
                     )
-
-                for file_data in files_data:
-                    file_id = file_data.get("id", None)
-                    if file_id:
-                        file = BankDepositDocuments.objects.get(
-                            id=file_id, bank_deposit=instance
-                        )
-                        file.description = file_data.get(
-                            "description", file.description
-                        )
-                        file.type = file_data.get("type", file.type)
-                        if "file" in file_data:
-                            file.file = file_data.get("file", file.file)
-                        file.save()
-                    else:
-                        BankDepositDocuments.objects.create(
-                            bank_deposit=instance, **file_data
-                        )
-                return instance
+            return instance
 
         except Exception as e:
             raise ValidationError({"error": str(e)})
@@ -1062,11 +1087,15 @@ class JournalEntryLineSerializer(serializers.ModelSerializer):
 class JournalEntrySerializer(serializers.ModelSerializer):
     details = JournalEntryLineSerializer(many=True)
     files = JournalEntryDocumentsSerializer(many=True, required=False)
-
+    amount=serializers.SerializerMethodField(read_only=True)
     class Meta:
         model = JournalEntry
         fields = "__all__"
 
+
+    def get_amount(self, obj):
+        return obj.details.aggregate(total_credit=Sum('credit'))['total_credit'] or 0
+    
     def create_bank_transactions(self, journal_entry, transaction_type):
         for detail in journal_entry.details.all():
             bank = detail.account
@@ -1264,11 +1293,17 @@ class ChequeClearanceDetailSerializer(serializers.ModelSerializer):
 class ChequeClearanceSerializer(serializers.ModelSerializer):
     files = ChequeClearanceDocumentsSerializer(many=True, required=False)
     details = ChequeClearanceDetailSerializer(many=True)
+    amount=serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = ChequeClearance
         fields = "__all__"
 
+    def get_amount(self, obj):
+        return (
+            obj.details.aggregate(total_credit=Sum('expense__payment'))['total_credit']
+            or 0
+        )
     
     def create(self, validated_data):
         files_data = validated_data.pop("files", [])

@@ -1388,7 +1388,8 @@ class PlotLedgerView(APIView):
 class BalanceSheetView(APIView):
 
     def get(self, request):
-        banks = Bank.objects.all()
+        banks = Bank.objects.filter(main_type__in=["Asset","Liabilities","Equity"])
+        
         main_type_dict = defaultdict(
             lambda: {
                 "total": 0,

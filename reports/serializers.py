@@ -35,6 +35,7 @@ class IncomingFundReportSerializer(serializers.ModelSerializer):
 class OutgoingFundReportSerializer(serializers.ModelSerializer):
     bank_name = serializers.CharField(source="bank.name", read_only=True)
     reference=serializers.SerializerMethodField(read_only=True)
+    customer_name=serializers.CharField(source="payee.name", read_only=True)
 
     def get_reference(self, instance):
         return "expense"

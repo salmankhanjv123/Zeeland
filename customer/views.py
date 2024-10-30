@@ -76,6 +76,8 @@ class CustomerMessagesListCreateView(generics.ListCreateAPIView):
         project_id = self.request.query_params.get("project")
         booking_id = self.request.query_params.get("booking_id")
         user_id = self.request.query_params.get("user_id")
+        start_date = self.request.query_params.get("start_date")
+        end_date = self.request.query_params.get("end_date")
 
         query_filters = Q()
         if project_id:
@@ -84,6 +86,8 @@ class CustomerMessagesListCreateView(generics.ListCreateAPIView):
             query_filters &= Q(user_id=user_id)
         if booking_id:
             query_filters &= Q(booking_id=booking_id)
+        if start_date and end_date:
+            query_filters &= Q(date__gte=start_date) & Q(date__lte=end_date)
         # Add filter for booking not null
         query_filters &= Q(booking__isnull=False)
         queryset = (

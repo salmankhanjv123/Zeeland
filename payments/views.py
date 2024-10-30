@@ -1,5 +1,5 @@
 from django.db.models import Max
-from django.db.models import Q, Sum
+from django.db.models import Q, Sum,Prefetch
 from django.shortcuts import get_object_or_404
 import datetime
 from decimal import Decimal
@@ -31,6 +31,9 @@ from .models import (
     Bank,
     BankTransaction,
     BankDeposit,
+    BankDepositDetail,
+    BankDepositTransactions,
+    BankDepositDocuments,
     DealerPayments,
     JournalEntry,
     BankTransfer,
@@ -346,80 +349,60 @@ class PaymentReminderViewSet(viewsets.ModelViewSet):
         return queryset
 
 
-def get_plot_info(instance):
-    plot_number = instance.plot.plot_number
-    plot_size = instance.plot.get_plot_size()
-    plot_type = instance.plot.get_type_display()
-    return f"{plot_number} || {plot_type} || {plot_size}"
-
+def get_plot_info(booking):
+    return [
+        f"{plot.plot_number} || {plot.get_type_display()} || {plot.get_plot_size()}"
+        for plot in booking.plots.all()
+    ]
 
 class DuePaymentsView(APIView):
     def get(self, request):
-        project = request.query_params.get("project")
-        today = date.today().day
-        current_month = datetime.date.today().replace(day=1)
+        project_id = request.query_params.get("project")
+        today_day = date.today().day
+        current_month = date.today().replace(day=1)
+
+        # Filter active bookings
         active_bookings = Booking.objects.filter(
             status="active", booking_type="installment_payment"
         )
+        
+        if project_id:
+            active_bookings = active_bookings.filter(project_id=project_id)
 
-        if project:
-            active_bookings = active_bookings.filter(project_id=project)
-        defaulter_bookings = []
+        due_payments = []
 
-        for booking in active_bookings:
+        for booking in active_bookings.prefetch_related('customer', 'plots'):
+            # Get the latest installment month
             latest_payment = IncomingFund.objects.filter(booking=booking).aggregate(
                 latest_installement_month=Max("installement_month")
             )
-            latest = IncomingFund.objects.filter(booking=booking)
+
+            latest_payment_obj = None
             if latest_payment["latest_installement_month"]:
                 latest_payment_obj = IncomingFund.objects.filter(
                     booking=booking,
                     installement_month=latest_payment["latest_installement_month"],
                 ).first()
-                if (
-                    latest_payment_obj.installement_month != current_month
-                    and latest_payment_obj.booking.installment_date < today
-                ):
-                    # Calculate the difference in months
-                    month_diff = (
-                        current_month.year - latest_payment_obj.installement_month.year
-                    ) * 12 + (
-                        current_month.month
-                        - latest_payment_obj.installement_month.month
-                    )
 
-                    # Append the booking object along with the month difference
-                    defaulter_bookings.append(
-                        {"booking": booking, "month_difference": month_diff}
-                    )
+            # Determine month difference
+            if latest_payment_obj and latest_payment_obj.installement_month != current_month and latest_payment_obj.booking.installment_date < today_day:
+                month_diff = (current_month.year - latest_payment_obj.installement_month.year) * 12 + (current_month.month - latest_payment_obj.installement_month.month)
             else:
-                # If no payments found, add the booking to defaulter_bookings
-                month_diff = (current_month.year - booking.booking_date.year) * 12 + (
-                    current_month.month - booking.booking_date.month
-                )
+                month_diff = (current_month.year - booking.booking_date.year) * 12 + (current_month.month - booking.booking_date.month)
 
-                defaulter_bookings.append(
-                    {"booking": booking, "month_difference": month_diff}
-                )
-        due_payments = []
-        for defaulter_booking in defaulter_bookings:
-            booking = defaulter_booking["booking"]
-            month_diff = defaulter_booking["month_difference"]
-            customer = Customers.objects.get(pk=booking.customer_id)
+            # Construct due payment entry
+            customer = booking.customer  # Prefetch customer to avoid extra query
             plot_info = get_plot_info(booking)
-            due_payments.append(
-                {
-                    "id": booking.id,
-                    "booking_id": booking.booking_id,
-                    "plot_info": plot_info,
-                    "customer_name": customer.name,
-                    "customer_contact": customer.contact,
-                    "due_date": booking.installment_date,
-                    "total_remaining_amount": month_diff
-                    * booking.installment_per_month,
-                    "month_difference": month_diff,
-                }
-            )
+            due_payments.append({
+                "id": booking.id,
+                "booking_id": booking.booking_id,
+                "plot_info": plot_info,
+                "customer_name": customer.name,
+                "customer_contact": customer.contact,
+                "due_date": booking.installment_date,
+                "total_remaining_amount": month_diff * booking.installment_per_month,
+                "month_difference": month_diff,
+            })
 
         return Response({"due_payments": due_payments})
 
@@ -447,7 +430,12 @@ class BankDepositViewSet(viewsets.ModelViewSet):
         if project_id:
             query_filters &= Q(project_id=project_id)
 
-        queryset = BankDeposit.objects.filter(query_filters).prefetch_related("files")
+        queryset = BankDeposit.objects.filter(query_filters).select_related("deposit_to").prefetch_related(
+        Prefetch("details", queryset=BankDepositDetail.objects.all().select_related("payment__bank")),
+        Prefetch("transactions", queryset=BankDepositTransactions.objects.all().select_related("customer","bank")),
+        Prefetch("files", queryset=BankDepositDocuments.objects.all())
+    )
+
         return queryset
 
     def perform_destroy(self, instance):
