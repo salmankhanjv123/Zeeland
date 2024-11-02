@@ -972,7 +972,7 @@ class EmployeeLedgerView(APIView):
         # Fetch customer information
         customer_info = (
             Customers.objects.filter(id=vendor_id)
-            .values("id", "name", "father_name", "contact", "address")
+            .values("id", "name", "father_name", "contact","designation", "address")
             .first()
         )
 
