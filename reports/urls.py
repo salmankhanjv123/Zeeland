@@ -11,6 +11,7 @@ from .views import (
     CustomerLedgerView,
     PlotLedgerView,
     BalanceSheetView,
+    ProfitReportView,
     IncomingPaymentsReport,
     IncomingChequeReport,
     OutgoingPaymentsReport,
@@ -37,4 +38,5 @@ urlpatterns = [
     path("employee-ledger/", EmployeeLedgerView.as_view()),
     path("plot-ledger/", PlotLedgerView.as_view()),
     path("balance-report/", BalanceSheetView.as_view()),
+    path("profit-report/", ProfitReportView.as_view()),
 ]

@@ -20,6 +20,7 @@ from .serializers import (
     PlotsSerializer,
     BookingPaymentsSerializer,
     TokenPaymentsSerializer,
+    BankDepositTransactionsSerializer,
 )
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -972,7 +973,7 @@ class EmployeeLedgerView(APIView):
         # Fetch customer information
         customer_info = (
             Customers.objects.filter(id=vendor_id)
-            .values("id", "name", "father_name", "contact","designation", "address")
+            .values("id", "name", "father_name", "contact", "designation", "address")
             .first()
         )
 
@@ -1388,8 +1389,23 @@ class PlotLedgerView(APIView):
 class BalanceSheetView(APIView):
 
     def get(self, request):
-        banks = Bank.objects.filter(main_type__in=["Asset","Liabilities","Equity"])
-        
+        project_id = self.request.query_params.get("project_id")
+        start_date = self.request.query_params.get("start_date")
+        end_date = self.request.query_params.get("end_date")
+
+        query_filters = Q()
+        if project_id:
+            query_filters &= Q(project_id=project_id)
+
+        if start_date and end_date:
+            query_filters &= Q(transaction_date__gte=start_date) & Q(
+                transaction_date__lte=end_date
+            )
+
+        banks = Bank.objects.filter(
+            main_type__in=["Asset", "Liabilities", "Equity"], project_id=project_id
+        )
+
         main_type_dict = defaultdict(
             lambda: {
                 "total": 0,
@@ -1405,7 +1421,7 @@ class BalanceSheetView(APIView):
             parent_bank = bank.parent_account
 
             # Calculate balance
-            transactions = BankTransaction.objects.filter(bank=bank)
+            transactions = BankTransaction.objects.filter(query_filters, bank=bank)
             balance = sum(t.deposit for t in transactions) - sum(
                 t.payment for t in transactions
             )
@@ -1488,6 +1504,125 @@ class BalanceSheetView(APIView):
         return Response(result)
 
 
+class ProfitReportView(APIView):
+
+    def get(self, request):
+        project_id = self.request.query_params.get("project_id")
+        start_date = self.request.query_params.get("start_date")
+        end_date = self.request.query_params.get("end_date")
+
+        query_filters = Q()
+        if project_id:
+            query_filters &= Q(project_id=project_id)
+
+        if start_date and end_date:
+            query_filters &= Q(transaction_date__gte=start_date) & Q(
+                transaction_date__lte=end_date
+            )
+
+        banks = Bank.objects.filter(
+            main_type__in=["Income", "Expense"], project_id=project_id
+        )
+
+        main_type_dict = defaultdict(
+            lambda: {
+                "total": 0,
+                "account_types": defaultdict(lambda: {"total": 0, "accounts": {}}),
+            }
+        )
+
+        for bank in banks:
+            main_type = bank.main_type
+            account_type = bank.account_type
+            bank_name = bank.name
+            bank_id = bank.id
+            parent_bank = bank.parent_account
+
+            # Calculate balance
+            transactions = BankTransaction.objects.filter(query_filters, bank=bank)
+            balance = sum(t.deposit for t in transactions) - sum(
+                t.payment for t in transactions
+            )
+
+            # Aggregate balances
+            main_type_dict[main_type]["total"] += balance
+            main_type_dict[main_type]["account_types"][account_type]["total"] += balance
+
+            # Create account entry if it doesn't exist
+            if (
+                bank.id
+                not in main_type_dict[main_type]["account_types"][account_type][
+                    "accounts"
+                ]
+            ):
+                main_type_dict[main_type]["account_types"][account_type]["accounts"][
+                    bank.id
+                ] = {
+                    "bank_name": bank_name,
+                    "bank_id": bank_id,
+                    "balance": balance,
+                    "sub_accounts": [],
+                }
+            else:
+                # Update balance if account already exists (e.g., as a sub-account added earlier)
+                main_type_dict[main_type]["account_types"][account_type]["accounts"][
+                    bank.id
+                ]["balance"] += balance
+
+            # If the bank has a parent, add it as a sub-account
+            if parent_bank:
+                parent_account_type = parent_bank.account_type
+                parent_main_type = parent_bank.main_type
+                if (
+                    parent_bank.id
+                    not in main_type_dict[parent_main_type]["account_types"][
+                        parent_account_type
+                    ]["accounts"]
+                ):
+                    main_type_dict[parent_main_type]["account_types"][
+                        parent_account_type
+                    ]["accounts"][parent_bank.id] = {
+                        "bank_name": parent_bank.name,
+                        "balance": 0,  # Initial balance is 0 since it will be updated by its own entry
+                        "sub_accounts": [],
+                    }
+                main_type_dict[parent_main_type]["account_types"][parent_account_type][
+                    "accounts"
+                ][parent_bank.id]["sub_accounts"].append(
+                    main_type_dict[main_type]["account_types"][account_type][
+                        "accounts"
+                    ][bank.id]
+                )
+                # Remove the sub-account from the main list to avoid duplication
+                del main_type_dict[main_type]["account_types"][account_type][
+                    "accounts"
+                ][bank.id]
+
+        # Convert to the desired output format
+        result = []
+        for main_type, main_data in main_type_dict.items():
+            account_types_list = []
+            for account_type, account_data in main_data["account_types"].items():
+                accounts_list = list(account_data["accounts"].values())
+                account_types_list.append(
+                    {
+                        "account_type": account_type,
+                        "total": account_data["total"],
+                        "accounts": accounts_list,
+                    }
+                )
+            result.append(
+                {
+                    "main_type": main_type,
+                    "total": main_data["total"],
+                    "account_types": account_types_list,
+                }
+            )
+
+        return Response(result)
+
+
+
 class IncomingPaymentsReport(APIView):
     def get(self, request):
         project_id = self.request.query_params.get("project_id")
@@ -1505,12 +1640,16 @@ class IncomingPaymentsReport(APIView):
         if start_date and end_date:
             query_filters &= Q(date__gte=start_date) & Q(date__lte=end_date)
 
-        booking_payments = IncomingFund.objects.filter(
-            query_filters, reference="payment"
-        ).select_related("booking__customer", "bank").prefetch_related("booking__plots")
-        token_payments = Token.objects.filter(query_filters).select_related(
-            "customer", "bank"
-        ).prefetch_related("plot")
+        booking_payments = (
+            IncomingFund.objects.filter(query_filters, reference="payment")
+            .select_related("booking__customer", "bank")
+            .prefetch_related("booking__plots")
+        )
+        token_payments = (
+            Token.objects.filter(query_filters)
+            .select_related("customer", "bank")
+            .prefetch_related("plot")
+        )
 
         booking_payments_serialized = BookingPaymentsSerializer(
             booking_payments, many=True
@@ -1555,21 +1694,31 @@ class OutgoingPaymentsReport(APIView):
         payment_type = self.request.query_params.get("payment_type")
 
         query_filters = Q()
+        deposit_query_filters = Q()
         if project_id:
             query_filters &= Q(project_id=project_id)
+            deposit_query_filters &= Q(bank_deposit__project_id=project_id)
 
         if payment_type:
             query_filters &= Q(payment_type=payment_type)
 
         if start_date and end_date:
             query_filters &= Q(date__gte=start_date) & Q(date__lte=end_date)
+            deposit_query_filters &= Q(date__gte=start_date) & Q(date__lte=end_date)
 
-        booking_payments = IncomingFund.objects.filter(
-            query_filters, reference="refund"
-        ).select_related("booking__customer",  "bank").prefetch_related("booking__plots")
+        booking_payments = (
+            IncomingFund.objects.filter(query_filters, reference="refund")
+            .select_related("booking__customer", "bank")
+            .prefetch_related("booking__plots")
+        )
         expense_payments = OutgoingFund.objects.filter(query_filters).select_related(
             "bank"
         )
+        bank_deposit_payments = BankDepositTransactions.objects.filter(
+            deposit_query_filters
+        ).select_related("customer", "bank")
+
+        print(bank_deposit_payments)
 
         booking_payments_serialized = BookingPaymentsSerializer(
             booking_payments, many=True
@@ -1579,8 +1728,14 @@ class OutgoingPaymentsReport(APIView):
             expense_payments, many=True
         ).data
 
+        bank_deposit_payments_serialized = BankDepositTransactionsSerializer(
+            bank_deposit_payments, many=True
+        ).data
+
         combined_payments = sorted(
-            booking_payments_serialized + expense_payment_serialized,
+            booking_payments_serialized
+            + expense_payment_serialized
+            + bank_deposit_payments_serialized,
             key=lambda x: x["date"],
         )
 
@@ -1634,13 +1789,19 @@ class IncomingChequeReport(APIView):
         if start_date and end_date:
             token_filters &= Q(date__gte=start_date) & Q(date__lte=end_date)
 
-        booking_payments = IncomingFund.objects.filter(
-            payment_filters, reference="payment", payment_type="Cheque"
-        ).select_related("booking__customer", "bank").prefetch_related("booking__plots")
+        booking_payments = (
+            IncomingFund.objects.filter(
+                payment_filters, reference="payment", payment_type="Cheque"
+            )
+            .select_related("booking__customer", "bank")
+            .prefetch_related("booking__plots")
+        )
 
-        token_payments = Token.objects.filter(
-            token_filters, payment_type="Cheque"
-        ).select_related("customer", "bank").prefetch_related("plot")
+        token_payments = (
+            Token.objects.filter(token_filters, payment_type="Cheque")
+            .select_related("customer", "bank")
+            .prefetch_related("plot")
+        )
 
         booking_payments_serialized = BookingPaymentsSerializer(
             booking_payments, many=True
@@ -1678,9 +1839,13 @@ class OutgoingChequeReport(APIView):
             expense_filters &= Q(date__gte=start_date) & Q(date__lte=end_date)
             payment_filters &= Q(date__gte=start_date) & Q(date__lte=end_date)
 
-        booking_payments = IncomingFund.objects.filter(
-            payment_filters, reference="refund", payment_type="Cheque"
-        ).select_related("booking__customer", "bank").prefetch_related("booking__plot")
+        booking_payments = (
+            IncomingFund.objects.filter(
+                payment_filters, reference="refund", payment_type="Cheque"
+            )
+            .select_related("booking__customer", "bank")
+            .prefetch_related("booking__plot")
+        )
 
         outgoing_payments = OutgoingFund.objects.filter(
             expense_filters, payment_type="Cheque"

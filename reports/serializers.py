@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from payments.models import IncomingFund, OutgoingFund, JournalVoucher
+from payments.models import IncomingFund, OutgoingFund, JournalVoucher,BankDepositTransactions
 from booking.models import Token
 from rest_framework.exceptions import ValidationError
 from plots.models import Plots
@@ -44,6 +44,23 @@ class OutgoingFundReportSerializer(serializers.ModelSerializer):
         model = OutgoingFund
         fields = "__all__"
         
+
+
+class BankDepositTransactionsSerializer(serializers.ModelSerializer):
+    bank_name = serializers.CharField(source="bank.name", read_only=True)
+    customer_name=serializers.CharField(source="customer.name", read_only=True)
+    reference=serializers.SerializerMethodField(read_only=True)
+    payment_type=serializers.SerializerMethodField(read_only=True)
+
+    def get_reference(self, instance):
+        return "expense"
+
+    def get_payment_type(self, instance):
+        return "Cash"
+    
+    class Meta:
+        model = BankDepositTransactions
+        fields = "__all__"
 
 
 class JournalVoucherReportSerializer(serializers.ModelSerializer):
