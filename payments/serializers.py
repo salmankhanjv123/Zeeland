@@ -32,7 +32,7 @@ from .models import (
 )
 import datetime
 from django.db import transaction
-from django.db.models import Sum
+from django.db.models import Sum,ProtectedError
 from rest_framework.exceptions import ValidationError
 
 
@@ -506,10 +506,14 @@ class OutgoingFundSerializer(serializers.ModelSerializer):
             )
 
     def delete_related_bank_transactions(self, outgoing_fund):
-        BankTransaction.objects.filter(
-            related_table="OutgoingFund", related_id=outgoing_fund.id
-        ).delete()
-
+        try:
+            BankTransaction.objects.filter(
+                related_table="OutgoingFund", related_id=outgoing_fund.id
+            ).delete()
+        except ProtectedError as e:
+            raise serializers.ValidationError({
+                "error": "Cannot update or delete bank transactions because they are referenced by cleared cheques. "
+            })
     @transaction.atomic
     def create(self, validated_data):
         files_data = validated_data.pop("files", [])
