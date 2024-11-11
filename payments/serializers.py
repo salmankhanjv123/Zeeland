@@ -1056,8 +1056,6 @@ class DealerPaymentsSerializer(serializers.ModelSerializer):
             payment=payment_amount,
             deposit=deposit_amount,
             transaction_date=date,
-            is_deposit=is_deposit,
-            is_cheque_clear=is_cheque_clear,
         )
 
 
