@@ -355,6 +355,7 @@ def get_plot_info(booking):
         for plot in booking.plots.all()
     ]
 
+
 class DuePaymentsView(APIView):
     def get(self, request):
         project_id = request.query_params.get("project")
@@ -384,12 +385,22 @@ class DuePaymentsView(APIView):
                     installement_month=latest_payment["latest_installement_month"],
                 ).first()
 
-            # Determine month difference
-            if latest_payment_obj and latest_payment_obj.installement_month != current_month and latest_payment_obj.booking.installment_date < today_day:
-                month_diff = (current_month.year - latest_payment_obj.installement_month.year) * 12 + (current_month.month - latest_payment_obj.installement_month.month)
+            # Determine month difference based on the latest payment or booking date
+            if latest_payment_obj:
+                last_payment_month = latest_payment_obj.installement_month
             else:
-                month_diff = (current_month.year - booking.booking_date.year) * 12 + (current_month.month - booking.booking_date.month)
+                # If no payments made, use booking date as the reference
+                last_payment_month = booking.booking_date
 
+            # Calculate the month difference between last_payment_month and current_month
+            month_diff = (current_month.year - last_payment_month.year) * 12 + (current_month.month - last_payment_month.month)
+
+            # Check if installment is due this month by comparing with installment date
+            if latest_payment_obj and today_day < booking.installment_date:
+                month_diff -= 1  # Reduce by one month if payment was received this month
+            
+            if month_diff < 1:
+                continue
             # Construct due payment entry
             customer = booking.customer  # Prefetch customer to avoid extra query
             plot_info = get_plot_info(booking)
@@ -405,7 +416,6 @@ class DuePaymentsView(APIView):
             })
 
         return Response({"due_payments": due_payments})
-
 
 class BankDepositViewSet(viewsets.ModelViewSet):
     """
