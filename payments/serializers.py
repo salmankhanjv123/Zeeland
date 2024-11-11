@@ -431,8 +431,6 @@ class IncomingFundSerializer(serializers.ModelSerializer):
             payment=deposit_amount,
             deposit=payment_amount,
             transaction_date=date,
-            is_deposit=is_deposit,
-            is_cheque_clear=is_cheque_clear,
         )
 
 
