@@ -1081,10 +1081,8 @@ class DealerPaymentsSerializer(serializers.ModelSerializer):
         date = validated_data.get("date", payment.date)
         reference = validated_data.get("reference", payment.reference)
         amount = validated_data.get("amount", payment.amount)
-        bank = validated_data.get("bank")
-        payment_type = validated_data.get("payment_type", payment.payment_type)
-        is_deposit = bank.detail_type != "Undeposited_Funds"
-        is_cheque_clear = payment_type != "Cheque"
+        new_bank = validated_data.get("bank", payment.bank)
+
 
         # Determine transaction type and payment/deposit amounts
         if reference == "refund":
@@ -1112,6 +1110,25 @@ class DealerPaymentsSerializer(serializers.ModelSerializer):
             transaction_date=date,
         )
 
+        # Retrieve the existing transaction to use its current `is_deposit` value if no bank change
+        existing_transaction = BankTransaction.objects.filter(
+            project=project,
+            bank=payment.bank,
+            related_table="dealer_payments",
+            related_id=payment.id,
+        ).first()
+
+        # Default to the existing is_deposit value if the bank hasn't changed
+        is_deposit = existing_transaction.is_deposit if existing_transaction else True
+        bank_changed = payment.bank != new_bank
+
+        # Update is_deposit based on the change in bank detail type
+        if bank_changed:
+            if new_bank.detail_type != "Undeposited_Funds":
+                is_deposit = True
+            elif payment.bank.detail_type != "Undeposited_Funds" and new_bank.detail_type == "Undeposited_Funds":
+                is_deposit = False
+       
         # Update transaction for the specified bank
         BankTransaction.objects.filter(
             project=project,
@@ -1120,10 +1137,11 @@ class DealerPaymentsSerializer(serializers.ModelSerializer):
             related_table="dealer_payments",
             related_id=payment.id,
         ).update(
-            bank=bank,
+            bank=new_bank,
             payment=payment_amount,
             deposit=deposit_amount,
             transaction_date=date,
+            is_deposit=is_deposit,
         )
 
 

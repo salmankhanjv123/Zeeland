@@ -368,12 +368,9 @@ class BookingSerializer(serializers.ModelSerializer):
             "dealer_comission_amount", booking.dealer_comission_amount
         )
         plot_cost = sum(plot.cost_price for plot in booking.plots.all())
+        new_bank = validated_data.get("bank", booking.bank)
 
-        advance_bank = validated_data.get("bank")
-        payment_type = validated_data.get("payment_type", booking.payment_type)
-        is_deposit = advance_bank.detail_type != "Undeposited_Funds"
-        is_cheque_clear = payment_type != "Cheque"
-        print(is_cheque_clear)
+
         # Account receivable (Debit)
         account_receivable_bank = Bank.objects.filter(
             used_for="Account_Receivable", project=project
@@ -423,7 +420,7 @@ class BookingSerializer(serializers.ModelSerializer):
             ).update(deposit=0, payment=plot_cost, transaction_date=booking_date)
 
         # Advance payment (Credit - Account Receivable) (Debit - Bank)
-        if advance_amount > 0 and account_receivable_bank and advance_bank:
+        if advance_amount > 0 and account_receivable_bank and new_bank:
             BankTransaction.objects.filter(
                 project=project,
                 bank=account_receivable_bank,
@@ -432,6 +429,25 @@ class BookingSerializer(serializers.ModelSerializer):
                 related_id=booking.id,
             ).update(payment=advance_amount, deposit=0, transaction_date=booking_date)
 
+        # Retrieve the existing transaction to use its current `is_deposit` value if no bank change
+            existing_transaction = BankTransaction.objects.filter(
+                project=project,
+                bank=booking.bank,
+                related_table="Booking",
+                related_id=booking.id,
+            ).first()
+
+            # Default to the existing is_deposit value if the bank hasn't changed
+            is_deposit = existing_transaction.is_deposit if existing_transaction else True
+            bank_changed = booking.bank != new_bank
+
+            # Update is_deposit based on the change in bank detail type
+            if bank_changed:
+                if new_bank.detail_type != "Undeposited_Funds":
+                    is_deposit = True
+                elif booking.bank.detail_type != "Undeposited_Funds" and new_bank.detail_type == "Undeposited_Funds":
+                    is_deposit = False
+            
             BankTransaction.objects.filter(
                 project=project,
                 bank=booking.bank,
@@ -440,11 +456,10 @@ class BookingSerializer(serializers.ModelSerializer):
                 related_id=booking.id,
             ).update(
                 payment=0,
-                bank=advance_bank,
+                bank=new_bank,
                 deposit=advance_amount,
                 transaction_date=booking_date,
                 is_deposit=is_deposit,
-                is_cheque_clear=is_cheque_clear,
             )
 
         # Dealer Comission (Credit - Account Payable) (Debit - Dealer Expense)
@@ -455,28 +470,32 @@ class BookingSerializer(serializers.ModelSerializer):
             used_for="Dealer_Expense", project=project
         ).first()
         if dealer_comission_amount > 0 and account_payable_bank and dealer_expense_bank:
-            BankTransaction.objects.filter(
+            # Update or create transaction for account payable bank
+            BankTransaction.objects.update_or_create(
                 project=project,
                 bank=account_payable_bank,
                 transaction_type="Dealer_Comission",
                 related_table="Booking",
                 related_id=booking.id,
-            ).update(
-                payment=0,
-                deposit=dealer_comission_amount,
-                transaction_date=booking_date,
+                defaults={
+                    "payment": 0,
+                    "deposit": dealer_comission_amount,
+                    "transaction_date": booking_date,
+                }
             )
 
-            BankTransaction.objects.filter(
+            # Update or create transaction for dealer expense bank
+            BankTransaction.objects.update_or_create(
                 project=project,
                 bank=dealer_expense_bank,
                 transaction_type="Dealer_Comission",
                 related_table="Booking",
                 related_id=booking.id,
-            ).update(
-                payment=0,
-                deposit=dealer_comission_amount,
-                transaction_date=booking_date,
+                defaults={
+                    "payment": 0,
+                    "deposit": dealer_comission_amount,
+                    "transaction_date": booking_date,
+                }
             )
 
 
@@ -628,10 +647,8 @@ class TokenSerializer(serializers.ModelSerializer):
         project = validated_data.get("project", payment.project)
         date = validated_data.get("date", payment.date)
         amount = validated_data.get("amount", payment.amount)
-        bank = validated_data.get("bank")
-        payment_type = validated_data.get("payment_type", payment.payment_type)
-        is_deposit = bank.detail_type != "Undeposited_Funds"
-        is_cheque_clear = payment_type != "Cheque"
+        new_bank = validated_data.get("bank", payment.bank)
+
 
         account_receivable_bank = Bank.objects.filter(
             used_for="Account_Receivable", project=project
@@ -649,6 +666,25 @@ class TokenSerializer(serializers.ModelSerializer):
             transaction_date=date,
         )
 
+        # Retrieve the existing transaction to use its current `is_deposit` value if no bank change
+        existing_transaction = BankTransaction.objects.filter(
+            project=project,
+            bank=payment.bank,
+            related_table="token",
+            related_id=payment.id,
+        ).first()
+
+        # Default to the existing is_deposit value if the bank hasn't changed
+        is_deposit = existing_transaction.is_deposit if existing_transaction else True
+        bank_changed = payment.bank != new_bank
+
+        # Update is_deposit based on the change in bank detail type
+        if bank_changed:
+            if new_bank.detail_type != "Undeposited_Funds":
+                is_deposit = True
+            elif payment.bank.detail_type != "Undeposited_Funds" and new_bank.detail_type == "Undeposited_Funds":
+                is_deposit = False
+       
         # Update transaction for the specified bank
         BankTransaction.objects.filter(
             project=project,
@@ -657,10 +693,11 @@ class TokenSerializer(serializers.ModelSerializer):
             related_table="token",
             related_id=payment.id,
         ).update(
-            bank=bank,
+            bank=new_bank,
             payment=0,
             deposit=amount,
             transaction_date=date,
+            is_deposit=is_deposit,
         )
 
 

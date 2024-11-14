@@ -1718,7 +1718,6 @@ class OutgoingPaymentsReport(APIView):
             deposit_query_filters
         ).select_related("customer", "bank")
 
-        print(bank_deposit_payments)
 
         booking_payments_serialized = BookingPaymentsSerializer(
             booking_payments, many=True
