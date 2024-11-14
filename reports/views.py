@@ -1746,8 +1746,10 @@ class OutgoingPaymentsReport(APIView):
 
         for payment in combined_payments:
             payment_type = payment["payment_type"]
+            amount = abs(payment["amount"])
             if payment_type in grouped_payments:
-                grouped_payments[payment_type]["total_amount"] += payment["amount"]
+                grouped_payments[payment_type]["total_amount"] += amount
+                payment["amount"] = amount
                 grouped_payments[payment_type]["payments"].append(payment)
 
         response_data = [
