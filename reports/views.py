@@ -1507,123 +1507,86 @@ class BalanceSheetView(APIView):
 
 
 class ProfitReportView(APIView):
-
     def get(self, request):
         project_id = self.request.query_params.get("project_id")
         start_date = self.request.query_params.get("start_date")
         end_date = self.request.query_params.get("end_date")
 
+        # Define the allowed account types
+        allowed_account_types = [
+            "Income", "Other_Income", "Expenses", "Cost_of_goods_sold", "Other_Expenses"
+        ]
+
+        # Apply query filters for transactions
         query_filters = Q()
         if project_id:
             query_filters &= Q(project_id=project_id)
-
         if start_date and end_date:
             query_filters &= Q(transaction_date__gte=start_date) & Q(
                 transaction_date__lte=end_date
             )
 
+        # Filter banks based on allowed account types
         banks = Bank.objects.filter(
-            main_type__in=["Income", "Expense"], project_id=project_id
+            account_type__in=allowed_account_types, project_id=project_id
         )
 
-        main_type_dict = defaultdict(
-            lambda: {
-                "total": 0,
-                "account_types": defaultdict(lambda: {"total": 0, "accounts": {}}),
-            }
-        )
+        # Initialize the structure for account types
+        account_type_dict = defaultdict(lambda: {"total": 0, "accounts": []})
 
         for bank in banks:
-            main_type = bank.main_type
             account_type = bank.account_type
             bank_name = bank.name
             bank_id = bank.id
             parent_bank = bank.parent_account
 
-            # Calculate balance
+            # Calculate balance for each bank
             transactions = BankTransaction.objects.filter(query_filters, bank=bank)
-            balance = sum(t.deposit for t in transactions) - sum(
-                t.payment for t in transactions
-            )
+            balance = sum(t.deposit for t in transactions) - sum(t.payment for t in transactions)
 
-            # Aggregate balances
-            main_type_dict[main_type]["total"] += balance
-            main_type_dict[main_type]["account_types"][account_type]["total"] += balance
+            # Create account entry
+            account_entry = {
+                "bank_name": bank_name,
+                "bank_id": bank_id,
+                "balance": balance,
+                "sub_accounts": [],
+            }
 
-            # Create account entry if it doesn't exist
-            if (
-                bank.id
-                not in main_type_dict[main_type]["account_types"][account_type][
-                    "accounts"
-                ]
-            ):
-                main_type_dict[main_type]["account_types"][account_type]["accounts"][
-                    bank.id
-                ] = {
-                    "bank_name": bank_name,
-                    "bank_id": bank_id,
-                    "balance": balance,
-                    "sub_accounts": [],
-                }
-            else:
-                # Update balance if account already exists (e.g., as a sub-account added earlier)
-                main_type_dict[main_type]["account_types"][account_type]["accounts"][
-                    bank.id
-                ]["balance"] += balance
-
-            # If the bank has a parent, add it as a sub-account
+            # If the bank has a parent, add it as a sub-account to the parent entry
             if parent_bank:
-                parent_account_type = parent_bank.account_type
-                parent_main_type = parent_bank.main_type
-                if (
-                    parent_bank.id
-                    not in main_type_dict[parent_main_type]["account_types"][
-                        parent_account_type
-                    ]["accounts"]
-                ):
-                    main_type_dict[parent_main_type]["account_types"][
-                        parent_account_type
-                    ]["accounts"][parent_bank.id] = {
+                parent_entry = next(
+                    (acc for acc in account_type_dict[parent_bank.account_type]["accounts"] if acc["bank_id"] == parent_bank.id),
+                    None
+                )
+                if not parent_entry:
+                    # Create parent entry if it doesn't exist
+                    parent_entry = {
                         "bank_name": parent_bank.name,
-                        "balance": 0,  # Initial balance is 0 since it will be updated by its own entry
+                        "bank_id": parent_bank.id,
+                        "balance": 0,
                         "sub_accounts": [],
                     }
-                main_type_dict[parent_main_type]["account_types"][parent_account_type][
-                    "accounts"
-                ][parent_bank.id]["sub_accounts"].append(
-                    main_type_dict[main_type]["account_types"][account_type][
-                        "accounts"
-                    ][bank.id]
-                )
-                # Remove the sub-account from the main list to avoid duplication
-                del main_type_dict[main_type]["account_types"][account_type][
-                    "accounts"
-                ][bank.id]
+                    account_type_dict[parent_bank.account_type]["accounts"].append(parent_entry)
+                # Append current bank as a sub-account
+                parent_entry["sub_accounts"].append(account_entry)
+            else:
+                # Directly add the account if there's no parent
+                account_type_dict[account_type]["accounts"].append(account_entry)
 
-        # Convert to the desired output format
-        result = []
-        for main_type, main_data in main_type_dict.items():
-            account_types_list = []
-            for account_type, account_data in main_data["account_types"].items():
-                accounts_list = list(account_data["accounts"].values())
-                account_types_list.append(
-                    {
-                        "account_type": account_type,
-                        "total": account_data["total"],
-                        "accounts": accounts_list,
-                    }
-                )
-            result.append(
-                {
-                    "main_type": main_type,
-                    "total": main_data["total"],
-                    "account_types": account_types_list,
-                }
-            )
+            # Update the total balance for the account type
+            account_type_dict[account_type]["total"] += balance
+
+        # Convert defaultdict to list format for final response
+        result = [
+            {
+                "account_type": account_type,
+                "total": account_data["total"],
+                "accounts": account_data["accounts"],
+            }
+            for account_type, account_data in account_type_dict.items()
+        ]
 
         return Response(result)
-
-
 
 class IncomingPaymentsReport(APIView):
     def get(self, request):
