@@ -249,6 +249,7 @@ class IncomingFundSerializer(serializers.ModelSerializer):
     installement_month = MonthField(required=False)
     booking_info = BookingSerializer(source="booking", read_only=True)
     plot_info = PlotsSerializer(source="booking.plots", many=True, read_only=True)
+    reference_plot_info = PlotsSerializer(source="reference_plot", read_only=True)
     bank_name = serializers.CharField(source="bank.name", read_only=True)
     account_type = serializers.CharField(source="bank.account_type", read_only=True)
     customer = CustomersSerializer(source="booking.customer", read_only=True)
