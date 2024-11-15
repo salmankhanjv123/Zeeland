@@ -2,6 +2,7 @@ from django.db import models
 from projects.models import Projects
 from booking.models import Booking
 from customer.models import Customers
+from plots.models import Plots
 
 
 class Bank(models.Model):
@@ -60,6 +61,7 @@ class IncomingFund(models.Model):
     project = models.ForeignKey(Projects, on_delete=models.PROTECT)
     reference = models.CharField(max_length=10, default="payment")
     booking = models.ForeignKey(Booking, on_delete=models.PROTECT)
+    reference_plot = models.ForeignKey(Plots, on_delete=models.PROTECT,blank=True, null=True)
     date = models.DateField()
     installement_month = MonthField(blank=True, null=True)
     amount = models.FloatField()

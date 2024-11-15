@@ -221,7 +221,7 @@ class IncomingFundViewSet(viewsets.ModelViewSet):
             if account_detail_type == "Undeposited_Funds":
                 query_filters &= Q(deposit=False)
         if plot_id:
-            query_filters &= Q(booking__plot_id=plot_id)
+            query_filters &= Q(booking__plots=plot_id)
         if customer_id:
             query_filters &= Q(booking__customer_id=customer_id)
 

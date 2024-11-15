@@ -621,7 +621,7 @@ class CustomerLedgerView(APIView):
                 "reference",
                 "booking_id",
                 credit=Case(
-                    When(reference="return", then=F("amount")),
+                    When(reference="refund", then=F("amount")),
                     default=Value(0),
                     output_field=FloatField(),
                 ),
@@ -1033,6 +1033,7 @@ class PlotLedgerView(APIView):
                         payment_data = (
                             IncomingFund.objects.filter(
                                 booking_id=booking_id,
+                                reference_plot=plot_id,
                                 date__gte=start_date,
                                 date__lte=end_date,
                             )
@@ -1123,7 +1124,7 @@ class PlotLedgerView(APIView):
 
                         paid_amount = (
                             IncomingFund.objects.filter(
-                                booking_id=booking_id, date__lt=start_date
+                                booking_id=booking_id,reference_plot=plot_id, date__lt=start_date
                             ).aggregate(
                                 total_amount=Sum(
                                     Case(
@@ -1230,7 +1231,7 @@ class PlotLedgerView(APIView):
                         )
                         paid_amount = (
                             IncomingFund.objects.filter(
-                                booking_id=booking_id
+                                booking_id=booking_id,reference_plot=plot_id,
                             ).aggregate(
                                 total_amount=Sum(
                                     Case(
@@ -1359,6 +1360,7 @@ class PlotLedgerView(APIView):
                             "transactions": combined_data,
                         }
                         result.append(response_data)
+
 
                 if not result:
                     plot_query = Plots.objects.get(id=plot_id)
