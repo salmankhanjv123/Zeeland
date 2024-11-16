@@ -20,6 +20,7 @@ class PlotsViewSet(viewsets.ModelViewSet):
         
         project_id = self.request.query_params.get('project')
         customer_id = self.request.query_params.get('customer_id')
+        booking_id = self.request.query_params.get('booking_id')
         plot_status = self.request.query_params.get('status')
         plot_type=self.request.query_params.get('plot_type')
 
@@ -30,6 +31,8 @@ class PlotsViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(project_id=project_id)
         if customer_id:
             queryset = queryset.filter(booking__customer_id=customer_id)
+        if booking_id:
+            queryset = queryset.filter(booking__id=booking_id)
         if plot_type:
             queryset = queryset.filter(type=plot_type)
         return queryset
