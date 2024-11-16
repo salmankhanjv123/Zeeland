@@ -1579,7 +1579,7 @@ class ProfitReportView(APIView):
         result = [
             {
                 "account_type": account_type,
-                "total": account_data["total"],
+                "total": abs(account_data["total"]),
                 "accounts": account_data["accounts"],
             }
             for account_type, account_data in account_type_dict.items()
