@@ -1542,7 +1542,7 @@ class ProfitReportView(APIView):
 
             # Calculate balance for each bank
             transactions = BankTransaction.objects.filter(query_filters, bank=bank)
-            balance = abs(sum(t.deposit for t in transactions) - sum(t.payment for t in transactions))
+            balance = int(sum(t.deposit for t in transactions) - sum(t.payment for t in transactions))
             # Create account entry
             account_entry = {
                 "bank_name": bank_name,
@@ -1579,7 +1579,7 @@ class ProfitReportView(APIView):
         result = [
             {
                 "account_type": account_type,
-                "total": abs(account_data["total"]),
+                "total": int(account_data["total"]),
                 "accounts": account_data["accounts"],
             }
             for account_type, account_data in account_type_dict.items()
