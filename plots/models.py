@@ -2,6 +2,10 @@ from django.db import models
 from projects.models import Projects
 # Create your models here.
 
+class Block(models.Model):
+    name= models.CharField(max_length=30)
+    project = models.ForeignKey(Projects, on_delete=models.PROTECT)
+
 
 class Plots(models.Model):
     Types = (
@@ -11,7 +15,7 @@ class Plots(models.Model):
     )
     project = models.ForeignKey(Projects, on_delete=models.PROTECT)
     plot_number = models.CharField(max_length=30)
-    block = models.CharField(max_length=30,blank=True, null=True)
+    block = models.ForeignKey(Block, on_delete=models.PROTECT,blank=True, null=True)
     address = models.TextField(blank=True, null=True)
     type = models.IntegerField(choices=Types)
     marlas = models.FloatField(default=0)

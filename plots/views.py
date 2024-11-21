@@ -1,10 +1,24 @@
 from rest_framework import viewsets
 from rest_framework.response import Response
 from rest_framework.generics import ListAPIView
-from .serializers import PlotsSerializer, ResalePlotsSerializer
-from .models import Plots,PlotsDocuments
+from .serializers import PlotsSerializer, ResalePlotsSerializer,BlockSerializer
+from .models import Plots,PlotsDocuments,Block
 from booking.models import Booking
 from django.db.models import Count, Prefetch
+
+
+class BlockViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint that allows Plots to be viewed or edited.
+    """
+    serializer_class = BlockSerializer
+    
+    def get_queryset(self):
+        queryset =Block.objects.all()
+        project_id = self.request.query_params.get('project_id')
+        if project_id:
+            queryset = queryset.filter(project_id=project_id)
+        return queryset
 
 
 class PlotsViewSet(viewsets.ModelViewSet):

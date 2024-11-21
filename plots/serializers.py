@@ -1,9 +1,13 @@
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
-from .models import Plots,PlotsDocuments
+from .models import Plots,PlotsDocuments,Block
 from booking.models import Booking
 
 
+class BlockSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Block
+        fields = '__all__' 
 
 class PlotsDocumentsSerializer(serializers.ModelSerializer):
     class Meta:
