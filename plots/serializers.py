@@ -35,6 +35,7 @@ class SubPlotsSerializer(serializers.ModelSerializer):
 
 class PlotsSerializer(serializers.ModelSerializer):
     category_name = serializers.SerializerMethodField(read_only=True)
+    block_name=serializers.CharField(source="block.name",read_only=True)
     plot_size = serializers.SerializerMethodField(read_only=True)
     files = PlotsDocumentsSerializer(many=True, required=False)
     sub_plots=SubPlotsSerializer(many=True,read_only=True)
