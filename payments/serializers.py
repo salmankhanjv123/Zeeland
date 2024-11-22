@@ -196,6 +196,7 @@ class MonthField(serializers.Field):
 class PlotsSerializer(serializers.ModelSerializer):
     category_name = serializers.SerializerMethodField(read_only=True)
     plot_size = serializers.SerializerMethodField(read_only=True)
+    block_name=serializers.CharField(source="block.name",read_only=True)
 
     def get_plot_size(self, instance):
         # Update this method according to your requirement
