@@ -15,7 +15,7 @@ class BlockViewSet(viewsets.ModelViewSet):
     
     def get_queryset(self):
         queryset =Block.objects.all()
-        project_id = self.request.query_params.get('project_id')
+        project_id = self.request.query_params.get('project')
         if project_id:
             queryset = queryset.filter(project_id=project_id)
         return queryset
