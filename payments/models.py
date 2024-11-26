@@ -177,6 +177,7 @@ class BankDeposit(models.Model):
     project = models.ForeignKey(Projects, on_delete=models.PROTECT)
     deposit_to = models.ForeignKey(Bank, on_delete=models.PROTECT)
     amount = models.FloatField(default=0)
+    payment_amount=models.FloatField(default=0)
     date = models.DateField()
 
     class Meta:

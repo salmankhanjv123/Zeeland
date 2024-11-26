@@ -786,6 +786,7 @@ class BankDepositSerializer(serializers.ModelSerializer):
 
         date = validated_data.get("date")
         amount = validated_data.get("amount")
+        payment_amount = validated_data.get("payment_amount")
         bank = validated_data.get("deposit_to")
         project = validated_data.get("project")
 
@@ -819,7 +820,7 @@ class BankDepositSerializer(serializers.ModelSerializer):
                 bank=undeposit_bank,
                 transaction_date=date,
                 deposit=0,
-                payment=amount,
+                payment=payment_amount,
                 transaction_type="deposit",
                 related_table="bank_deposits",
                 related_id=bank_deposit.id,
@@ -860,6 +861,7 @@ class BankDepositSerializer(serializers.ModelSerializer):
 
         date = validated_data.get("date", instance.date)
         amount = validated_data.get("amount", instance.amount)
+        payment_amount = validated_data.get("payment_amount",instance.payment_amount)
         bank = validated_data.get("deposit_to", instance.deposit_to)
         project = validated_data.get("project", instance.project)
 
@@ -867,6 +869,7 @@ class BankDepositSerializer(serializers.ModelSerializer):
 
             instance.date = date
             instance.amount = amount
+            instance.payment_amount = payment_amount
             instance.deposit_to = bank
             instance.save()
 
@@ -909,7 +912,7 @@ class BankDepositSerializer(serializers.ModelSerializer):
                 bank=undeposit_bank,
                 transaction_date=date,
                 deposit=0,
-                payment=amount,
+                payment=payment_amount,
                 transaction_type="deposit",
                 related_table="bank_deposits",
                 related_id=instance.id,
