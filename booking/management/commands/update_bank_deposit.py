@@ -6,7 +6,7 @@ class Command(BaseCommand):
     help = "Update payment_amount for all BankDeposit records"
 
     def handle(self, *args, **kwargs):
-        deposits = BankDeposit.objects.prefetch_related("details__payment").filter(project_id=3)
+        deposits = BankDeposit.objects.prefetch_related("details__payment").filter(project_id=6)
 
         for deposit in deposits:
             total_payment = sum(
@@ -18,7 +18,7 @@ class Command(BaseCommand):
             deposit.save(update_fields=["payment_amount"])
             try:
                 bank_transaction = BankTransaction.objects.get(
-                    bank_id=42,
+                    bank_id=15,
                     related_table="bank_deposits",
                     related_id=deposit.id,
                 )
