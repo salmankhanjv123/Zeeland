@@ -833,8 +833,8 @@ class VendorLedgerView(APIView):
                 "date",
                 "remarks",
                 document=F("id"),
-                payment=F("amount"),
-                expense=Value(0.0),
+                debit=F("amount"),
+                credit=Value(0.0),
                 customer_name=F("payee__name"),
                 reference=Value("Expenses", output_field=CharField()),
             )
@@ -848,8 +848,8 @@ class VendorLedgerView(APIView):
                 "remarks",
                 "date",
                 document=F("bank_deposit"),
-                payment=Abs(F("amount")),
-                expense=Value(0.0),
+                debit=Abs(F("amount")),
+                credit=Value(0.0),
                 customer_name=F("customer__name"),
                 reference=Value("Deposits", output_field=CharField()),
             )
@@ -860,8 +860,8 @@ class VendorLedgerView(APIView):
             .select_related("person")
             .values(
                 "id",
-                payment=F("credit"),
-                expense=F("debit"),
+                "credit",
+                "debit",
                 remarks=F("description"),
                 document=F("journal_entry"),
                 date=F("journal_entry__date"),
@@ -880,7 +880,7 @@ class VendorLedgerView(APIView):
         current_balance = opening_balance
 
         for entry in combined_data:
-            current_balance += entry["expense"] - entry["payment"]
+            current_balance += entry["credit"] - entry["debit"]
             entry["balance"] = current_balance
         # Fetch customer information
         customer_info = (
