@@ -817,16 +817,41 @@ class VendorLedgerView(APIView):
         start_date = self.request.query_params.get("start_date")
         end_date = self.request.query_params.get("end_date")
 
+        journal_filters = Q()
         query_filters = Q()
 
-        if project_id:
-            query_filters &= Q(project_id=project_id)
-
         if start_date and end_date:
+            journal_filters &= Q(journal_entry__date__gte=start_date) & Q(
+                journal_entry__date__lte=end_date
+            )
             query_filters &= Q(date__gte=start_date) & Q(date__lte=end_date)
 
+        outgoing_fund_debit = (
+            OutgoingFund.objects.filter(payee=vendor_id, date__lt=start_date)
+            .aggregate(total_debit=Sum("amount", output_field=FloatField()))
+            .get("total_debit", 0.0) or 0.0
+        )
+        bank_deposit_debit = (
+            BankDepositTransactions.objects.filter(customer_id=vendor_id, date__lt=start_date)
+            .aggregate(total_debit=Sum(Abs(F("amount")), output_field=FloatField()))
+            .get("total_debit", 0.0) or 0.0
+        )
+        journal_data = JournalEntryLine.objects.filter(
+            person_id=vendor_id, journal_entry__date__lt=start_date
+        ).aggregate(
+            total_credit=Sum("credit", output_field=FloatField()),
+            total_debit=Sum("debit", output_field=FloatField()),
+        )
+        journal_credit = journal_data.get("total_credit", 0.0) or 0.0
+        journal_debit = journal_data.get("total_debit", 0.0) or 0.0
+        journal_balance = journal_credit - journal_debit
+        opening_balance = journal_balance - bank_deposit_debit - outgoing_fund_debit
+
+
+
+
         expense_data = (
-            OutgoingFund.objects.filter(payee=vendor_id)
+            OutgoingFund.objects.filter(query_filters, payee=vendor_id)
             .select_related("payee")
             .values(
                 "id",
@@ -839,9 +864,9 @@ class VendorLedgerView(APIView):
                 reference=Value("Expenses", output_field=CharField()),
             )
         )
-        
+
         bank_deposit_data = (
-            BankDepositTransactions.objects.filter(customer_id=vendor_id)
+            BankDepositTransactions.objects.filter(query_filters, customer_id=vendor_id)
             .select_related("customer")
             .values(
                 "id",
@@ -856,7 +881,7 @@ class VendorLedgerView(APIView):
         )
 
         journal_data = (
-            JournalEntryLine.objects.filter(person_id=vendor_id)
+            JournalEntryLine.objects.filter(journal_filters, person_id=vendor_id)
             .select_related("person")
             .values(
                 "id",
@@ -876,7 +901,6 @@ class VendorLedgerView(APIView):
             key=lambda x: x["date"],
         )
 
-        opening_balance = 0
         current_balance = opening_balance
 
         for entry in combined_data:
@@ -892,7 +916,7 @@ class VendorLedgerView(APIView):
         response_data = {
             "customer_info": customer_info,
             "opening_balance": opening_balance,
-            "closing_balance": 0,
+            "closing_balance": current_balance,
             "transactions": combined_data,
         }
 
@@ -906,46 +930,68 @@ class EmployeeLedgerView(APIView):
         start_date = self.request.query_params.get("start_date")
         end_date = self.request.query_params.get("end_date")
 
+        journal_filters = Q()
         query_filters = Q()
 
-        if project_id:
-            query_filters &= Q(project_id=project_id)
-
         if start_date and end_date:
+            journal_filters &= Q(journal_entry__date__gte=start_date) & Q(
+                journal_entry__date__lte=end_date
+            )
             query_filters &= Q(date__gte=start_date) & Q(date__lte=end_date)
+        
+        outgoing_fund_debit = (
+            OutgoingFund.objects.filter(payee=vendor_id, date__lt=start_date)
+            .aggregate(total_debit=Sum("amount", output_field=FloatField()))
+            .get("total_debit", 0.0) or 0.0
+        )
+        bank_deposit_debit = (
+            BankDepositTransactions.objects.filter(customer_id=vendor_id, date__lt=start_date)
+            .aggregate(total_debit=Sum(Abs(F("amount")), output_field=FloatField()))
+            .get("total_debit", 0.0) or 0.0
+        )
+        journal_data = JournalEntryLine.objects.filter(
+            person_id=vendor_id, journal_entry__date__lt=start_date
+        ).aggregate(
+            total_credit=Sum("credit", output_field=FloatField()),
+            total_debit=Sum("debit", output_field=FloatField()),
+        )
+        journal_credit = journal_data.get("total_credit", 0.0) or 0.0
+        journal_debit = journal_data.get("total_debit", 0.0) or 0.0
+        journal_balance = journal_credit - journal_debit
+        opening_balance = journal_balance - bank_deposit_debit - outgoing_fund_debit
 
         expense_data = (
-            OutgoingFund.objects.filter(payee=vendor_id)
+            OutgoingFund.objects.filter(query_filters,payee=vendor_id)
             .select_related("payee")
             .values(
                 "id",
                 "date",
                 "remarks",
                 document=F("id"),
-                credit=F("amount"),
-                debit=Value(0.0),
+                debit=F("amount"),
+                credit=Value(0.0),
                 customer_name=F("payee__name"),
                 reference=Value("Expenses", output_field=CharField()),
             )
         )
 
         bank_deposit_data = (
-            BankDepositTransactions.objects.filter(customer_id=vendor_id)
+            BankDepositTransactions.objects.filter(query_filters,customer_id=vendor_id)
             .select_related("customer")
             .values(
                 "id",
                 "remarks",
                 "date",
                 document=F("id"),
-                credit=F("amount"),
-                debit=Value(0.0),
+                debit=Abs(F("amount")),
+                credit=Value(0.0),
                 customer_name=F("customer__name"),
                 reference=Value("Deposits", output_field=CharField()),
             )
         )
 
         journal_data = (
-            JournalEntryLine.objects.filter(person_id=vendor_id)
+            JournalEntryLine.objects.filter(journal_filters,person_id=vendor_id)
             .select_related("person")
             .values(
                 "id",
@@ -965,7 +1011,6 @@ class EmployeeLedgerView(APIView):
             key=lambda x: x["date"],
         )
 
-        opening_balance = 0
         current_balance = opening_balance
 
         for entry in combined_data:
@@ -981,7 +1026,7 @@ class EmployeeLedgerView(APIView):
         response_data = {
             "customer_info": customer_info,
             "opening_balance": opening_balance,
-            "closing_balance": 0,
+            "closing_balance": current_balance,
             "transactions": combined_data,
         }
 
@@ -1125,7 +1170,9 @@ class PlotLedgerView(APIView):
 
                         paid_amount = (
                             IncomingFund.objects.filter(
-                                booking_id=booking_id,reference_plot=plot_id, date__lt=start_date
+                                booking_id=booking_id,
+                                reference_plot=plot_id,
+                                date__lt=start_date,
                             ).aggregate(
                                 total_amount=Sum(
                                     Case(
@@ -1232,7 +1279,8 @@ class PlotLedgerView(APIView):
                         )
                         paid_amount = (
                             IncomingFund.objects.filter(
-                                booking_id=booking_id,reference_plot=plot_id,
+                                booking_id=booking_id,
+                                reference_plot=plot_id,
                             ).aggregate(
                                 total_amount=Sum(
                                     Case(
@@ -1361,7 +1409,6 @@ class PlotLedgerView(APIView):
                             "transactions": combined_data,
                         }
                         result.append(response_data)
-
 
                 if not result:
                     plot_query = Plots.objects.get(id=plot_id)
@@ -1515,7 +1562,11 @@ class ProfitReportView(APIView):
 
         # Define the allowed account types
         allowed_account_types = [
-            "Income", "Other_Income", "Expenses", "Cost_of_goods_sold", "Other_Expenses"
+            "Income",
+            "Other_Income",
+            "Expenses",
+            "Cost_of_goods_sold",
+            "Other_Expenses",
         ]
 
         # Apply query filters for transactions
@@ -1543,7 +1594,10 @@ class ProfitReportView(APIView):
 
             # Calculate balance for each bank
             transactions = BankTransaction.objects.filter(query_filters, bank=bank)
-            balance = int(sum(t.deposit for t in transactions) - sum(t.payment for t in transactions))
+            balance = int(
+                sum(t.deposit for t in transactions)
+                - sum(t.payment for t in transactions)
+            )
             # Create account entry
             account_entry = {
                 "bank_name": bank_name,
@@ -1555,8 +1609,14 @@ class ProfitReportView(APIView):
             # If the bank has a parent, add it as a sub-account to the parent entry
             if parent_bank:
                 parent_entry = next(
-                    (acc for acc in account_type_dict[parent_bank.account_type]["accounts"] if acc["bank_id"] == parent_bank.id),
-                    None
+                    (
+                        acc
+                        for acc in account_type_dict[parent_bank.account_type][
+                            "accounts"
+                        ]
+                        if acc["bank_id"] == parent_bank.id
+                    ),
+                    None,
                 )
                 if not parent_entry:
                     # Create parent entry if it doesn't exist
@@ -1566,7 +1626,9 @@ class ProfitReportView(APIView):
                         "balance": 0,
                         "sub_accounts": [],
                     }
-                    account_type_dict[parent_bank.account_type]["accounts"].append(parent_entry)
+                    account_type_dict[parent_bank.account_type]["accounts"].append(
+                        parent_entry
+                    )
                 # Append current bank as a sub-account
                 parent_entry["sub_accounts"].append(account_entry)
             else:
@@ -1587,6 +1649,7 @@ class ProfitReportView(APIView):
         ]
 
         return Response(result)
+
 
 class IncomingPaymentsReport(APIView):
     def get(self, request):
@@ -1682,7 +1745,6 @@ class OutgoingPaymentsReport(APIView):
         bank_deposit_payments = BankDepositTransactions.objects.filter(
             deposit_query_filters
         ).select_related("customer", "bank")
-
 
         booking_payments_serialized = BookingPaymentsSerializer(
             booking_payments, many=True
