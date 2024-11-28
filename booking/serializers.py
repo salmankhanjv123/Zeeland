@@ -560,6 +560,19 @@ class TokenSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         files_data = validated_data.pop("files", [])
         plots_data = validated_data.pop("plot", [])
+        project=validated_data.get("project")
+        
+        try:
+            latest_token = Token.objects.filter(project=project).latest(
+                "created_at"
+            )
+            latest_token_number = int(latest_token.document_number) + 1
+        except Token.DoesNotExist:
+            latest_token_number = 1
+
+        document_number_str = str(latest_token_number).zfill(3)
+        validated_data["document_number"] = document_number_str
+        
         token = Token.objects.create(**validated_data)
 
         if plots_data:

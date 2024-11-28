@@ -79,6 +79,7 @@ class BookingDocuments(models.Model):
 
 class Token(models.Model):
     project = models.ForeignKey(Projects, on_delete=models.PROTECT)
+    document_number=models.CharField(max_length=10, blank=True, null=True)
     user = models.ForeignKey(User, on_delete=models.PROTECT)
     plot=models.ManyToManyField(Plots,related_name="tokens")
     plot_amount=models.FloatField(default=0)

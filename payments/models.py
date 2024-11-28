@@ -59,10 +59,13 @@ class MonthField(models.DateField):
 
 class IncomingFund(models.Model):
     project = models.ForeignKey(Projects, on_delete=models.PROTECT)
+    document_number=models.CharField(max_length=10, blank=True, null=True)
     reference = models.CharField(max_length=10, default="payment")
     booking = models.ForeignKey(Booking, on_delete=models.PROTECT)
     reference_plot = models.ForeignKey(Plots, on_delete=models.PROTECT,blank=True, null=True)
     date = models.DateField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
     installement_month = MonthField(blank=True, null=True)
     amount = models.FloatField()
     remarks = models.TextField(blank=True, null=True)

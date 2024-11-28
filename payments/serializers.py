@@ -263,9 +263,11 @@ class IncomingFundSerializer(serializers.ModelSerializer):
     @transaction.atomic
     def create(self, validated_data):
         files_data = validated_data.pop("files", [])
-        reference = validated_data["reference"]
-        booking = validated_data["booking"]
-        amount = validated_data["amount"]
+        project=validated_data.get("project")
+        reference = validated_data.get("reference")
+        booking = validated_data.get("booking")
+        amount = validated_data.get("amount")
+        
         if reference == "payment":
             booking.total_receiving_amount += amount
             booking.remaining -= amount
@@ -274,8 +276,19 @@ class IncomingFundSerializer(serializers.ModelSerializer):
             booking.remaining += amount
         else:
             raise ValueError("Invalid reference type")
-
         booking.save()
+        
+        try:
+            latest_payment = IncomingFund.objects.filter(project=project).latest(
+                "created_at"
+            )
+            latest_payment_number = int(latest_payment.document_number) + 1
+        except IncomingFund.DoesNotExist:
+            latest_payment_number = 1
+
+        document_number_str = str(latest_payment_number).zfill(3)
+        validated_data["document_number"] = document_number_str
+
         incoming_fund = IncomingFund.objects.create(**validated_data)
         for file_data in files_data:
             IncomingFundDocuments.objects.create(
