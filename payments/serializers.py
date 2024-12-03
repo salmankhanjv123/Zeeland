@@ -85,7 +85,7 @@ class BankTransactionSerializer(serializers.ModelSerializer):
         elif obj.related_table == "OutgoingFund":
             try:
                 related_instance = OutgoingFund.objects.get(pk=obj.related_id)
-                return related_instance.payee.name
+                return related_instance.payee.name if related_instance.payee else None
             except OutgoingFund.DoesNotExist:
                 return None
         elif obj.related_table == "dealer_payments":
