@@ -225,12 +225,17 @@ class BookingSerializer(serializers.ModelSerializer):
                 related_id=booking.id,
             )
 
+            payment_amount = 0
+            deposit_amount = advance_amount
+            if advance_bank.main_type in ["Equity"]:
+                payment_amount, deposit_amount = deposit_amount, payment_amount
+            
             BankTransaction.objects.create(
                 project=project,
                 bank=advance_bank,
                 transaction_type="Booking_Advance",
-                payment=0,
-                deposit=advance_amount,
+                payment=payment_amount,
+                deposit=deposit_amount,
                 transaction_date=booking_date,
                 related_table="Booking",
                 related_id=booking.id,
@@ -471,6 +476,11 @@ class BookingSerializer(serializers.ModelSerializer):
                 elif booking.bank.detail_type != "Undeposited_Funds" and new_bank.detail_type == "Undeposited_Funds":
                     is_deposit = False
             
+            payment_amount = 0
+            deposit_amount = advance_amount
+            if new_bank.main_type in ["Equity"]:
+                payment_amount, deposit_amount = deposit_amount, payment_amount
+            
             BankTransaction.objects.filter(
                 project=project,
                 bank=booking.bank,
@@ -478,9 +488,9 @@ class BookingSerializer(serializers.ModelSerializer):
                 related_table="Booking",
                 related_id=booking.id,
             ).update(
-                payment=0,
                 bank=new_bank,
-                deposit=advance_amount,
+                payment=payment_amount,
+                deposit=deposit_amount,
                 transaction_date=booking_date,
                 is_deposit=is_deposit,
             )
@@ -611,6 +621,7 @@ class TokenSerializer(serializers.ModelSerializer):
         date = validated_data.get("date")
         amount = validated_data.get("amount", 0)
         bank = validated_data.get("bank")
+        main_type=bank.main_type
         payment_type = validated_data.get("payment_type")
         is_deposit = bank.detail_type != "Undeposited_Funds"
         is_cheque_clear = payment_type != "Cheque"
@@ -629,13 +640,16 @@ class TokenSerializer(serializers.ModelSerializer):
             related_table="token",
             related_id=payment.id,
         )
-
+        payment_amount = 0
+        deposit_amount = amount
+        if main_type in ["Equity"]:
+            payment_amount, deposit_amount = deposit_amount, payment_amount
         BankTransaction.objects.create(
             project=project,
             bank=bank,
             transaction_type="Token",
-            payment=0,
-            deposit=amount,
+            payment=payment_amount,
+            deposit=deposit_amount,
             transaction_date=date,
             related_table="token",
             related_id=payment.id,
@@ -684,6 +698,7 @@ class TokenSerializer(serializers.ModelSerializer):
         date = validated_data.get("date", payment.date)
         amount = validated_data.get("amount", payment.amount)
         new_bank = validated_data.get("bank", payment.bank)
+        main_type=new_bank.main_type
 
 
         account_receivable_bank = Bank.objects.filter(
@@ -721,6 +736,10 @@ class TokenSerializer(serializers.ModelSerializer):
             elif payment.bank.detail_type != "Undeposited_Funds" and new_bank.detail_type == "Undeposited_Funds":
                 is_deposit = False
        
+        payment_amount = 0
+        deposit_amount = amount
+        if main_type in ["Equity"]:
+            payment_amount, deposit_amount = deposit_amount, payment_amount
         # Update transaction for the specified bank
         BankTransaction.objects.filter(
             project=project,
@@ -730,8 +749,8 @@ class TokenSerializer(serializers.ModelSerializer):
             related_id=payment.id,
         ).update(
             bank=new_bank,
-            payment=0,
-            deposit=amount,
+            payment=payment_amount,
+            deposit=deposit_amount,
             transaction_date=date,
             is_deposit=is_deposit,
         )

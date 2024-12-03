@@ -630,7 +630,7 @@ class CustomerLedgerView(APIView):
                     default=Value(0),
                     output_field=FloatField(),
                 ),
-                document=F("id"),
+                document=F("document_number"),
                 customer_name=F("booking__customer__name"),
             )
         )
@@ -644,7 +644,7 @@ class CustomerLedgerView(APIView):
                 "remarks",
                 debit=F("amount"),
                 credit=Value(0.0),
-                document=F("id"),
+                document=F("document_number"),
                 customer_name=F("customer__name"),
                 reference=Value("token", output_field=CharField()),
             )
@@ -1100,7 +1100,7 @@ class PlotLedgerView(APIView):
                                     default=Value(0),
                                     output_field=FloatField(),
                                 ),
-                                document=F("id"),
+                                document=F("document_number"),
                                 customer_name=F("booking__customer__name"),
                             )
                         )
@@ -1119,7 +1119,7 @@ class PlotLedgerView(APIView):
                                 "remarks",
                                 debit=F("amount"),
                                 credit=Value(0.0),
-                                document=F("id"),
+                                document=F("document_number"),
                                 customer_name=F("customer__name"),
                                 reference=Value("token", output_field=CharField()),
                             )
@@ -1342,7 +1342,7 @@ class PlotLedgerView(APIView):
                         "remarks",
                         debit=F("amount"),
                         credit=Value(0.0),
-                        document=F("id"),
+                        document=F("document_number"),
                         customer_name=F("customer__name"),
                         reference=Value("token", output_field=CharField()),
                     )
@@ -1375,7 +1375,7 @@ class PlotLedgerView(APIView):
                                 "remarks",
                                 debit=F("amount"),
                                 credit=Value(0.0),
-                                document=F("id"),
+                                document=F("document_number"),
                                 customer_name=F("customer__name"),
                                 reference=Value("token", output_field=CharField()),
                             )

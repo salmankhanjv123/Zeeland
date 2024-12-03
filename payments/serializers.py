@@ -91,7 +91,7 @@ class BankTransactionSerializer(serializers.ModelSerializer):
         elif obj.related_table == "dealer_payments":
             try:
                 related_instance = DealerPayments.objects.get(pk=obj.related_id)
-                return related_instance.booking.customer.name
+                return related_instance.booking.dealer.name
             except DealerPayments.DoesNotExist:
                 return None
         return None
@@ -304,10 +304,12 @@ class IncomingFundSerializer(serializers.ModelSerializer):
         reference = validated_data.get("reference")
         amount = validated_data.get("amount", 0)
         bank = validated_data.get("bank")
+        main_type=bank.main_type
         payment_type = validated_data.get("payment_type")
         is_deposit = bank.detail_type != "Undeposited_Funds"
         is_cheque_clear = payment_type != "Cheque"
 
+        #debit in account payable and credit in bank/equity
         if reference == "refund":
             target_bank = Bank.objects.filter(
                 used_for="Account_Payable", project=project
@@ -322,20 +324,25 @@ class IncomingFundSerializer(serializers.ModelSerializer):
                 related_table="incoming_funds",
                 related_id=payment.id,
             )
-
+            
+            payment_amount = amount
+            deposit_amount = 0
+            if main_type in ["Equity"]:
+                payment_amount, deposit_amount = deposit_amount, payment_amount
+            
             BankTransaction.objects.create(
                 project=project,
                 bank=bank,
                 transaction_type="Customer_Refund",
-                payment=amount,
-                deposit=0,
+                payment=payment_amount,
+                deposit=deposit_amount,
                 transaction_date=date,
                 related_table="incoming_funds",
                 related_id=payment.id,
                 is_deposit=is_deposit,
                 is_cheque_clear=is_cheque_clear,
             )
-
+         #credit in account receivable and debit in bank/equity
         else:
             target_bank = Bank.objects.filter(
                 used_for="Account_Receivable", project=project
@@ -352,12 +359,17 @@ class IncomingFundSerializer(serializers.ModelSerializer):
                 related_id=payment.id,
             )
 
+            payment_amount = 0
+            deposit_amount = amount
+            if main_type in ["Equity"]:
+                payment_amount, deposit_amount = deposit_amount, payment_amount
+            
             BankTransaction.objects.create(
                 project=project,
                 bank=bank,
                 transaction_type="Customer_Payment",
-                payment=0,
-                deposit=amount,
+                payment=payment_amount,
+                deposit=deposit_amount,
                 transaction_date=date,
                 related_table="incoming_funds",
                 related_id=payment.id,
@@ -422,6 +434,7 @@ class IncomingFundSerializer(serializers.ModelSerializer):
         reference = validated_data.get("reference", payment.reference)
         amount = validated_data.get("amount", payment.amount)
         new_bank = validated_data.get("bank", payment.bank)
+        main_type=new_bank.main_type
         payment_type = validated_data.get("payment_type", payment.payment_type)
 
         # Set related_table and related_id based on advance_payment flag
@@ -471,6 +484,11 @@ class IncomingFundSerializer(serializers.ModelSerializer):
                 transaction_date=date,
             )
 
+            payment_amount = amount
+            deposit_amount = 0
+            if main_type in ["Equity"]:
+                payment_amount, deposit_amount = deposit_amount, payment_amount
+
             # Update bank transaction with new_bank for refund
             BankTransaction.objects.filter(
                 project=project,
@@ -480,8 +498,8 @@ class IncomingFundSerializer(serializers.ModelSerializer):
                 related_id=related_id,
             ).update(
                 bank=new_bank,
-                payment=amount,
-                deposit=0,
+                payment=payment_amount,
+                deposit=deposit_amount,
                 transaction_date=date,
                 is_deposit=is_deposit,
             )
@@ -505,6 +523,10 @@ class IncomingFundSerializer(serializers.ModelSerializer):
                 transaction_date=date,
             )
 
+            payment_amount = 0
+            deposit_amount = amount
+            if main_type in ["Equity"]:
+                payment_amount, deposit_amount = deposit_amount, payment_amount
             # Update bank transaction with new_bank for payment
             BankTransaction.objects.filter(
                 project=project,
@@ -514,8 +536,8 @@ class IncomingFundSerializer(serializers.ModelSerializer):
                 related_id=related_id,
             ).update(
                 bank=new_bank,
-                payment=0,
-                deposit=amount,
+                payment=payment_amount,
+                deposit=deposit_amount,
                 transaction_date=date,
                 is_deposit=is_deposit,
             )
@@ -577,12 +599,22 @@ class OutgoingFundSerializer(serializers.ModelSerializer):
 
         # Transactions for each detail in OutgoingFundDetails
         for detail in outgoing_fund.details.all():
+            amount = detail.amount
+            bank = detail.category
+            main_type=bank.main_type
+            
+            payment = amount
+            deposit = 0
+            
+            if main_type in ["Asset", "Expense"]:
+                payment, deposit = deposit, payment
+            
             BankTransaction.objects.create(
                 project_id=project_id,
-                bank=detail.category,  # Assuming category is a Bank here
+                bank=bank,  
                 transaction_type="Expenses",
-                payment=0,
-                deposit=detail.amount,
+                payment=payment,
+                deposit=deposit,
                 transaction_date=outgoing_fund.date,
                 related_table="OutgoingFund",
                 related_id=outgoing_fund.id,
@@ -841,18 +873,26 @@ class BankDepositSerializer(serializers.ModelSerializer):
 
             for data in transactions_data:
                 amount = abs(data.get("amount"))
-                bank = data.get("bank")
                 date = data.get("date")
+                bank = data.get("bank")
+                main_type=bank.main_type
+                
+                payment = amount
+                deposit = 0
+                
+                if main_type in ["Asset", "Expense"]:
+                    payment, deposit = deposit, payment
+                
                 BankDepositTransactions.objects.create(
                     bank_deposit=bank_deposit, **data
                 )
-                #  expense account deposit hence increase
+                
                 BankTransaction.objects.create(
                     project=project,
                     bank=bank,
                     transaction_date=date,
-                    payment=0,  # No payment
-                    deposit=amount,  # Increase deposit
+                    payment=payment,  
+                    deposit=deposit,  
                     transaction_type="deposit",
                     related_table="bank_deposits",
                     related_id=bank_deposit.id,
@@ -937,16 +977,23 @@ class BankDepositSerializer(serializers.ModelSerializer):
             for data in transactions_data:
                 amount = abs(data.get("amount"))
                 bank = data.get("bank")
+                main_type=bank.main_type
                 date = data.get("date")
+                
                 BankDepositTransactions.objects.create(bank_deposit=instance, **data)
 
-                # debit in expense
+                payment = amount
+                deposit = 0
+                
+                if main_type in ["Asset", "Expense"]:
+                    payment, deposit = deposit, payment
+
                 BankTransaction.objects.create(
                     project=project,
                     bank=bank,
                     transaction_date=date,
-                    payment=0,  # No payment
-                    deposit=amount,  # Increase deposit
+                    payment=payment,  
+                    deposit=deposit,  
                     transaction_type="deposit",
                     related_table="bank_deposits",
                     related_id=instance.id,
@@ -1204,6 +1251,7 @@ class JournalEntrySerializer(serializers.ModelSerializer):
         for detail in journal_entry.details.all():
             bank = detail.account
             main_type = bank.main_type
+            
             payment = detail.debit
             deposit = detail.credit
 
