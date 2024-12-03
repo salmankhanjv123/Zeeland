@@ -106,9 +106,20 @@ class BookingSerializer(serializers.ModelSerializer):
                     BookingDocuments.objects.create(booking=booking, **file_data)
 
                 if advance_amount > 0:
+                    
+                    try:
+                        latest_payment = IncomingFund.objects.filter(project=project).latest(
+                            "created_at"
+                        )
+                        latest_payment_number = int(latest_payment.document_number) + 1
+                    except IncomingFund.DoesNotExist:
+                        latest_payment_number = 1
+                    document_number_str = str(latest_payment_number).zfill(3)
+                    
                     IncomingFund.objects.create(
                         project=project,
                         booking=booking,
+                        document_number=document_number_str,
                         date=booking_date,
                         installement_month=installement_month,
                         amount=advance_amount,
@@ -261,6 +272,7 @@ class BookingSerializer(serializers.ModelSerializer):
         files_data = validated_data.pop("files", [])
         plots_data = validated_data.pop("plots", [])
         token = validated_data.get("token", instance.token)
+        project= validated_data.get("project", instance.project)
         token_amount = token.amount if token else 0
         booking_date = validated_data.get("booking_date", instance.booking_date)
         installement_month = datetime.datetime(
@@ -297,9 +309,19 @@ class BookingSerializer(serializers.ModelSerializer):
                     advance_payment_obj.save()
                 else:
                     # If no advance payment exists, and advance_amount > 0, create a new IncomingFund
+                                        
+                    try:
+                        latest_payment = IncomingFund.objects.filter(project=project).latest(
+                            "created_at"
+                        )
+                        latest_payment_number = int(latest_payment.document_number) + 1
+                    except IncomingFund.DoesNotExist:
+                        latest_payment_number = 1
+                    document_number_str = str(latest_payment_number).zfill(3)
                     if advance_amount > 0:
                         IncomingFund.objects.create(
                             project=instance.project,
+                            document_number=document_number_str,
                             booking=instance,
                             date=booking_date,
                             installement_month=installement_month,
