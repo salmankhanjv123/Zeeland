@@ -20,7 +20,9 @@ from .serializers import (
     PlotsSerializer,
     BookingPaymentsSerializer,
     TokenPaymentsSerializer,
+    PaymentDataSerializer,
     BankDepositTransactionsSerializer,
+    TokenDataSerializer,
 )
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -526,7 +528,6 @@ class CustomerLedgerView(APIView):
         customer_id = self.request.query_params.get("customer_id")
         start_date = self.request.query_params.get("start_date")
         end_date = self.request.query_params.get("end_date")
-
         plot_id = self.request.query_params.get("plot_id")
 
         booking_query_filters = Q()
@@ -609,46 +610,15 @@ class CustomerLedgerView(APIView):
                 reference=Value("Deposits", output_field=CharField()),
             )
         )
-        payment_data = (
-            IncomingFund.objects.filter(
-                payment_query_filters, booking__customer_id=customer_id
-            )
-            .select_related("booking__customer")
-            .values(
-                "id",
-                "date",
-                "remarks",
-                "reference",
-                "booking_id",
-                credit=Case(
-                    When(reference="refund", then=F("amount")),
-                    default=Value(0),
-                    output_field=FloatField(),
-                ),
-                debit=Case(
-                    When(reference="payment", then=F("amount")),
-                    default=Value(0),
-                    output_field=FloatField(),
-                ),
-                document=F("document_number"),
-                customer_name=F("booking__customer__name"),
-            )
-        )
+        payment_data_query = IncomingFund.objects.filter(
+            payment_query_filters, booking__customer_id=customer_id
+        ).select_related("booking__customer")
+        payment_data = PaymentDataSerializer(payment_data_query, many=True).data
 
-        token_data = (
-            Token.objects.filter(token_query_filters, customer_id=customer_id)
-            .select_related("customer")
-            .values(
-                "id",
-                "date",
-                "remarks",
-                debit=F("amount"),
-                credit=Value(0.0),
-                document=F("document_number"),
-                customer_name=F("customer__name"),
-                reference=Value("token", output_field=CharField()),
-            )
-        )
+        token_data_query = Token.objects.filter(
+            token_query_filters, customer_id=customer_id
+        ).select_related("customer")
+        token_data = TokenDataSerializer(token_data_query, many=True).data
 
         resale_data = (
             PlotResale.objects.filter(
@@ -675,7 +645,7 @@ class CustomerLedgerView(APIView):
                 "id",
                 "date",
                 "remarks",
-                debit=F("company_amount_paid")-F("amount_received"),
+                debit=F("company_amount_paid") - F("amount_received"),
                 credit=Value(0.0),
                 document=F("id"),
                 customer_name=F("booking__customer__name"),
@@ -846,12 +816,16 @@ class VendorLedgerView(APIView):
         outgoing_fund_debit = (
             OutgoingFund.objects.filter(payee=vendor_id, date__lt=start_date)
             .aggregate(total_debit=Sum("amount", output_field=FloatField()))
-            .get("total_debit", 0.0) or 0.0
+            .get("total_debit", 0.0)
+            or 0.0
         )
         bank_deposit_debit = (
-            BankDepositTransactions.objects.filter(customer_id=vendor_id, date__lt=start_date)
+            BankDepositTransactions.objects.filter(
+                customer_id=vendor_id, date__lt=start_date
+            )
             .aggregate(total_debit=Sum(Abs(F("amount")), output_field=FloatField()))
-            .get("total_debit", 0.0) or 0.0
+            .get("total_debit", 0.0)
+            or 0.0
         )
         journal_data = JournalEntryLine.objects.filter(
             person_id=vendor_id, journal_entry__date__lt=start_date
@@ -863,9 +837,6 @@ class VendorLedgerView(APIView):
         journal_debit = journal_data.get("total_debit", 0.0) or 0.0
         journal_balance = journal_credit - journal_debit
         opening_balance = journal_balance - bank_deposit_debit - outgoing_fund_debit
-
-
-
 
         expense_data = (
             OutgoingFund.objects.filter(query_filters, payee=vendor_id)
@@ -955,16 +926,20 @@ class EmployeeLedgerView(APIView):
                 journal_entry__date__lte=end_date
             )
             query_filters &= Q(date__gte=start_date) & Q(date__lte=end_date)
-        
+
         outgoing_fund_debit = (
             OutgoingFund.objects.filter(payee=vendor_id, date__lt=start_date)
             .aggregate(total_debit=Sum("amount", output_field=FloatField()))
-            .get("total_debit", 0.0) or 0.0
+            .get("total_debit", 0.0)
+            or 0.0
         )
         bank_deposit_debit = (
-            BankDepositTransactions.objects.filter(customer_id=vendor_id, date__lt=start_date)
+            BankDepositTransactions.objects.filter(
+                customer_id=vendor_id, date__lt=start_date
+            )
             .aggregate(total_debit=Sum(Abs(F("amount")), output_field=FloatField()))
-            .get("total_debit", 0.0) or 0.0
+            .get("total_debit", 0.0)
+            or 0.0
         )
         journal_data = JournalEntryLine.objects.filter(
             person_id=vendor_id, journal_entry__date__lt=start_date
@@ -978,7 +953,7 @@ class EmployeeLedgerView(APIView):
         opening_balance = journal_balance - bank_deposit_debit - outgoing_fund_debit
 
         expense_data = (
-            OutgoingFund.objects.filter(query_filters,payee=vendor_id)
+            OutgoingFund.objects.filter(query_filters, payee=vendor_id)
             .select_related("payee")
             .values(
                 "id",
@@ -993,7 +968,7 @@ class EmployeeLedgerView(APIView):
         )
 
         bank_deposit_data = (
-            BankDepositTransactions.objects.filter(query_filters,customer_id=vendor_id)
+            BankDepositTransactions.objects.filter(query_filters, customer_id=vendor_id)
             .select_related("customer")
             .values(
                 "id",
@@ -1008,7 +983,7 @@ class EmployeeLedgerView(APIView):
         )
 
         journal_data = (
-            JournalEntryLine.objects.filter(journal_filters,person_id=vendor_id)
+            JournalEntryLine.objects.filter(journal_filters, person_id=vendor_id)
             .select_related("person")
             .values(
                 "id",
