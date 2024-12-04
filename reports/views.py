@@ -659,7 +659,23 @@ class CustomerLedgerView(APIView):
                 "id",
                 "date",
                 "remarks",
-                debit=F("company_amount_paid"),
+                credit=F("amount_received"),
+                debit=F("booking__total_amount"),
+                document=F("id"),
+                customer_name=F("booking__customer__name"),
+                reference=Value("close booking", output_field=CharField()),
+            )
+        )
+        resale_data_extra = (
+            PlotResale.objects.filter(
+                resale_query_filters, booking__customer_id=customer_id
+            )
+            .select_related("customer")
+            .values(
+                "id",
+                "date",
+                "remarks",
+                debit=F("company_amount_paid")-F("amount_received"),
                 credit=Value(0.0),
                 document=F("id"),
                 customer_name=F("booking__customer__name"),
@@ -671,9 +687,10 @@ class CustomerLedgerView(APIView):
             list(booking_data)
             + list(payment_data)
             + list(token_data)
-            + list(resale_data)
             + list(expense_data)
-            + list(bank_deposit_data),
+            + list(bank_deposit_data)
+            + list(resale_data)
+            + list(resale_data_extra),
             key=lambda x: x["date"],
         )
 
