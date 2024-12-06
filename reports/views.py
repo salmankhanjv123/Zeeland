@@ -645,7 +645,7 @@ class CustomerLedgerView(APIView):
                 "id",
                 "date",
                 "remarks",
-                debit=F("company_amount_paid") - F("amount_received"),
+                debit=F("company_amount_paid"),
                 credit=Value(0.0),
                 document=F("id"),
                 customer_name=F("booking__customer__name"),
