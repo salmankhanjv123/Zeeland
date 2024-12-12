@@ -402,48 +402,74 @@ class BookingSerializer(serializers.ModelSerializer):
             used_for="Account_Receivable", project=project
         ).first()
         if account_receivable_bank:
-            BankTransaction.objects.filter(
+            BankTransaction.objects.update_or_create(
                 project=project,
                 bank=account_receivable_bank,
                 related_table="Booking",
+                transaction_type="Booking",
                 related_id=booking.id,
-            ).update(payment=0, deposit=booking_amount, transaction_date=booking_date)
+                defaults={
+                    "payment": 0,
+                    "deposit": booking_amount,
+                    "transaction_date": booking_date,
+                },
+            )
+
 
         # Sale account (Credit)
         sale_bank = Bank.objects.filter(
             used_for="Sale_Account", project=project
         ).first()
         if sale_bank:
-            BankTransaction.objects.filter(
+            BankTransaction.objects.update_or_create(
                 project=project,
                 bank=sale_bank,
                 related_table="Booking",
+                transaction_type="Booking",
                 related_id=booking.id,
-            ).update(deposit=booking_amount, payment=0, transaction_date=booking_date)
+                defaults={
+                    "deposit": booking_amount,
+                    "payment": 0,
+                    "transaction_date": booking_date,
+                },
+            )
+
 
         # Cost of Goods Sold (COGS - Debit)
         cogs_bank = Bank.objects.filter(
             used_for="Cost_of_Good_Sold", project=project
         ).first()
         if cogs_bank:
-            BankTransaction.objects.filter(
+            BankTransaction.objects.update_or_create(
                 project=project,
                 bank=cogs_bank,
                 related_table="Booking",
+                transaction_type="Booking",
                 related_id=booking.id,
-            ).update(payment=0, deposit=plot_cost, transaction_date=booking_date)
+                defaults={
+                    "payment": 0,
+                    "deposit": plot_cost,
+                    "transaction_date": booking_date,
+                },
+            )
 
         # Land Inventory (Credit)
         land_inventory_bank = Bank.objects.filter(
             used_for="Land_Inventory", project=project
         ).first()
         if land_inventory_bank:
-            BankTransaction.objects.filter(
+            BankTransaction.objects.update_or_create(
                 project=project,
                 bank=land_inventory_bank,
                 related_table="Booking",
+                transaction_type="Booking",
                 related_id=booking.id,
-            ).update(deposit=0, payment=plot_cost, transaction_date=booking_date)
+                defaults={
+                    "deposit": 0,
+                    "payment": plot_cost,
+                    "transaction_date": booking_date,
+                },
+            )
 
         # Advance payment (Credit - Account Receivable) (Debit - Bank)
         if advance_amount > 0 and account_receivable_bank and new_bank:
