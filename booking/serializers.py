@@ -55,7 +55,7 @@ class BookingSerializer(serializers.ModelSerializer):
     bank_name = serializers.CharField(source="bank.name", read_only=True)
     plot_info = PlotsSerializer(source="plots", many=True, read_only=True)
     files = BookingDocumentsSerializer(many=True, required=False)
-    plots = CreatePlotsSerializer(many=True)
+    plots = CreatePlotsSerializer(many=True,required=True)
 
     class Meta:
         model = Booking
@@ -93,9 +93,8 @@ class BookingSerializer(serializers.ModelSerializer):
                     token.save()
 
                 booking = Booking.objects.create(**validated_data)
-
+                booking.plots.set([plot["id"] for plot in plots_data])
                 if plots_data and project.id==5:
-                    booking.plots.set([plot["id"] for plot in plots_data])
                     for plot_data in plots_data:
                         plot_id = plot_data["id"]
                         plot = Plots.objects.get(id=plot_id)
@@ -295,9 +294,8 @@ class BookingSerializer(serializers.ModelSerializer):
                 for key, value in validated_data.items():
                     setattr(instance, key, value)
                 instance.save()
-
+                instance.plots.set([plot["id"] for plot in plots_data])
                 if plots_data and project.id==5:
-                    instance.plots.set([plot["id"] for plot in plots_data])
                     for plot_data in plots_data:
                         plot_id = plot_data["id"]
                         plot = Plots.objects.get(id=plot_id)
