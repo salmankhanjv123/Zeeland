@@ -447,13 +447,18 @@ class BookingSerializer(serializers.ModelSerializer):
 
         # Advance payment (Credit - Account Receivable) (Debit - Bank)
         if advance_amount > 0 and account_receivable_bank and new_bank:
-            BankTransaction.objects.filter(
+            BankTransaction.objects.update_or_create(
                 project=project,
                 bank=account_receivable_bank,
                 transaction_type="Booking_Advance",
                 related_table="Booking",
                 related_id=booking.id,
-            ).update(payment=advance_amount, deposit=0, transaction_date=booking_date)
+                defaults={
+                    "payment": advance_amount,
+                    "deposit": 0,
+                    "transaction_date": booking_date,
+                },
+            )
 
         # Retrieve the existing transaction to use its current `is_deposit` value if no bank change
             existing_transaction = BankTransaction.objects.filter(
@@ -479,19 +484,21 @@ class BookingSerializer(serializers.ModelSerializer):
             if new_bank.main_type in ["Equity"]:
                 payment_amount, deposit_amount = deposit_amount, payment_amount
             
-            BankTransaction.objects.filter(
+            BankTransaction.objects.update_or_create(
                 project=project,
                 bank=booking.bank,
                 transaction_type="Booking_Advance",
                 related_table="Booking",
                 related_id=booking.id,
-            ).update(
-                bank=new_bank,
-                payment=payment_amount,
-                deposit=deposit_amount,
-                transaction_date=booking_date,
-                is_deposit=is_deposit,
+                defaults={
+                    "bank": new_bank,
+                    "payment": payment_amount,
+                    "deposit": deposit_amount,
+                    "transaction_date": booking_date,
+                    "is_deposit": is_deposit,
+                },
             )
+
 
         # Dealer Comission (Credit - Account Payable) (Debit - Dealer Expense)
         account_payable_bank = Bank.objects.filter(
