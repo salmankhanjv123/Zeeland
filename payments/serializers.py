@@ -253,10 +253,8 @@ class IncomingFundSerializer(serializers.ModelSerializer):
     reference_plot_info = PlotsSerializer(source="reference_plot", read_only=True)
     bank_name = serializers.CharField(source="bank.name", read_only=True)
     account_type = serializers.CharField(source="bank.account_type", read_only=True)
-    document_number=serializers.CharField(required=True)
     customer = CustomersSerializer(source="booking.customer", read_only=True)
     files = IncomingFundDocumentsSerializer(many=True, required=False)
-
 
     class Meta:
         model = IncomingFund
@@ -284,16 +282,12 @@ class IncomingFundSerializer(serializers.ModelSerializer):
             latest_payment = IncomingFund.objects.filter(project=project).latest(
                 "created_at"
             )
-            latest_payment_number = int(latest_payment.document_number)
+            latest_payment_number = int(latest_payment.document_number) + 1
         except IncomingFund.DoesNotExist:
             latest_payment_number = 1
 
         document_number_str = str(latest_payment_number).zfill(3)
-        
-        if document_number_str==validated_data.get("document_number"):
-            validated_data["document_number"] =str(int(document_number_str)+1).zfill(3)
-        else:
-            validated_data["document_number"] = validated_data.get("document_number")
+        validated_data["document_number"] = document_number_str
 
         incoming_fund = IncomingFund.objects.create(**validated_data)
         for file_data in files_data:
