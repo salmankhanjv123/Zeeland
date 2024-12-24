@@ -186,7 +186,7 @@ class IncomingFundViewSet(viewsets.ModelViewSet):
     """
     API endpoint that allows IncomingFund to be viewed or edited.
     """
-
+    
     serializer_class = IncomingFundSerializer
 
     def get_queryset(self):
@@ -233,7 +233,7 @@ class IncomingFundViewSet(viewsets.ModelViewSet):
             .prefetch_related("files")
         )
         return queryset
-
+  
     def perform_destroy(self, instance):
         # Check for existing related bank transaction entries
         related_bank_transactions = BankTransaction.objects.filter(
