@@ -265,6 +265,31 @@ class IncomingFundViewSet(viewsets.ModelViewSet):
         booking.save()
         return super().perform_destroy(instance)
 
+class LatestPaymentView(APIView):
+    
+    def get(self, request):
+        project_id = request.query_params.get("project_id")
+        print(f"Project ID: {project_id}")
+
+        if not project_id:
+            return Response({'error': 'Project ID is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            filtered_payments = IncomingFund.objects.filter(project_id=project_id)
+            print(f"Filtered Payments Count: {filtered_payments.count()}")
+
+            if not filtered_payments.exists():
+                return Response({'error': 'No payments found for this project'}, status=status.HTTP_404_NOT_FOUND)
+
+            latest_payment = filtered_payments.latest('created_at')
+            print(f"Latest Payment: {latest_payment}")
+            
+            serializer = IncomingFundSerializer(latest_payment)
+            return Response(serializer.data)
+        except Exception as e:
+            print(f"Error: {e}")
+            return Response({'error': 'An unexpected error occurred'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 class OutgoingFundViewSet(viewsets.ModelViewSet):
     """

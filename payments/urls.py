@@ -15,6 +15,7 @@ from .views import (
     JournalEntryViewSet,
     BankTransferViewSet,
     ChequeClearanceViewSet,
+    LatestPaymentView
 )
 from rest_framework import routers
 
@@ -43,4 +44,5 @@ urlpatterns = [
     path("", include(router.urls)),
     path("due-payments/", DuePaymentsView.as_view(), name="due_payments"),
     path("v2/bank-transactions/", BankTransactionAPIView.as_view()),
+    path('latest_payment/', LatestPaymentView.as_view(), name='latest_payment'),
 ]
