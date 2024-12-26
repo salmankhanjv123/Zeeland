@@ -254,6 +254,7 @@ class IncomingFundSerializer(serializers.ModelSerializer):
     bank_name = serializers.CharField(source="bank.name", read_only=True)
     account_type = serializers.CharField(source="bank.account_type", read_only=True)
     document_number=serializers.CharField(required=True)
+    previous_serial_num=serializers.CharField(required=False)
     customer = CustomersSerializer(source="booking.customer", read_only=True)
     files = IncomingFundDocumentsSerializer(many=True, required=False)
 
@@ -269,7 +270,9 @@ class IncomingFundSerializer(serializers.ModelSerializer):
         reference = validated_data.get("reference")
         booking = validated_data.get("booking")
         amount = validated_data.get("amount")
-        
+        if(validated_data.get("previous_serial_num")):
+            validated_data["previous_serial_num"] = str(int(validated_data["previous_serial_num"]) - 1)
+
         if reference == "payment":
             booking.total_receiving_amount += amount
             booking.remaining -= amount
