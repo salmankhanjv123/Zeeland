@@ -119,7 +119,7 @@ class OutgoingFund(models.Model):
     payee = models.ForeignKey(Customers, on_delete=models.PROTECT,blank=True, null=True)
     date = models.DateField()
     amount = models.FloatField()
-    remarks = models.TextField(blank=True, null=True)
+    remarks = models.TextField(max_length=3000, blank=True, null=True)
     payment_type = models.CharField(max_length=20, default="cash")
     cheque_number = models.CharField(max_length=50, blank=True, null=True)
     bank = models.ForeignKey(
