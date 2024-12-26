@@ -137,7 +137,7 @@ class OutgoingFundDetails(models.Model):
     category = models.ForeignKey(
         Bank, related_name="expenses_details", on_delete=models.PROTECT
     )
-    description=models.CharField(max_length=100,blank=True,null=True)
+    description=models.CharField(max_length=3000,blank=True,null=True)
     amount=models.FloatField(default=0)
 
     class Meta:
