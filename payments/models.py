@@ -148,7 +148,7 @@ class OutgoingFundDocuments(models.Model):
         OutgoingFund, related_name="files", on_delete=models.CASCADE
     )
     file = models.FileField(upload_to="media/dealer_files")
-    description = models.TextField()
+    description = models.TextField(max_length=3000, blank=True, null=True)
     type = models.CharField(max_length=20)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
