@@ -253,7 +253,7 @@ class IncomingFundSerializer(serializers.ModelSerializer):
     reference_plot_info = PlotsSerializer(source="reference_plot", read_only=True)
     bank_name = serializers.CharField(source="bank.name", read_only=True)
     account_type = serializers.CharField(source="bank.account_type", read_only=True)
-    document_number=serializers.CharField(required=True)
+    document_number=serializers.CharField(required=False)
     previous_serial_num=serializers.CharField(required=False)
     customer = CustomersSerializer(source="booking.customer", read_only=True)
     files = IncomingFundDocumentsSerializer(many=True, required=False)
@@ -282,9 +282,34 @@ class IncomingFundSerializer(serializers.ModelSerializer):
         else:
             raise ValueError("Invalid reference type")
         booking.save()
-        
+        if reference == "refund" and (validated_data.get("document_number") is None or validated_data.get("document_number") == ""):
+            try:
+                latest_payment = IncomingFund.objects.filter(project=project, previous_serial_num=None).latest("created_at")
+                temp = 0
+                latest_payment_number = int(latest_payment.document_number) + 1
+                while temp == 0:
+                        if IncomingFund.objects.filter(project=project, document_number=str(latest_payment_number)).exists():
+                            latest_payment_number = latest_payment_number + 1
+                        else:
+                            temp = 1
+            except IncomingFund.DoesNotExist:
+                latest_payment_number = 1
+            document_number_str = str(latest_payment_number).zfill(3)
+            validated_data["document_number"] = document_number_str
+
         if IncomingFund.objects.filter(project=project, document_number=validated_data.get("document_number")).exists():
-            raise serializers.ValidationError({"document_num_error": ["A row with the same document number already exists."]})
+            if(validated_data.get("previous_serial_num")):
+                raise serializers.ValidationError({"document_num_error": [f"A row with the same document number : {validated_data['document_number']} already exists."]})
+            else:
+                temp = 0
+                latest_payment_number = int(validated_data.get("document_number"))
+                while temp == 0:
+                        if IncomingFund.objects.filter(project=project, document_number=str(latest_payment_number)).exists():
+                            latest_payment_number = latest_payment_number + 1
+                        else:
+                            temp = 1
+                document_number_str = str(latest_payment_number).zfill(3)
+                validated_data["document_number"] = document_number_str
 
         incoming_fund = IncomingFund.objects.create(**validated_data)
         for file_data in files_data:
