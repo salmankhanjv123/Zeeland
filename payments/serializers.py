@@ -91,7 +91,8 @@ class BankTransactionSerializer(serializers.ModelSerializer):
         elif obj.related_table == "dealer_payments":
             try:
                 related_instance = DealerPayments.objects.get(pk=obj.related_id)
-                return related_instance.booking.dealer.name
+                # return related_instance.booking.dealer.name
+                return related_instance.booking.dealer.name if related_instance.booking.dealer else None
             except DealerPayments.DoesNotExist:
                 return None
         return None
