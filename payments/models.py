@@ -59,7 +59,7 @@ class MonthField(models.DateField):
 
 class IncomingFund(models.Model):
     project = models.ForeignKey(Projects, on_delete=models.PROTECT)
-    document_number=models.CharField(max_length=10, blank=True, null=True)
+    document_number = models.CharField(max_length=20, blank=True, null=True)
     previous_serial_num=models.CharField(max_length=10, blank=True, null=True)
     reference = models.CharField(max_length=10, default="payment")
     booking = models.ForeignKey(Booking, on_delete=models.PROTECT)
