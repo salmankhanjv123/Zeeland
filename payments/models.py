@@ -69,6 +69,7 @@ class IncomingFund(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     installement_month = MonthField(blank=True, null=True)
     amount = models.FloatField()
+    discount_amount = models.FloatField(blank=True, null=True)
     remarks = models.TextField(blank=True, null=True)
     advance_payment = models.BooleanField(default=False)
     payment_type = models.CharField(max_length=20, default="cash")

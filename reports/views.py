@@ -1025,6 +1025,7 @@ class EmployeeLedgerView(APIView):
         return Response(response_data)
 
 
+
 class PlotLedgerView(APIView):
     def get(self, request):
         plot_id = self.request.query_params.get("plot_id")
@@ -1088,7 +1089,7 @@ class PlotLedgerView(APIView):
                                     output_field=FloatField(),
                                 ),
                                 debit=Case(
-                                    When(reference="payment", then=F("amount")),
+                                    When(reference__in=["payment", "Discount"], then=F("amount")),
                                     default=Value(0),
                                     output_field=FloatField(),
                                 ),

@@ -91,7 +91,6 @@ class BankTransactionSerializer(serializers.ModelSerializer):
         elif obj.related_table == "dealer_payments":
             try:
                 related_instance = DealerPayments.objects.get(pk=obj.related_id)
-                # return related_instance.booking.dealer.name
                 return related_instance.booking.dealer.name if related_instance.booking.dealer else None
             except DealerPayments.DoesNotExist:
                 return None
@@ -258,7 +257,7 @@ class IncomingFundSerializer(serializers.ModelSerializer):
     previous_serial_num=serializers.CharField(required=False)
     customer = CustomersSerializer(source="booking.customer", read_only=True)
     files = IncomingFundDocumentsSerializer(many=True, required=False)
-
+    discount_amount=serializers.CharField(required=False)
 
     class Meta:
         model = IncomingFund
@@ -266,6 +265,7 @@ class IncomingFundSerializer(serializers.ModelSerializer):
 
     @transaction.atomic
     def create(self, validated_data):
+        discount_amount = validated_data.get("discount_amount")
         files_data = validated_data.pop("files", [])
         project=validated_data.get("project")
         reference = validated_data.get("reference")
@@ -318,7 +318,63 @@ class IncomingFundSerializer(serializers.ModelSerializer):
                 incoming_fund=incoming_fund, **file_data
             )
         self.create_bank_transactions(incoming_fund, validated_data)
+        if discount_amount!="0":
+            bank_id= Bank.objects.filter(project=project, name="Discount Given").values('id').first()
+            validated_data["bank_id"]=bank_id['id']
+            validated_data["payment_type"]="Discount_Given"
+            validated_data["reference"]="Discount"
+            validated_data["amount"]=discount_amount
+            validated_data["document_number"] = "D-"+validated_data["document_number"]
+            discount = IncomingFund.objects.create(**validated_data)
+            self.create_discount_transaction(discount, validated_data)
         return incoming_fund
+
+    def create_discount_transaction(self, payment, validated_data):
+        """Create multiple bank transactions for different accounts."""
+        project = validated_data.get("project")
+        date = validated_data.get("date")
+        amount = validated_data.get("amount", 0)
+        bank = validated_data.get("bank")
+        bank_id=validated_data.get("bank_id")
+        main_type=bank.main_type
+        payment_type = validated_data.get("payment_type")
+        is_deposit = bank.detail_type != "Undeposited_Funds"
+        is_cheque_clear = payment_type != "Cheque"
+
+        target_bank = Bank.objects.filter(
+            used_for="Account_Receivable", project=project
+        ).first()
+        discount_bank=Bank.objects.filter(project=project, name="Discount Given").first()
+
+        BankTransaction.objects.create(
+            project=project,
+            bank=target_bank,
+            transaction_type="Customer_Payment",
+            payment=amount,
+            deposit=0,
+            transaction_date=date,
+            related_table="incoming_funds",
+            related_id=payment.id,
+        )
+
+        payment_amount = 0
+        deposit_amount = amount
+        if main_type in ["Equity"]:
+            payment_amount, deposit_amount = deposit_amount, payment_amount
+            
+        BankTransaction.objects.create(
+            project=project,
+            bank=discount_bank,
+            transaction_type="Customer_Payment",
+            payment=deposit_amount,
+            deposit=payment_amount,
+            transaction_date=date,
+            related_table="incoming_funds",
+            related_id=payment.id,
+            is_deposit=is_deposit,
+            is_cheque_clear=is_cheque_clear,
+        )
+
 
     def create_bank_transactions(self, payment, validated_data):
         """Create multiple bank transactions for different accounts."""
@@ -407,18 +463,29 @@ class IncomingFundSerializer(serializers.ModelSerializer):
         new_amount = validated_data.get("amount", instance.amount)
         booking = instance.booking
         old_amount = instance.amount
+        discount_amount= validated_data.get("discount_amount", instance.discount_amount)
+        old_discount_amount= instance.discount_amount
 
         if new_amount != old_amount:
             if reference == "payment":
                 booking.total_receiving_amount += new_amount - old_amount
                 booking.remaining -= new_amount - old_amount
                 booking.save()
+            # if reference == "Discount":
+            #     booking.total_receiving_amount += new_amount - old_amount
+            #     booking.remaining -= new_amount - old_amount
+            #     booking.save()
             elif reference == "refund":
                 booking.total_receiving_amount -= new_amount - old_amount
                 booking.remaining += new_amount - old_amount
                 booking.save()
             else:
                 raise ValueError(f"Invalid reference type: {reference}")
+        if discount_amount != old_discount_amount:
+            discount_instance = IncomingFund.objects.get(document_number="D-"+instance.document_number)
+            discount_instance.amount = discount_amount
+            discount_instance.save()
+            self.update_discount_transaction(discount_instance.id,discount_instance.project, discount_amount)
 
         self.update_bank_transactions(instance, validated_data)
         for key, value in validated_data.items():
@@ -449,6 +516,38 @@ class IncomingFundSerializer(serializers.ModelSerializer):
                     incoming_fund=instance, **file_data
                 )
         return instance
+    
+    def update_discount_transaction(self, id, project, discount_amount):
+        """Update bank transactions for discount amount changes"""
+        discount_bank = Bank.objects.filter(project=project, name="Discount Given").first()
+        target_bank = Bank.objects.filter(used_for="Account_Receivable", project=project).first()
+
+        # Retrieve the relevant bank transactions
+        discount_transaction = BankTransaction.objects.filter(
+            project=project,
+            bank=discount_bank,
+            related_table="incoming_funds",
+            related_id=id,
+        ).first()
+
+        target_transaction = BankTransaction.objects.filter(
+            project=project,
+            bank=target_bank,
+            related_table="incoming_funds",
+            related_id=id,
+        ).first()
+
+        # Update the bank transactions
+        if discount_transaction:
+            if discount_transaction.transaction_type == "Customer_Payment":
+                discount_transaction.payment = discount_amount
+                discount_transaction.save()
+
+        if target_transaction:
+            if target_transaction.transaction_type == "Customer_Payment":
+                target_transaction.payment = discount_amount
+                target_transaction.save()
+
 
     def update_bank_transactions(self, payment, validated_data):
         """Update bank transactions for the given payment."""
