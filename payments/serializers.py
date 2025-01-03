@@ -318,13 +318,14 @@ class IncomingFundSerializer(serializers.ModelSerializer):
                 incoming_fund=incoming_fund, **file_data
             )
         self.create_bank_transactions(incoming_fund, validated_data)
-        if discount_amount!="0":
+        if discount_amount and discount_amount != "0":
             bank_id= Bank.objects.filter(project=project, name="Discount Given").values('id').first()
             validated_data["bank_id"]=bank_id['id']
             validated_data["payment_type"]="Discount_Given"
             validated_data["reference"]="Discount"
             validated_data["amount"]=discount_amount
             validated_data["document_number"] = "D-"+validated_data["document_number"]
+            validated_data["previous_serial_num"]= validated_data["document_number"]
             discount = IncomingFund.objects.create(**validated_data)
             self.create_discount_transaction(discount, validated_data)
         return incoming_fund
