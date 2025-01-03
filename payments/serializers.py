@@ -671,7 +671,7 @@ class FilePathField(serializers.FileField):
     def to_internal_value(self, data):
         if isinstance(data, str):
             try:
-                file_path = data.replace("http://127.0.0.1:8000/media/", "")
+                file_path = data.replace("http://zelandpvt.com/media/", "")
                 file_name = file_path.split("/")[-1]
                 file_content = urlopen(data).read()
                 file = ContentFile(file_content, name=file_name)
