@@ -34,6 +34,8 @@ import datetime
 from django.db import transaction
 from django.db.models import Sum, ProtectedError
 from rest_framework.exceptions import ValidationError
+from django.core.files.base import ContentFile
+from urllib.request import urlopen
 
 
 class SubAccountSerializer(serializers.ModelSerializer):
@@ -665,7 +667,23 @@ class IncomingFundSerializer(serializers.ModelSerializer):
                 is_deposit=is_deposit,
             )
 
+class FilePathField(serializers.FileField):
+    def to_internal_value(self, data):
+        if isinstance(data, str):
+            try:
+                file_path = data.replace("http://127.0.0.1:8000/media/", "")
+                file_name = file_path.split("/")[-1]
+                file_content = urlopen(data).read()
+                file = ContentFile(file_content, name=file_name)
+                return file
+            except Exception as e:
+                raise serializers.ValidationError(f"Invalid file path: {e}")
+        else:
+            return super().to_internal_value(data)
+
 class OutgoingFundDocumentsSerializer(serializers.ModelSerializer):
+    file = FilePathField()
+
     class Meta:
         model = OutgoingFundDocuments
         exclude = ["outgoing_fund"]
@@ -674,6 +692,7 @@ class OutgoingFundDocumentsSerializer(serializers.ModelSerializer):
         validated_data = super().to_internal_value(data)
         validated_data["id"] = data.get("id")
         return validated_data
+
 
 
 class OutgoingFundDetailsSerializer(serializers.ModelSerializer):
