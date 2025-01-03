@@ -670,16 +670,11 @@ class IncomingFundSerializer(serializers.ModelSerializer):
 class FilePathField(serializers.FileField):
     def to_internal_value(self, data):
         if isinstance(data, str):
-            try:
-                file_path = data.replace("http://zelandpvt.com/media/", "")
-                file_name = file_path.split("/")[-1]
-                file_content = urlopen(data).read()
-                file = ContentFile(file_content, name=file_name)
-                return file
-            except Exception as e:
-                raise serializers.ValidationError(f"Invalid file path: {e}")
+            file_path = data.replace("http://zelandpvt.com/media/", "")
+            return file_path
         else:
             return super().to_internal_value(data)
+        
 
 class OutgoingFundDocumentsSerializer(serializers.ModelSerializer):
     file = FilePathField()
