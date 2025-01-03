@@ -481,7 +481,7 @@ class IncomingFundSerializer(serializers.ModelSerializer):
                 booking.save()
             else:
                 raise ValueError(f"Invalid reference type: {reference}")
-        if discount_amount != old_discount_amount:
+        if float(discount_amount) != float(old_discount_amount):
             discount_instance = IncomingFund.objects.get(document_number="D-"+instance.document_number)
             discount_instance.amount = discount_amount
             discount_instance.save()
