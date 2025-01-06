@@ -466,8 +466,8 @@ class IncomingFundSerializer(serializers.ModelSerializer):
         new_amount = validated_data.get("amount", instance.amount)
         booking = instance.booking
         old_amount = instance.amount
-        discount_amount= validated_data.get("discount_amount", instance.discount_amount)
-        old_discount_amount= instance.discount_amount
+        discount_amount= validated_data.get("discount_amount", instance.discount_amount if instance.discount_amount else 0)
+        old_discount_amount= instance.discount_amount if instance.discount_amount else 0
 
         if new_amount != old_amount:
             if reference == "payment":
