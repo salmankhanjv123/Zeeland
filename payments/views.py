@@ -106,6 +106,8 @@ class BankTransactionViewSet(viewsets.ModelViewSet):
         if is_cheque_clear:
             query_filters &= Q(is_cheque_clear=is_cheque_clear)
         queryset = BankTransaction.objects.filter(query_filters)
+        queryset = queryset.exclude(bank__name="Discount Given")
+
         return queryset
 
 
