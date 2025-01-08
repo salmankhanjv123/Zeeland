@@ -1,5 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
+from django.db import transaction
+from plots.models import Plots
 from .models import Projects,BalanceSheet,BalanceSheetDetails,BalanceSheetAmountDetails
 
 
@@ -8,6 +10,22 @@ class ProjectsSerializer(serializers.ModelSerializer):
     class Meta:
         model = Projects
         fields = '__all__'  # or specify specific fields
+
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        # Update the instance with validated data
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        # Save the updated instance to persist changes
+        instance.save()
+        plots = Plots.objects.filter(project_id=instance.id)
+        # Update cost_price for each plot
+        cost_per_marla = validated_data.get("cost_per_marla", None)
+        if cost_per_marla is not None:
+            for plot in plots:
+                plot.cost_price = cost_per_marla * plot.marlas
+                plot.save()
+        return instance
 
 class BalanceSheetAmountDetailsSerializer(serializers.ModelSerializer):
     project_name=serializers.CharField(source="project.name",read_only=True)
