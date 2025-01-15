@@ -126,6 +126,7 @@ class BookingSerializer(serializers.ModelSerializer):
                         bank=validated_data.get("bank"),
                         payment_type=validated_data.get("payment_type"),
                         cheque_number=validated_data.get("cheque_number"),
+                        discount_amount=0
                     )
                 self.create_bank_transactions(booking, validated_data)
                 return booking
@@ -331,6 +332,7 @@ class BookingSerializer(serializers.ModelSerializer):
                             bank=validated_data.get("bank"),
                             payment_type=validated_data.get("payment_type"),
                             cheque_number=validated_data.get("cheque_number"),
+                            discount_amount=0
                         )
                         # Account receivable (Debit)
                         account_receivable_bank = Bank.objects.filter(

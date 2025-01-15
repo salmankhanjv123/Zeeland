@@ -299,6 +299,7 @@ class IncomingFundSerializer(serializers.ModelSerializer):
                 latest_payment_number = 1
             document_number_str = str(latest_payment_number).zfill(3)
             validated_data["document_number"] = document_number_str
+            validated_data["discount_amount"] = 0
 
         if IncomingFund.objects.filter(project=project, document_number=validated_data.get("document_number")).exists():
             if(validated_data.get("previous_serial_num")):
