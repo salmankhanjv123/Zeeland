@@ -158,6 +158,12 @@ class BankTransactionSerializer(serializers.ModelSerializer):
                 return related_instance.cheque_number
             except Booking.DoesNotExist:
                 return None
+        elif obj.related_table == "token" and obj.transaction_type == "TokenRefund":
+                    try:
+                        related_instance = Token.objects.get(pk=obj.related_id)
+                        return related_instance.refund_cheque_number
+                    except Token.DoesNotExist:
+                        return None   
         elif obj.related_table == "token":
             try:
                 related_instance = Token.objects.get(pk=obj.related_id)
@@ -469,6 +475,8 @@ class IncomingFundSerializer(serializers.ModelSerializer):
         old_amount = instance.amount
         discount_amount= validated_data.get("discount_amount", instance.discount_amount if instance.discount_amount else 0)
         old_discount_amount= instance.discount_amount if instance.discount_amount else 0
+        new_date= validated_data.get("date", instance.date)
+        old_date= instance.date
 
         if new_amount != old_amount:
             if reference == "payment":
@@ -485,11 +493,36 @@ class IncomingFundSerializer(serializers.ModelSerializer):
                 booking.save()
             else:
                 raise ValueError(f"Invalid reference type: {reference}")
-        if float(discount_amount) != float(old_discount_amount):
+
+        if float(discount_amount) != float(old_discount_amount) or new_date != old_date:
+            print("discount")
+            # Fetch the IncomingFund instance
             discount_instance = IncomingFund.objects.get(document_number="D-"+instance.document_number)
-            discount_instance.amount = discount_amount
+            print(discount_instance)
+            # Track whether the discount amount has changed
+            is_discount_amount_changed = float(discount_amount) != float(old_discount_amount)
+            print(f"{discount_amount}   {old_discount_amount}   {is_discount_amount_changed}")
+            # Track whether the date has changed
+            is_date_change= new_date != old_date
+            print(f"{new_date}   {old_date}   {is_date_change}")
+            # Update discount amount if it has changed
+            if is_discount_amount_changed:
+                discount_instance.amount = discount_amount
+
+            # Update date if it has changed
+            if is_date_change:
+                discount_instance.date = new_date
+
+            # Save the updated instance
             discount_instance.save()
-            self.update_discount_transaction(discount_instance.id,discount_instance.project, discount_amount)
+            print(discount_instance.date)
+            # Pass the discount_amount only if it has changed; otherwise, pass None
+            self.update_discount_transaction(
+                discount_instance.id,
+                discount_instance.project,
+                discount_amount if is_discount_amount_changed else None,
+                new_date if is_date_change else None
+            )            
 
         self.update_bank_transactions(instance, validated_data)
         for key, value in validated_data.items():
@@ -521,8 +554,10 @@ class IncomingFundSerializer(serializers.ModelSerializer):
                 )
         return instance
     
-    def update_discount_transaction(self, id, project, discount_amount):
+    
+    def update_discount_transaction(self, id, project, discount_amount,new_date):
         """Update bank transactions for discount amount changes"""
+        print(f"{discount_amount}   {new_date} ")
         discount_bank = Bank.objects.filter(project=project, name="Discount Given").first()
         target_bank = Bank.objects.filter(used_for="Account_Receivable", project=project).first()
 
@@ -541,17 +576,26 @@ class IncomingFundSerializer(serializers.ModelSerializer):
             related_id=id,
         ).first()
 
-        # Update the bank transactions
-        if discount_transaction:
-            if discount_transaction.transaction_type == "Customer_Payment":
-                discount_transaction.payment = discount_amount
-                discount_transaction.save()
+        if discount_amount != None:
+            # Update the bank transactions
+            if discount_transaction:
+                if discount_transaction.transaction_type == "Customer_Payment":
+                    discount_transaction.payment = discount_amount
+                    discount_transaction.save()
 
-        if target_transaction:
-            if target_transaction.transaction_type == "Customer_Payment":
-                target_transaction.payment = discount_amount
-                target_transaction.save()
-
+            if target_transaction:
+                if target_transaction.transaction_type == "Customer_Payment":
+                    target_transaction.payment = discount_amount
+                    target_transaction.save()
+        if new_date != None:
+            if discount_transaction:
+                if discount_transaction.transaction_type == "Customer_Payment":
+                    discount_transaction.date = new_date
+                    discount_transaction.save()
+            if target_transaction:
+                if target_transaction.transaction_type == "Customer_Payment":
+                    target_transaction.date = new_date
+                    target_transaction.save()
 
     def update_bank_transactions(self, payment, validated_data):
         """Update bank transactions for the given payment."""
@@ -671,11 +715,17 @@ class IncomingFundSerializer(serializers.ModelSerializer):
 class FilePathField(serializers.FileField):
     def to_internal_value(self, data):
         if isinstance(data, str):
-            file_path = data.replace("http://zelandpvt.com/media/", "")
-            return file_path
+            try:
+                file_path = data.replace("http://127.0.0.1:8000/media/", "")
+                file_name = file_path.split("/")[-1]
+                file_content = urlopen(data).read()
+                file = ContentFile(file_content, name=file_name)
+                return file
+            except Exception as e:
+                raise serializers.ValidationError(f"Invalid file path: {e}")
         else:
             return super().to_internal_value(data)
-        
+
 
 class OutgoingFundDocumentsSerializer(serializers.ModelSerializer):
     file = FilePathField()
@@ -688,8 +738,6 @@ class OutgoingFundDocumentsSerializer(serializers.ModelSerializer):
         validated_data = super().to_internal_value(data)
         validated_data["id"] = data.get("id")
         return validated_data
-
-
 
 class OutgoingFundDetailsSerializer(serializers.ModelSerializer):
     category_name = serializers.CharField(source="category.name", read_only=True)

@@ -2,6 +2,7 @@ from rest_framework import viewsets, status
 from rest_framework.generics import ListAPIView
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
+from datetime import date as Date  # Ensure this import is present at the top of your file
 from .serializers import (
     BookingSerializer,
     BookingForPaymentsSerializer,
@@ -9,7 +10,7 @@ from .serializers import (
     PlotResaleSerializer,
 )
 from .models import Booking, Token, PlotResale
-from payments.models import BankTransaction
+from payments.models import BankTransaction,Bank
 from django.db.models import Q
 from rest_framework.views import APIView
 
@@ -205,3 +206,87 @@ class UpdateTokenStatusView(APIView):
         token.save()
 
         return Response({"status": token.status}, status=status.HTTP_200_OK)
+
+class RefundTokenViewSet(APIView):
+    def patch(self, request, token_id):
+        try:
+            token = Token.objects.get(pk=token_id)
+        except Token.DoesNotExist:
+            return Response(
+                {"error": "Token not found"}, status=status.HTTP_404_NOT_FOUND
+            )
+        refund_date = request.data.get("refund_date")
+        bank = request.data.get("bank")
+        refundPayment_type = request.data.get("payment_type")
+        cheque_number=request.data.get("cheque_number")
+        # Get the status value from the request data
+        status_value = request.data.get("status")
+        if not status_value:
+            return Response(
+                {"error": "Status field is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        allowed_statuses = ["pending", "accepted", "cancelled","refunded"]
+        # Validate the status value
+        if status_value not in allowed_statuses:
+            return Response(
+                {
+                    "error": f"Invalid status. Allowed statuses are {', '.join(allowed_statuses)}"
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Update the token status
+        token.status = status_value
+        token.refund_cheque_number=cheque_number
+        token.refund_date=refund_date
+        if status_value == "refunded":
+            plots_to_update = token.plot.all()
+            for plot in plots_to_update:
+                plot.status = "active"
+                plot.save()
+        token.save()
+        # delete row from token_plot table which matches token.id
+        self.create_bank_transactions(token, bank, refund_date,refundPayment_type)
+        return Response({"status": token.status}, status=status.HTTP_200_OK)
+    
+    def create_bank_transactions(self, token, refundBank, refund_date, refundPayment_type):
+        """Create multiple bank transactions for different accounts."""
+        project = token.project
+        date = refund_date
+        amount = token.amount
+        bank = Bank.objects.filter(id=refundBank).first()
+        main_type=bank.main_type
+        token_type = refundPayment_type
+        is_deposit = bank.detail_type != "Undeposited_Funds"
+        is_cheque_clear = token_type != "Cheque"
+        account_receivable_bank = Bank.objects.filter(
+            used_for="Account_Receivable", project=project
+        ).first()
+
+        BankTransaction.objects.create(
+            project=project,
+            bank=account_receivable_bank,
+            transaction_type="TokenRefund",
+            payment=0,
+            deposit=amount,
+            transaction_date=date,
+            related_table="token",
+            related_id=token.id,
+        )
+        token_amount = 0
+        deposit_amount = amount
+        if main_type in ["Equity"]:
+            token_amount, deposit_amount = deposit_amount, token_amount
+        BankTransaction.objects.create(
+            project=project,
+            bank=bank,
+            transaction_type="TokenRefund",
+            payment=deposit_amount,
+            deposit=token_amount,
+            transaction_date=date,
+            related_table="token",
+            related_id=token.id,
+            is_deposit=is_deposit,
+            is_cheque_clear=is_cheque_clear,
+        )

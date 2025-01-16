@@ -605,7 +605,6 @@ class TokenDocumentsSerializer(serializers.ModelSerializer):
         validated_data["id"] = data.get("id")
         return validated_data
 
-
 class TokenSerializer(serializers.ModelSerializer):
     customer_info = CustomersInfoSerializer(source="customer", read_only=True)
     plot_info = PlotsSerializer(source="plot", many=True, read_only=True)
@@ -639,11 +638,15 @@ class TokenSerializer(serializers.ModelSerializer):
 
         document_number_str = str(latest_token_number).zfill(3)
         validated_data["document_number"] = document_number_str
-        
+        print(validated_data)
         token = Token.objects.create(**validated_data)
 
         if plots_data:
-            token.plot.set([plot["id"] for plot in plots_data])
+            plot_ids = [plot["id"] for plot in plots_data]
+            token.plot.set(plot_ids)  # Associate plots with the token
+            for plot_id in plot_ids:
+                Plots.objects.filter(id=plot_id).update(status="pending")
+        
 
         for file_data in files_data:
             TokenDocuments.objects.create(token=token, **file_data)
@@ -701,8 +704,25 @@ class TokenSerializer(serializers.ModelSerializer):
             setattr(instance, key, value)
         instance.save()
 
+        # Handle plot updates
         if plots_data:
-            instance.plot.set([plot["id"] for plot in plots_data])
+            # Get the new plot IDs
+            new_plot_ids = [plot["id"] for plot in plots_data]
+
+            # Get the current plot IDs associated with the token
+            current_plot_ids = list(instance.plot.values_list("id", flat=True))
+
+            # Update the token's plot association
+            instance.plot.set(new_plot_ids)
+
+            # Set previous plots back to 'active' if no longer associated
+            plots_to_revert = set(current_plot_ids) - set(new_plot_ids)
+            if plots_to_revert:
+                Plots.objects.filter(id__in=plots_to_revert).update(status="active")
+
+            # Set the new plots to 'pending'
+            Plots.objects.filter(id__in=new_plot_ids).update(status="pending")
+
         # Handle file updates and deletions
         existing_files = TokenDocuments.objects.filter(token=instance)
         updated_file_ids = {

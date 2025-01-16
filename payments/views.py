@@ -188,7 +188,7 @@ class IncomingFundViewSet(viewsets.ModelViewSet):
     """
     API endpoint that allows IncomingFund to be viewed or edited.
     """
-
+    
     serializer_class = IncomingFundSerializer
 
     def get_queryset(self):
@@ -235,8 +235,22 @@ class IncomingFundViewSet(viewsets.ModelViewSet):
             .prefetch_related("files")
         )
         return queryset
-
+  
     def perform_destroy(self, instance):
+         # Handle discount instance and related transactions
+        try:
+            discount_instance = IncomingFund.objects.get(document_number=f"D-{instance.document_number}")
+            
+            # Delete all bank transactions related to the discount instance
+            BankTransaction.objects.filter(
+                related_table="incoming_funds",
+                related_id=discount_instance.id
+            ).delete()
+            
+            # Delete the discount instance
+            discount_instance.delete()
+        except IncomingFund.DoesNotExist:
+            pass  # No discount instance exists, continue deletion of the main payment
         # Check for existing related bank transaction entries
         related_bank_transactions = BankTransaction.objects.filter(
             related_table="incoming_funds",
@@ -267,6 +281,7 @@ class IncomingFundViewSet(viewsets.ModelViewSet):
         booking.save()
         return super().perform_destroy(instance)
 
+
 class LatestPaymentView(APIView):
     
     def get(self, request):
@@ -291,7 +306,6 @@ class LatestPaymentView(APIView):
         except Exception as e:
             print(f"Error: {e}")
             return Response({'error': 'An unexpected error occurred'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
 
 class OutgoingFundViewSet(viewsets.ModelViewSet):
     """

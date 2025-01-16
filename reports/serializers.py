@@ -84,7 +84,6 @@ class PlotsSerializer(serializers.ModelSerializer):
     plot_size = serializers.SerializerMethodField(read_only=True)
     block_name = serializers.CharField(source="block.name", read_only=True)  # Added block_name (salman modified)
 
-
     def get_plot_size(self, instance):
         return instance.get_plot_size()
 

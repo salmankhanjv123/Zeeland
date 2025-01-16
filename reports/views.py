@@ -615,11 +615,37 @@ class CustomerLedgerView(APIView):
         ).select_related("booking__customer")
         payment_data = PaymentDataSerializer(payment_data_query, many=True).data
 
-        token_data_query = Token.objects.filter(
-            token_query_filters, customer_id=customer_id
-        ).select_related("customer")
-        token_data = TokenDataSerializer(token_data_query, many=True).data
+        # Query for normal tokens
+        normal_tokens = Token.objects.filter(
+                token_query_filters, customer_id=customer_id
+            ).select_related("customer").values(
+                "id",
+                "date",
+                "remarks",
+                debit=F("amount"),
+                credit=Value(0.0),
+                document=F("document_number"),
+                customer_name=F("customer__name"),
+                reference=Value("token", output_field=CharField()),
+            )
 
+        # Query for refunded tokens
+        refunded_tokens = Token.objects.filter(
+           token_query_filters, customer_id=customer_id,
+            status="refunded",
+        ).select_related("customer").values(
+            "id",
+            "refund_date",
+            "remarks",
+            debit=Value(0.0),
+            credit=F("amount"),
+            document=F("document_number"),
+            customer_name=F("customer__name"),
+            reference=Value("tokenRefund", output_field=CharField()),
+        )
+
+        # Combine the two querysets
+        token_data = normal_tokens.union(refunded_tokens)
         resale_data = (
             PlotResale.objects.filter(
                 resale_query_filters, booking__customer_id=customer_id
@@ -645,7 +671,7 @@ class CustomerLedgerView(APIView):
                 "id",
                 "date",
                 "remarks",
-                debit=F("company_amount_paid"),
+                debit=F("company_amount_paid") - F("amount_received"),
                 credit=Value(0.0),
                 document=F("id"),
                 customer_name=F("booking__customer__name"),
@@ -1025,7 +1051,6 @@ class EmployeeLedgerView(APIView):
         return Response(response_data)
 
 
-
 class PlotLedgerView(APIView):
     def get(self, request):
         plot_id = self.request.query_params.get("plot_id")
@@ -1098,15 +1123,14 @@ class PlotLedgerView(APIView):
                             )
                         )
 
-                        token_data = (
-                            Token.objects.filter(
+
+                        # Query for normal tokens
+                        normal_tokens = Token.objects.filter(
                                 plot=plot_id,
                                 booking=booking_id,
                                 date__gte=start_date,
                                 date__lte=end_date,
-                            )
-                            .select_related("customer")
-                            .values(
+                            ).select_related("customer").values(
                                 "id",
                                 "date",
                                 "remarks",
@@ -1116,7 +1140,28 @@ class PlotLedgerView(APIView):
                                 customer_name=F("customer__name"),
                                 reference=Value("token", output_field=CharField()),
                             )
+
+                        # Query for refunded tokens
+                        refunded_tokens = Token.objects.filter(
+                            plot=plot_id,
+                            booking=booking_id,
+                            date__gte=start_date,
+                            date__lte=end_date,
+                            status="refunded",
+                        ).select_related("customer").values(
+                            "id",
+                            "refund_date",
+                            "remarks",
+                            debit=Value(0.0),
+                            credit=F("amount"),
+                            document=F("document_number"),
+                            customer_name=F("customer__name"),
+                            reference=Value("tokenRefund", output_field=CharField()),
                         )
+
+                        # Combine the two querysets
+                        token_data = normal_tokens.union(refunded_tokens)
+                        
 
                         resale_data = (
                             PlotResale.objects.filter(
@@ -1359,23 +1404,46 @@ class PlotLedgerView(APIView):
                         )
                         remaining_amount = plot_amount - token_amount
 
-                        token_data = (
-                            Token.objects.filter(id=token_id)
+                        combined_token_data = (
+                        Token.objects.filter(id=token_id)
+                        .select_related("customer")
+                        .values(
+                            "id",
+                            "date",
+                            "remarks",
+                            debit=F("amount"),
+                            credit=Value(0.0),
+                            document=F("document_number"),
+                            customer_name=F("customer__name"),
+                            reference=Value("token", output_field=CharField()),
+                        )
+                    )
+
+                        # Add refunded token data
+                        refunded_token_data = (
+                            Token.objects.filter(id=token_id, status__iexact="refunded")
                             .select_related("customer")
                             .values(
                                 "id",
-                                "date",
+                                "refund_date",
                                 "remarks",
-                                debit=F("amount"),
-                                credit=Value(0.0),
+                                debit=Value(0.0),
+                                credit=F("amount"),
                                 document=F("document_number"),
                                 customer_name=F("customer__name"),
-                                reference=Value("token", output_field=CharField()),
+                                reference=Value("tokenRefund", output_field=CharField()),
                             )
                         )
+                        # Rename the refund_date to date to maintain consistency in the final combined data
+                        refunded_token_data = [
+                            {**entry, "date": entry.pop("refund_date")} for entry in refunded_token_data
+                        ]
 
+
+                        # Combine token and refunded token data
                         combined_data = sorted(
-                            list(token_data), key=lambda x: x["date"]
+                            list(combined_token_data) + list(refunded_token_data),
+                            key=lambda x: x["date"],
                         )
 
                         opening_balance = plot_amount
