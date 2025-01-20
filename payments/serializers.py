@@ -468,92 +468,93 @@ class IncomingFundSerializer(serializers.ModelSerializer):
 
     @transaction.atomic
     def update(self, instance, validated_data):
-        files_data = validated_data.pop("files", [])
-        reference = validated_data.get("reference", instance.reference)
-        new_amount = validated_data.get("amount", instance.amount)
-        booking = instance.booking
-        old_amount = instance.amount
-        discount_amount= validated_data.get("discount_amount", instance.discount_amount if instance.discount_amount else 0)
-        old_discount_amount= instance.discount_amount if instance.discount_amount else 0
-        new_date= validated_data.get("date", instance.date)
-        old_date= instance.date
+            files_data = validated_data.pop("files", [])
+            reference = validated_data.get("reference", instance.reference)
+            new_amount = validated_data.get("amount", instance.amount)
+            booking = instance.booking
+            old_amount = instance.amount
+            discount_amount= validated_data.get("discount_amount", instance.discount_amount if instance.discount_amount else 0)
+            old_discount_amount= instance.discount_amount if instance.discount_amount else 0
+            new_date= validated_data.get("date", instance.date)
+            old_date= instance.date
 
-        if new_amount != old_amount:
-            if reference == "payment":
-                booking.total_receiving_amount += new_amount - old_amount
-                booking.remaining -= new_amount - old_amount
-                booking.save()
-            # if reference == "Discount":
-            #     booking.total_receiving_amount += new_amount - old_amount
-            #     booking.remaining -= new_amount - old_amount
-            #     booking.save()
-            elif reference == "refund":
-                booking.total_receiving_amount -= new_amount - old_amount
-                booking.remaining += new_amount - old_amount
-                booking.save()
-            else:
-                raise ValueError(f"Invalid reference type: {reference}")
+            if new_amount != old_amount:
+                if reference == "payment":
+                    booking.total_receiving_amount += new_amount - old_amount
+                    booking.remaining -= new_amount - old_amount
+                    booking.save()
+                # if reference == "Discount":
+                #     booking.total_receiving_amount += new_amount - old_amount
+                #     booking.remaining -= new_amount - old_amount
+                #     booking.save()
+                elif reference == "refund":
+                    booking.total_receiving_amount -= new_amount - old_amount
+                    booking.remaining += new_amount - old_amount
+                    booking.save()
+                else:
+                    raise ValueError(f"Invalid reference type: {reference}")
 
-        if float(discount_amount) != float(old_discount_amount) or new_date != old_date:
-            print("discount")
-            # Fetch the IncomingFund instance
-            discount_instance = IncomingFund.objects.get(document_number="D-"+instance.document_number)
-            print(discount_instance)
-            # Track whether the discount amount has changed
-            is_discount_amount_changed = float(discount_amount) != float(old_discount_amount)
-            print(f"{discount_amount}   {old_discount_amount}   {is_discount_amount_changed}")
-            # Track whether the date has changed
-            is_date_change= new_date != old_date
-            print(f"{new_date}   {old_date}   {is_date_change}")
-            # Update discount amount if it has changed
-            if is_discount_amount_changed:
-                discount_instance.amount = discount_amount
+            if float(discount_amount) != float(old_discount_amount) or new_date != old_date:
+                try:
+                    discount_instance = IncomingFund.objects.get(document_number="D-"+instance.document_number)
+                    if discount_instance:
+                        # Fetch the IncomingFund instance
+                        discount_instance = IncomingFund.objects.get(document_number="D-"+instance.document_number)
+                        # Track whether the discount amount has changed
+                        is_discount_amount_changed = float(discount_amount) != float(old_discount_amount)
+                        # Track whether the date has changed
+                        is_date_change= new_date != old_date
+                        # Update discount amount if it has changed
+                        if is_discount_amount_changed:
+                            discount_instance.amount = discount_amount
 
-            # Update date if it has changed
-            if is_date_change:
-                discount_instance.date = new_date
+                        # Update date if it has changed
+                        if is_date_change:
+                            discount_instance.date = new_date
 
-            # Save the updated instance
-            discount_instance.save()
-            print(discount_instance.date)
-            # Pass the discount_amount only if it has changed; otherwise, pass None
-            self.update_discount_transaction(
-                discount_instance.id,
-                discount_instance.project,
-                discount_amount if is_discount_amount_changed else None,
-                new_date if is_date_change else None
-            )            
+                        # Save the updated instance
+                        discount_instance.save()
+                        # Pass the discount_amount only if it has changed; otherwise, pass None
+                        self.update_discount_transaction(
+                            discount_instance.id,
+                            discount_instance.project,
+                            discount_amount if is_discount_amount_changed else None,
+                            new_date if is_date_change else None
+                        )
+                except IncomingFund.DoesNotExist:
+                    print("No IncomingFund instance found")
+                    # You can also return a custom response here          
 
-        self.update_bank_transactions(instance, validated_data)
-        for key, value in validated_data.items():
-            setattr(instance, key, value)
-        instance.save()
+            self.update_bank_transactions(instance, validated_data)
+            for key, value in validated_data.items():
+                setattr(instance, key, value)
+            instance.save()
 
-        # Handle file updates and deletions
-        existing_files = IncomingFundDocuments.objects.filter(incoming_fund=instance)
-        updated_file_ids = {
-            file_data.get("id") for file_data in files_data if "id" in file_data
-        }
-        files_to_delete = existing_files.exclude(id__in=updated_file_ids)
-        for file in files_to_delete:
-            file.delete()
-        for file_data in files_data:
-            file_id = file_data.get("id", None)
-            if file_id:
-                file = IncomingFundDocuments.objects.get(
-                    id=file_id, incoming_fund=instance
-                )
-                file.description = file_data.get("description", file.description)
-                file.type = file_data.get("type", file.type)
-                if "file" in file_data:
-                    file.file = file_data.get("file", file.file)
-                file.save()
-            else:
-                IncomingFundDocuments.objects.create(
-                    incoming_fund=instance, **file_data
-                )
-        return instance
-    
+            # Handle file updates and deletions
+            existing_files = IncomingFundDocuments.objects.filter(incoming_fund=instance)
+            updated_file_ids = {
+                file_data.get("id") for file_data in files_data if "id" in file_data
+            }
+            files_to_delete = existing_files.exclude(id__in=updated_file_ids)
+            for file in files_to_delete:
+                file.delete()
+            for file_data in files_data:
+                file_id = file_data.get("id", None)
+                if file_id:
+                    file = IncomingFundDocuments.objects.get(
+                        id=file_id, incoming_fund=instance
+                    )
+                    file.description = file_data.get("description", file.description)
+                    file.type = file_data.get("type", file.type)
+                    if "file" in file_data:
+                        file.file = file_data.get("file", file.file)
+                    file.save()
+                else:
+                    IncomingFundDocuments.objects.create(
+                        incoming_fund=instance, **file_data
+                    )
+            return instance
+        
     
     def update_discount_transaction(self, id, project, discount_amount,new_date):
         """Update bank transactions for discount amount changes"""

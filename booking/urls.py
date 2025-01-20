@@ -6,6 +6,7 @@ from .views import (
     latest_booking_id,
     PlotResaleViewSet,
     UpdateTokenStatusView,
+    RefundTokenViewSet
 )
 from rest_framework import routers
 
@@ -21,4 +22,6 @@ urlpatterns = [
     path("booking-for-payments/", BookingForPaymentsListView.as_view()),
     path("booking/<int:project>/latest-booking/", latest_booking_id),
     path("plot-token/<int:token_id>/update-status/", UpdateTokenStatusView.as_view()),
+    path("plot-token/<int:token_id>/token-refund/", RefundTokenViewSet.as_view()),
+
 ]
