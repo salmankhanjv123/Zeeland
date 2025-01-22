@@ -292,7 +292,7 @@ class LatestPaymentView(APIView):
             return Response({'error': 'Project ID is required'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            filtered_payments = IncomingFund.objects.filter(project_id=project_id)
+            filtered_payments = IncomingFund.objects.filter(project_id=project_id, reference="payment")
             print(f"Filtered Payments Count: {filtered_payments.count()}")
 
             if not filtered_payments.exists():
