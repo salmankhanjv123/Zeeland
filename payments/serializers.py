@@ -293,18 +293,15 @@ class IncomingFundSerializer(serializers.ModelSerializer):
         booking.save()
         if reference == "refund" and (validated_data.get("document_number") is None or validated_data.get("document_number") == ""):
             try:
-                latest_payment = IncomingFund.objects.filter(project=project, previous_serial_num=None).latest("created_at")
-                temp = 0
-                latest_payment_number = int(latest_payment.document_number) + 1
-                while temp == 0:
-                        if IncomingFund.objects.filter(project=project, document_number=str(latest_payment_number)).exists():
-                            latest_payment_number = latest_payment_number + 1
-                        else:
-                            temp = 1
+                latest_payment = IncomingFund.objects.filter(project=project, reference="refund").latest("created_at")
+                if not latest_payment.document_number.startswith("R-"):
+                    validated_data["document_number"] = "R-001"
+                else:
+                    latest_payment_number = int(latest_payment.document_number.split("-")[1].lstrip('0')) + 1
+                    document_number_str = str(latest_payment_number).zfill(3)
+                    validated_data["document_number"] = "R-" + document_number_str
             except IncomingFund.DoesNotExist:
-                latest_payment_number = 1
-            document_number_str = str(latest_payment_number).zfill(3)
-            validated_data["document_number"] = document_number_str
+                validated_data["document_number"] = "R-001"
             validated_data["discount_amount"] = 0
 
         if IncomingFund.objects.filter(project=project, document_number=validated_data.get("document_number")).exists():

@@ -108,7 +108,7 @@ class BookingSerializer(serializers.ModelSerializer):
                 if advance_amount > 0:
                     
                     try:
-                        latest_payment = IncomingFund.objects.filter(project=project, previous_serial_num=None).latest("created_at")
+                        latest_payment = IncomingFund.objects.filter(project=project, reference="payment", previous_serial_num=None).latest("created_at")
                         latest_payment_number = int(latest_payment.document_number) + 1
                     except IncomingFund.DoesNotExist:
                         latest_payment_number = 1
@@ -314,7 +314,7 @@ class BookingSerializer(serializers.ModelSerializer):
                 else:
                     # If no advance payment exists, and advance_amount > 0, create a new IncomingFund             
                     try:
-                        latest_payment = IncomingFund.objects.filter(project=project, previous_serial_num=None).latest("created_at")
+                        latest_payment = IncomingFund.objects.filter(project=project, reference="payment", previous_serial_num=None).latest("created_at")
                         latest_payment_number = int(latest_payment.document_number) + 1
                     except IncomingFund.DoesNotExist:
                         latest_payment_number = 1
