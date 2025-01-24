@@ -72,7 +72,6 @@ class BookingSerializer(serializers.ModelSerializer):
         installement_month = datetime.datetime(
             booking_date.year, booking_date.month, 1
         ).date()
-
         try:
             with transaction.atomic():
                 try:
@@ -96,11 +95,11 @@ class BookingSerializer(serializers.ModelSerializer):
 
                 if plots_data:
                     booking.plots.set([plot["id"] for plot in plots_data])
-                    # for plot_data in plots_data:
-                    #     plot_id = plot_data["id"]
-                    #     plot = Plots.objects.get(id=plot_id)
-                    #     plot.status = "sold"
-                    #     plot.save()
+                    for plot_data in plots_data:
+                        plot_id = plot_data["id"]
+                        plot = Plots.objects.get(id=plot_id)
+                        plot.status = "sold"
+                        plot.save()
 
                 for file_data in files_data:
                     BookingDocuments.objects.create(booking=booking, **file_data)
@@ -118,6 +117,7 @@ class BookingSerializer(serializers.ModelSerializer):
                         project=project,
                         booking=booking,
                         document_number=document_number_str,
+                        reference_plot_id=plots_data[0].get("id"),
                         date=booking_date,
                         installement_month=installement_month,
                         amount=advance_amount,
@@ -286,10 +286,10 @@ class BookingSerializer(serializers.ModelSerializer):
         try:
             with transaction.atomic():
                 self.update_bank_transactions(instance, validated_data)
-                # if instance.plots.exists():
-                #     for existing_plot in instance.plots.all():
-                #         existing_plot.status = "active"
-                #         existing_plot.save()
+                if instance.plots.exists():
+                    for existing_plot in instance.plots.all():
+                        existing_plot.status = "active"
+                        existing_plot.save()
 
                 for key, value in validated_data.items():
                     setattr(instance, key, value)
@@ -297,11 +297,11 @@ class BookingSerializer(serializers.ModelSerializer):
 
                 if plots_data:
                     instance.plots.set([plot["id"] for plot in plots_data])
-                    # for plot_data in plots_data:
-                    #     plot_id = plot_data["id"]
-                    #     plot = Plots.objects.get(id=plot_id)
-                    #     plot.status = "sold"
-                    #     plot.save()
+                    for plot_data in plots_data:
+                        plot_id = plot_data["id"]
+                        plot = Plots.objects.get(id=plot_id)
+                        plot.status = "sold"
+                        plot.save()
 
                 advance_amount = validated_data.get("advance", instance.advance)
                 advance_payment_obj = IncomingFund.objects.filter(
@@ -323,6 +323,7 @@ class BookingSerializer(serializers.ModelSerializer):
                         IncomingFund.objects.create(
                             project=instance.project,
                             document_number=document_number_str,
+                            reference_plot_id=plots_data[0].get("id"),
                             booking=instance,
                             date=booking_date,
                             installement_month=installement_month,
@@ -815,7 +816,7 @@ class PlotResaleSerializer(serializers.ModelSerializer):
     customer = serializers.CharField(source="booking.customer.name", read_only=True)
     booking_number = serializers.CharField(source="booking.booking_id", read_only=True)
     total_amount = serializers.FloatField(source="booking.total_amount", read_only=True)
-
+    closingType = serializers.CharField(required=False)
     plot_info = serializers.SerializerMethodField(read_only=True)
 
     def get_plot_info(self, instance):
@@ -832,6 +833,7 @@ class PlotResaleSerializer(serializers.ModelSerializer):
 
     @transaction.atomic
     def create(self, validated_data):
+        closingType = validated_data.pop("closingType", None)
         booking = validated_data.get("booking")
         booking.status = "close"
         booking.save()
@@ -840,9 +842,11 @@ class PlotResaleSerializer(serializers.ModelSerializer):
         for plot in plots:
             plot.status = "active"
             plot.save()
-
         plot_resale = PlotResale.objects.create(**validated_data)
-        self.create_bank_transactions(plot_resale, validated_data)
+        if closingType=="Auto Close":
+            self.create_bank_transactions(plot_resale, validated_data)
+        else:
+            self.create_bank_transactions_manual(plot_resale, validated_data)
         return plot_resale
 
     def create_bank_transactions(self, plot_resale, validated_data):
@@ -964,16 +968,112 @@ class PlotResaleSerializer(serializers.ModelSerializer):
                 related_id=plot_resale.id,
             )
 
+    def create_bank_transactions_manual(self, plot_resale, validated_data):
+        """Create multiple bank transactions for different accounts."""
+        project = plot_resale.booking.project
+        date = validated_data.get("date")
+        company_amount_paid = validated_data.get("company_amount_paid")
+        plot_cost = sum(plot.cost_price for plot in plot_resale.booking.plots.all())
+        booking_amount = plot_resale.booking.total_amount
+        remaining=float(booking_amount)-float(company_amount_paid)
+
+        # Account Payable (credit)
+        account_payable_bank = Bank.objects.filter(
+            used_for="Account_Payable", project=project
+        ).first()
+        if account_payable_bank:
+            BankTransaction.objects.create(
+                project=project,
+                bank=account_payable_bank,
+                transaction_type="Close_Booking",
+                payment=0,
+                deposit=company_amount_paid,
+                transaction_date=date,
+                related_table="plot_resale",
+                related_id=plot_resale.id,
+            )
+
+        # Account receivable (credit)
+        account_receivable_bank = Bank.objects.filter(
+            used_for="Account_Receivable", project=project
+        ).first()
+        if account_receivable_bank:
+            BankTransaction.objects.create(
+                project=project,
+                bank=account_receivable_bank,
+                transaction_type="Close_Booking",
+                payment=remaining,
+                deposit=0,
+                transaction_date=date,
+                related_table="plot_resale",
+                related_id=plot_resale.id,
+            )
+
+        # Sale account (debit with booking price)
+        sale_bank = Bank.objects.filter(
+            used_for="Sale_Account", project=project
+        ).first()
+        if sale_bank:
+            BankTransaction.objects.create(
+                project=project,
+                bank=sale_bank,
+                transaction_type="Close_Booking",
+                deposit=0,
+                payment=booking_amount,
+                transaction_date=date,
+                related_table="plot_resale",
+                related_id=plot_resale.id,
+            )
+
+        # Cost of Goods Sold (COGS - credit)
+        cogs_bank = Bank.objects.filter(
+            used_for="Cost_of_Good_Sold", project=project
+        ).first()
+        if cogs_bank:
+            BankTransaction.objects.create(
+                project=project,
+                bank=cogs_bank,
+                transaction_type="Close_Booking",
+                payment=plot_cost,
+                deposit=0,
+                transaction_date=date,
+                related_table="plot_resale",
+                related_id=plot_resale.id,
+            )
+
+        # Land Inventory (debit)
+        land_inventory_bank = Bank.objects.filter(
+            used_for="Land_Inventory", project=project
+        ).first()
+        if land_inventory_bank:
+            BankTransaction.objects.create(
+                project=project,
+                bank=land_inventory_bank,
+                transaction_type="Close_Booking",
+                deposit=plot_cost,
+                payment=0,
+                transaction_date=date,
+                related_table="plot_resale",
+                related_id=plot_resale.id,
+            )
+
+
     @transaction.atomic
     def update(self, instance, validated_data):
-        self.update_bank_transactions(instance, validated_data)
+        print("Validated data:", validated_data)
+        closingType = validated_data.pop("closingType", None)
+        print(closingType)
+        if closingType=="Auto Close":
+            self.update_bank_transactions(instance, validated_data)
+        else:
+            self.update_bank_transactions_manual(instance, validated_data)
         for key, value in validated_data.items():
             setattr(instance, key, value)
         instance.save()
         return instance
 
     def update_bank_transactions(self, plot_resale, validated_data):
-        BankTransaction.objects.filter(related_id=plot_resale.id).delete()
+        BankTransaction.objects.filter(related_id=plot_resale.id, transaction_type="Close_Booking").delete()
         
         project = plot_resale.booking.project
         date = validated_data.get("date")
@@ -1091,3 +1191,96 @@ class PlotResaleSerializer(serializers.ModelSerializer):
                 related_table="plot_resale",
                 related_id=plot_resale.id,
             )
+
+    def update_bank_transactions_manual(self, plot_resale, validated_data):
+        BankTransaction.objects.filter(related_id=plot_resale.id, transaction_type="Close_Booking").delete()
+        
+        project = plot_resale.booking.project
+        date = validated_data.get("date")
+        company_amount_paid = validated_data.get("company_amount_paid")
+        plot_cost = sum(plot.cost_price for plot in plot_resale.booking.plots.all())
+        booking_amount = plot_resale.booking.total_amount
+        remaining=float(booking_amount)-float(company_amount_paid)
+
+
+       
+        # Account Payable (credit)
+        account_payable_bank = Bank.objects.filter(
+            used_for="Account_Payable", project=project
+        ).first()
+        if account_payable_bank:
+            BankTransaction.objects.create(
+                project=project,
+                bank=account_payable_bank,
+                transaction_type="Close_Booking",
+                payment=0,
+                deposit=company_amount_paid,
+                transaction_date=date,
+                related_table="plot_resale",
+                related_id=plot_resale.id,
+            )
+
+        # Account receivable (credit)
+        account_receivable_bank = Bank.objects.filter(
+            used_for="Account_Receivable", project=project
+        ).first()
+        if account_receivable_bank:
+            BankTransaction.objects.create(
+                project=project,
+                bank=account_receivable_bank,
+                transaction_type="Close_Booking",
+                payment=remaining,
+                deposit=0,
+                transaction_date=date,
+                related_table="plot_resale",
+                related_id=plot_resale.id,
+            )
+
+        # Sale account (debit with booking price)
+        sale_bank = Bank.objects.filter(
+            used_for="Sale_Account", project=project
+        ).first()
+        if sale_bank:
+            BankTransaction.objects.create(
+                project=project,
+                bank=sale_bank,
+                transaction_type="Close_Booking",
+                deposit=0,
+                payment=booking_amount,
+                transaction_date=date,
+                related_table="plot_resale",
+                related_id=plot_resale.id,
+            )
+
+        # Cost of Goods Sold (COGS - credit)
+        cogs_bank = Bank.objects.filter(
+            used_for="Cost_of_Good_Sold", project=project
+        ).first()
+        if cogs_bank:
+            BankTransaction.objects.create(
+                project=project,
+                bank=cogs_bank,
+                transaction_type="Close_Booking",
+                payment=plot_cost,
+                deposit=0,
+                transaction_date=date,
+                related_table="plot_resale",
+                related_id=plot_resale.id,
+            )
+
+        # Land Inventory (debit)
+        land_inventory_bank = Bank.objects.filter(
+            used_for="Land_Inventory", project=project
+        ).first()
+        if land_inventory_bank:
+            BankTransaction.objects.create(
+                project=project,
+                bank=land_inventory_bank,
+                transaction_type="Close_Booking",
+                deposit=plot_cost,
+                payment=0,
+                transaction_date=date,
+                related_table="plot_resale",
+                related_id=plot_resale.id,
+            )
+    
