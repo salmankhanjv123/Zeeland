@@ -331,7 +331,8 @@ class IncomingFundSerializer(serializers.ModelSerializer):
             validated_data["reference"]="Discount"
             validated_data["amount"]=discount_amount
             validated_data["document_number"] = "D-"+validated_data["document_number"]
-            validated_data["previous_serial_num"]= validated_data["document_number"]
+            if not validated_data.get("previous_serial_num"):
+                validated_data["previous_serial_num"] = validated_data["document_number"]
             discount = IncomingFund.objects.create(**validated_data)
             self.create_discount_transaction(discount, validated_data)
         return incoming_fund
@@ -555,7 +556,6 @@ class IncomingFundSerializer(serializers.ModelSerializer):
     
     def update_discount_transaction(self, id, project, discount_amount,new_date):
         """Update bank transactions for discount amount changes"""
-        print(f"{discount_amount}   {new_date} ")
         discount_bank = Bank.objects.filter(project=project, name="Discount Given").first()
         target_bank = Bank.objects.filter(used_for="Account_Receivable", project=project).first()
 
