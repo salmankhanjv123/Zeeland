@@ -655,7 +655,7 @@ class CustomerLedgerView(APIView):
                 "id",
                 "date",
                 "remarks",
-                credit=F("amount_received"),
+                credit=F("company_amount_paid") - F("amount_received"),
                 debit=F("booking__total_amount"),
                 document=F("id"),
                 customer_name=F("booking__customer__name"),
@@ -797,7 +797,7 @@ class CustomerLedgerView(APIView):
             or 0.0
         )
         token_amount = (
-            Token.objects.filter(customer_id=customer_id).aggregate(
+            Token.objects.filter(customer_id=customer_id).exclude(status="refunded").aggregate(
                 total_amount=Coalesce(
                     Sum("amount"), Value(0, output_field=FloatField())
                 )
@@ -1335,7 +1335,7 @@ class PlotLedgerView(APIView):
                         )
 
                         token_amount = (
-                            Token.objects.filter(booking=booking_id).aggregate(
+                            Token.objects.filter(booking=booking_id).exclude(status="refunded").aggregate(
                                 total_amount=Coalesce(
                                     Sum("amount"), Value(0, output_field=FloatField())
                                 )
@@ -1343,18 +1343,19 @@ class PlotLedgerView(APIView):
                             or 0.0
                         )
 
-                        resale_amount = (
-                            PlotResale.objects.filter(booking=booking_id).aggregate(
-                                total_amount=Coalesce(
-                                    Sum("company_amount_paid"),
-                                    Value(0, output_field=FloatField()),
-                                )
-                            )["total_amount"]
-                            or 0.0
-                        )
+                        # resale_amount = (
+                        #     PlotResale.objects.filter(booking=booking_id).aggregate(
+                        #         total_amount=Coalesce(
+                        #             Sum("company_amount_paid"),
+                        #             Value(0, output_field=FloatField()),
+                        #         )
+                        #     )["total_amount"]
+                        #     or 0.0
+                        # )
 
                         remaining_amount = (
-                            plot_amount - token_amount - paid_amount - resale_amount
+                            plot_amount - token_amount - paid_amount
+                            # plot_amount - token_amount - paid_amount - resale_amount
                         )
 
                         response_data = {
@@ -1395,7 +1396,7 @@ class PlotLedgerView(APIView):
                         plot_amount = plot_data.get("total")
 
                         token_amount = (
-                            Token.objects.filter(id=token_id).aggregate(
+                            Token.objects.filter(id=token_id).exclude(status="refunded").aggregate(
                                 total_amount=Coalesce(
                                     Sum("amount"), Value(0, output_field=FloatField())
                                 )
