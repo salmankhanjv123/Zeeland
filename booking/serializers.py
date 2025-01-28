@@ -1062,7 +1062,6 @@ class PlotResaleSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         print("Validated data:", validated_data)
         closingType = validated_data.get("closingType")
-        print(closingType)
         if closingType=="Auto Close":
             self.update_bank_transactions(instance, validated_data)
         else:
