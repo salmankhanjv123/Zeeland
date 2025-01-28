@@ -655,29 +655,29 @@ class CustomerLedgerView(APIView):
                 "id",
                 "date",
                 "remarks",
-                credit=F("company_amount_paid") - F("amount_received"),
+                credit=Value(0.0),
                 debit=F("booking__total_amount"),
                 document=F("id"),
                 customer_name=F("booking__customer__name"),
                 reference=Value("close booking", output_field=CharField()),
             )
         )
-        resale_data_extra = (
-            PlotResale.objects.filter(
-                resale_query_filters, booking__customer_id=customer_id
-            )
-            .select_related("customer")
-            .values(
-                "id",
-                "date",
-                "remarks",
-                debit=F("company_amount_paid") - F("amount_received"),
-                credit=Value(0.0),
-                document=F("id"),
-                customer_name=F("booking__customer__name"),
-                reference=Value("close booking", output_field=CharField()),
-            )
-        )
+        # resale_data_extra = (
+        #     PlotResale.objects.filter(
+        #         resale_query_filters, booking__customer_id=customer_id
+        #     )
+        #     .select_related("customer")
+        #     .values(
+        #         "id",
+        #         "date",
+        #         "remarks",
+        #         debit=Value(0.0),
+        #         credit=Value(0.0),
+        #         document=F("id"),
+        #         customer_name=F("booking__customer__name"),
+        #         reference=Value("close booking", output_field=CharField()),
+        #     )
+        # )
         # Combine and sort by date
         combined_data = sorted(
             list(booking_data)
@@ -685,8 +685,8 @@ class CustomerLedgerView(APIView):
             + list(token_data)
             + list(expense_data)
             + list(bank_deposit_data)
-            + list(resale_data)
-            + list(resale_data_extra),
+            + list(resale_data),
+            # + list(resale_data_extra),
             key=lambda x: x["date"],
         )
 
