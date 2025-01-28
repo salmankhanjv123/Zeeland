@@ -129,6 +129,7 @@ class PlotResale(models.Model):
     customer_profit = models.FloatField(default=0)
     company_profit = models.FloatField(default=0)
     remarks = models.TextField(blank=True, null=True)
+    closingType=models.CharField(max_length=20, default="Auto Close")
 
     class Meta:
         db_table = "plot_resale"

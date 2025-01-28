@@ -833,7 +833,7 @@ class PlotResaleSerializer(serializers.ModelSerializer):
 
     @transaction.atomic
     def create(self, validated_data):
-        closingType = validated_data.pop("closingType", None)
+        closingType = validated_data.get("closingType")
         booking = validated_data.get("booking")
         booking.status = "close"
         booking.save()
@@ -1061,7 +1061,7 @@ class PlotResaleSerializer(serializers.ModelSerializer):
     @transaction.atomic
     def update(self, instance, validated_data):
         print("Validated data:", validated_data)
-        closingType = validated_data.pop("closingType", None)
+        closingType = validated_data.get("closingType")
         print(closingType)
         if closingType=="Auto Close":
             self.update_bank_transactions(instance, validated_data)
