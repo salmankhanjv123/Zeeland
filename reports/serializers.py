@@ -177,7 +177,7 @@ class PaymentDataSerializer(serializers.ModelSerializer):
 
     def get_debit(self, obj):
         # Custom logic for debit
-        return obj.amount if obj.reference == "payment" else 0.0
+        return obj.amount if obj.reference in ["payment", "Discount"] else 0.0
 
     def get_deposit_id(self, obj):
         try:
