@@ -283,6 +283,8 @@ class BookingSerializer(serializers.ModelSerializer):
             booking_date.year, booking_date.month, 1
         ).date()
 
+        if validated_data.get("installment_plan") == 0:
+          validated_data["installment_per_month"] = 0
         try:
             with transaction.atomic():
                 self.update_bank_transactions(instance, validated_data)
