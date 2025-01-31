@@ -325,6 +325,9 @@ class IncomingFundSerializer(serializers.ModelSerializer):
             )
         self.create_bank_transactions(incoming_fund, validated_data)
         if discount_amount and discount_amount != "0":
+            booking.total_receiving_amount += float(discount_amount)
+            booking.remaining -= float(discount_amount)
+            booking.save()
             bank_id= Bank.objects.filter(project=project, name="Discount Given").values('id').first()
             validated_data["bank_id"]=bank_id['id']
             validated_data["payment_type"]="Discount_Given"
@@ -481,10 +484,6 @@ class IncomingFundSerializer(serializers.ModelSerializer):
                     booking.total_receiving_amount += new_amount - old_amount
                     booking.remaining -= new_amount - old_amount
                     booking.save()
-                # if reference == "Discount":
-                #     booking.total_receiving_amount += new_amount - old_amount
-                #     booking.remaining -= new_amount - old_amount
-                #     booking.save()
                 elif reference == "refund":
                     booking.total_receiving_amount -= new_amount - old_amount
                     booking.remaining += new_amount - old_amount
@@ -504,6 +503,9 @@ class IncomingFundSerializer(serializers.ModelSerializer):
                         is_date_change= new_date != old_date
                         # Update discount amount if it has changed
                         if is_discount_amount_changed:
+                            booking.total_receiving_amount += float(discount_amount) - float(old_discount_amount)
+                            booking.remaining -= discount_amount - old_discount_amount
+                            booking.save()
                             discount_instance.amount = discount_amount
 
                         # Update date if it has changed
