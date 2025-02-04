@@ -460,8 +460,11 @@ class DuePaymentsView(APIView):
             booking_payments_total= booking_months_count * booking.installment_per_month + token_amount_received
             
             short_fall_amount=round(booking_payments_total-received_amount_total)
-            
-            performance = round((received_amount_total / booking_payments_total) * 100, 3)
+
+            if booking_payments_total == 0:
+                performance = 0  # or another appropriate value
+            else:
+                performance = round((received_amount_total / booking_payments_total) * 100, 3)            
             # Calculate the remaining months difference
             months_diff = booking_months_count - paid_installment_months_count
 
