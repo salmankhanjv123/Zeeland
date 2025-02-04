@@ -1,7 +1,9 @@
 from django.db.models import Max
-from django.db.models import Q, Sum,Prefetch
+from django.db.models import Q, Sum,Prefetch,FloatField
+from django.db.models.functions import Coalesce,Cast
 from django.shortcuts import get_object_or_404
 import datetime
+from datetime import date, timedelta
 from decimal import Decimal
 from rest_framework import viewsets, status
 from django.db.models.signals import post_save
@@ -396,11 +398,9 @@ def get_plot_info(booking):
         for plot in booking.plots.all()
     ]
 
-
 class DuePaymentsView(APIView):
     def get(self, request):
         project_id = request.query_params.get("project")
-        today_day = date.today().day
         current_month = date.today().replace(day=1)
 
         # Filter active bookings
@@ -414,37 +414,60 @@ class DuePaymentsView(APIView):
         due_payments = []
 
         for booking in active_bookings.prefetch_related('customer', 'plots'):
-            # Get the latest installment month
-            latest_payment = IncomingFund.objects.filter(booking=booking).aggregate(
-                latest_installement_month=Max("installement_month")
+            installment_received_amount = (
+                IncomingFund.objects
+                .filter(booking=booking, reference__in=["payment", "Discount"])
+                .annotate(amount_as_float=Cast("amount", FloatField()))  # Cast amount to FloatField
+                .aggregate(total=Coalesce(Sum("amount_as_float"), 0.0)).get("total", 0.0)
+            )
+            refunded_amount= (
+                IncomingFund.objects
+                .filter(booking=booking, reference="refund")
+                .annotate(amount_as_float=Cast("amount", FloatField()))  # Cast amount to FloatField
+                .aggregate(total=Coalesce(Sum("amount_as_float"), 0.0)).get("total", 0.0)
+            )
+            token_amount_received = 0.0
+            if booking.token:
+                if booking.token.status!="refunded":
+                    token_amount_received=booking.token.amount
+            
+            received_amount_total = installment_received_amount + token_amount_received - refunded_amount
+
+           # Get valid installment months (ignore None values)
+            paid_installment_months_count = (
+                IncomingFund.objects
+                .filter(booking=booking, reference="payment", installement_month__isnull=False)
+                .count()
             )
 
-            latest_payment_obj = None
-            if latest_payment["latest_installement_month"]:
-                latest_payment_obj = IncomingFund.objects.filter(
-                    booking=booking,
-                    installement_month=latest_payment["latest_installement_month"],
-                ).first()
+            # Get the latest installment reminder date
+            reminder_date = booking.installment_date
 
-            # Determine month difference based on the latest payment or booking date
-            if latest_payment_obj:
-                last_payment_month = latest_payment_obj.installement_month
+            # Ensure reminder_date is not None before comparing
+            if reminder_date and date.today().day < reminder_date:
+                # If today's date is less than the reminder date, use the previous month
+                current_month = (date.today().replace(day=1) - timedelta(days=1)).replace(day=1)
             else:
-                # If no payments made, use booking date as the reference
-                last_payment_month = booking.booking_date
+                # Otherwise, use the current month
+                current_month = date.today().replace(day=1)
 
-            # Calculate the month difference between last_payment_month and current_month
-            month_diff = (current_month.year - last_payment_month.year) * 12 + (current_month.month - last_payment_month.month)
+            # Get the booking date's first day of the month
+            booking_month = booking.booking_date.replace(day=1)
 
-            # Check if installment is due this month by comparing with installment date
-            if latest_payment_obj and today_day < booking.installment_date:
-                month_diff -= 1  # Reduce by one month if payment was received this month
+            # Calculate the total months since booking
+            booking_months_count = (current_month.year - booking_month.year) * 12 + (current_month.month - booking_month.month)
+
+            booking_payments_total= booking_months_count * booking.installment_per_month + token_amount_received
             
-            if month_diff < 1:
-                continue
-            # Construct due payment entry
-            customer = booking.customer  # Prefetch customer to avoid extra query
+            short_fall_amount=round(booking_payments_total-received_amount_total)
+            
+            performance = round((received_amount_total / booking_payments_total) * 100, 3)
+            # Calculate the remaining months difference
+            months_diff = booking_months_count - paid_installment_months_count
+
+            customer = booking.customer
             plot_info = get_plot_info(booking)
+
             due_payments.append({
                 "id": booking.id,
                 "booking_id": booking.booking_id,
@@ -452,11 +475,15 @@ class DuePaymentsView(APIView):
                 "customer_name": customer.name,
                 "customer_contact": customer.contact,
                 "due_date": booking.installment_date,
-                "total_remaining_amount": month_diff * booking.installment_per_month,
-                "month_difference": month_diff,
+                "total_remaining_amount": booking.total_amount - received_amount_total,
+                "month_difference": months_diff,
+                "performance": performance,
+                "short_fall_amount": short_fall_amount
             })
 
         return Response({"due_payments": due_payments})
+
+
 
 class BankDepositViewSet(viewsets.ModelViewSet):
     """
