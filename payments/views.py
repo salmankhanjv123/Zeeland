@@ -460,29 +460,30 @@ class DuePaymentsView(APIView):
             booking_payments_total= booking_months_count * booking.installment_per_month + token_amount_received
             
             short_fall_amount=round(booking_payments_total-received_amount_total)
-
+            
             if booking_payments_total == 0:
                 performance = 0  # or another appropriate value
             else:
-                performance = round((received_amount_total / booking_payments_total) * 100, 3)            
+                performance = round((received_amount_total / booking_payments_total) * 100, 3)
             # Calculate the remaining months difference
             months_diff = booking_months_count - paid_installment_months_count
 
             customer = booking.customer
             plot_info = get_plot_info(booking)
 
-            due_payments.append({
-                "id": booking.id,
-                "booking_id": booking.booking_id,
-                "plot_info": plot_info,
-                "customer_name": customer.name,
-                "customer_contact": customer.contact,
-                "due_date": booking.installment_date,
-                "total_remaining_amount": booking.total_amount - received_amount_total,
-                "month_difference": months_diff,
-                "performance": performance,
-                "short_fall_amount": short_fall_amount
-            })
+            if short_fall_amount > 0:
+                due_payments.append({
+                    "id": booking.id,
+                    "booking_id": booking.booking_id,
+                    "plot_info": plot_info,
+                    "customer_name": customer.name,
+                    "customer_contact": customer.contact,
+                    "due_date": booking.installment_date,
+                    "total_remaining_amount": booking.total_amount - received_amount_total,
+                    "month_difference": months_diff,
+                    "performance": performance,
+                    "short_fall_amount": short_fall_amount
+                })
 
         return Response({"due_payments": due_payments})
 
