@@ -433,13 +433,6 @@ class DuePaymentsView(APIView):
             
             received_amount_total = installment_received_amount + token_amount_received - refunded_amount
 
-           # Get valid installment months (ignore None values)
-            paid_installment_months_count = (
-                IncomingFund.objects
-                .filter(booking=booking, reference="payment", installement_month__isnull=False)
-                .count()
-            )
-
             # Get the latest installment reminder date
             reminder_date = booking.installment_date
 
@@ -464,9 +457,12 @@ class DuePaymentsView(APIView):
             if booking_payments_total == 0:
                 performance = 0  # or another appropriate value
             else:
-                performance = round((received_amount_total / booking_payments_total) * 100, 3)
+                performance = round(100-((received_amount_total / booking_payments_total) * 100), 3)
             # Calculate the remaining months difference
-            months_diff = booking_months_count - paid_installment_months_count
+            if short_fall_amount > 0:
+                months_diff = math.ceil(short_fall_amount / booking.installment_per_month)
+            else:
+                months_diff=0
 
             customer = booking.customer
             plot_info = get_plot_info(booking)
