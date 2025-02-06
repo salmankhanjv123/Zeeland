@@ -461,7 +461,10 @@ class DuePaymentsView(APIView):
                 performance = round(100-((received_amount_total / booking_payments_total) * 100), 3)
             # Calculate the remaining months difference
             if short_fall_amount > 0:
-                months_diff = math.ceil(short_fall_amount / booking.installment_per_month)
+                if booking.installment_per_month != 0:
+                    months_diff = math.ceil(short_fall_amount / booking.installment_per_month)
+                else:
+                    months_diff = ""
             else:
                 months_diff=0
 
