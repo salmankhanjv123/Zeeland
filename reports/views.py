@@ -887,8 +887,14 @@ class VendorLedgerView(APIView):
                 "remarks",
                 "date",
                 document=F("bank_deposit"),
-                debit=Abs(F("amount")),
-                credit=Value(0.0),
+                 debit=Case(
+                    When(amount__lte=0, then=Abs(F("amount"))),
+                    default=Value(0.0),
+                ),
+                credit=Case(
+                    When(amount__gt=0, then=Abs(F("amount"))),
+                    default=Value(0.0),
+                ),
                 customer_name=F("customer__name"),
                 reference=Value("Deposits", output_field=CharField()),
             )
