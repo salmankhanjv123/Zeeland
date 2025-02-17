@@ -75,8 +75,10 @@ class PlotsSerializer(serializers.ModelSerializer):
         project = validated_data.get('project', instance.project)
         project_id=project.id
         plot_number = validated_data.get('plot_number', instance.plot_number)
+        block=validated_data.get('block') 
+
         
-        if Plots.objects.filter(project=project, plot_number=plot_number).exclude(id=instance.id).exists() and project_id!=5:
+        if Plots.objects.filter(project=project, plot_number=plot_number, block_id=block).exclude(id=instance.id).exists() and project_id!=5:
             raise ValidationError({"error": f"A plot with number '{plot_number}' already exists in this project."})
         
         for attr, value in validated_data.items():
