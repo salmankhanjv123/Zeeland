@@ -145,15 +145,17 @@ class BookingSerializer(serializers.ModelSerializer):
                                 project=project,
                                 booking=booking,
                                 reminder_date=custom_reminder,
+                                user=booking.user_id,
+                                worked_on=False,
+                                created_at=booking.created_at,
+                                updated_at=booking.updated_at,
+                                contact=booking.customer.contact,
                                 remarks=f"Custom Installment reminder for booking: {booking.booking_id}, Outstanding custom payment of: {custom_installment_amount}"
                             )
-
                         today = custom_reminder
 
                 return booking
         except Exception as e:
-            import traceback
-            traceback.print_exc()  # Print the full error traceback
             raise serializers.ValidationError(f"Error creating booking: {e}")
 
     def create_bank_transactions(self, booking, validated_data):
@@ -476,6 +478,11 @@ class BookingSerializer(serializers.ModelSerializer):
                             project=project,
                             booking=instance,
                             reminder_date=new_reminder_date,
+                            user=instance.user_id,
+                            worked_on=False,
+                            created_at=instance.created_at,
+                            updated_at=instance.updated_at,
+                            contact=instance.customer.contact,
                             remarks=f"Custom Installment reminder for booking : {instance.booking_id}, Outstanding custom payment of : {custom_installment_amount - remaining_balance}"
                         )
                         new_reminder_date += relativedelta(months=custom_installment_plan)
@@ -483,10 +490,15 @@ class BookingSerializer(serializers.ModelSerializer):
                     # **Create Full Amount Reminders for Future Payments**
                     while new_reminder_date < booking_completion_date:
                         if new_reminder_date <= booking_completion_date:  # Ensure it's within range
-                            PaymentReminder.objects.create(
+                                PaymentReminder.objects.create(
                                 project=project,
                                 booking=instance,
                                 reminder_date=new_reminder_date,
+                                user=instance.user_id,
+                                worked_on=False,
+                                created_at=instance.created_at,
+                                updated_at=instance.updated_at,
+                                contact=instance.customer.contact,
                                 remarks=f"Custom Installment reminder for booking : {instance.booking_id}, Outstanding custom payment of : {custom_installment_amount}"
                             )
                         new_reminder_date += relativedelta(months=custom_installment_plan)
