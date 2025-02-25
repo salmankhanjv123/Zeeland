@@ -1,8 +1,10 @@
 from django_cron import CronJobBase, Schedule
 from django.utils.timezone import now
 from booking.models import Booking
-from .models import PaymentReminder
+from .models import PaymentReminder, IncomingFund
+from django.db.models.functions import Coalesce,Cast
 from django.db import transaction
+from django.db.models import Sum,FloatField
 from django.contrib.auth.models import User
 import logging
 logger = logging.getLogger(__name__)
@@ -29,7 +31,19 @@ class GeneratePaymentReminders(CronJobBase):
                     if booking.token.status!="refunded":
                         token_amount_received=booking.token.amount
 
-                booking_received_amount = booking.total_receiving_amount
+                installment_received_amount = (
+                    IncomingFund.objects
+                    .filter(booking=booking, reference__in=["payment", "Discount"])
+                    .annotate(amount_as_float=Cast("amount", FloatField()))  # Cast amount to FloatField
+                    .aggregate(total=Coalesce(Sum("amount_as_float"), 0.0)).get("total", 0.0)
+                )
+                refunded_amount= (
+                    IncomingFund.objects
+                    .filter(booking=booking, reference="refund")
+                    .annotate(amount_as_float=Cast("amount", FloatField()))  # Cast amount to FloatField
+                    .aggregate(total=Coalesce(Sum("amount_as_float"), 0.0)).get("total", 0.0)
+                )
+                booking_received_amount = installment_received_amount + token_amount_received - refunded_amount
                 reminder_date = today.date()  # Store a proper date
                 booking_date=booking.booking_date
 
@@ -37,7 +51,8 @@ class GeneratePaymentReminders(CronJobBase):
                 booking_payments_total= booking_months_count * booking.installment_per_month + token_amount_received
                 logger.info(f"Processing booking_payments_total {booking_payments_total}")
                 logger.info(f"Processing booking_received_amount {booking_received_amount}")
-                
+                short_fall_amount=round(booking_payments_total-booking_received_amount)
+
                 if booking_payments_total > booking_received_amount:
                     # deleted_count, _ = PaymentReminder.objects.filter(
                     #     booking=booking,
@@ -55,5 +70,5 @@ class GeneratePaymentReminders(CronJobBase):
                         worked_on=False,
                         created_at=today,
                         updated_at=today,
-                        remarks=f"Payment not recieved for booking {booking.booking_id} outstanding amount: {float(booking_payments_total)-float(booking_received_amount)}"
+                        remarks=f"Payment not recieved for booking {booking.booking_id} outstanding amount: {float(short_fall_amount)}"
                     )
