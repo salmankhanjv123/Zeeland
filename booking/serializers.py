@@ -8,6 +8,8 @@ from plots.serializers import PlotsSerializer
 from django.db.models import Sum, Q, Case, Value, F, When, FloatField
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
+from django.contrib.auth.models import User
+
 
 
 class PlotsSerializer(serializers.ModelSerializer):
@@ -137,6 +139,7 @@ class BookingSerializer(serializers.ModelSerializer):
                 if custom_installment_plan > 0 and custom_installment_amount > 0:
 
                     today = booking_date
+                    user_id = User.objects.get(pk=booking.user_id)  # Fetch the user instance
                     while today < booking_completion_date:
                         custom_reminder = today + relativedelta(months=custom_installment_plan)
                         
@@ -145,7 +148,7 @@ class BookingSerializer(serializers.ModelSerializer):
                                 project=project,
                                 booking=booking,
                                 reminder_date=custom_reminder,
-                                user=booking.user_id,
+                                user=user_id,
                                 worked_on=False,
                                 created_at=booking.created_at,
                                 updated_at=booking.updated_at,
@@ -471,14 +474,14 @@ class BookingSerializer(serializers.ModelSerializer):
 
                     # Adjust the start date based on paid installments
                     new_reminder_date = today + relativedelta(months=num_paid_installments * custom_installment_plan)
-
+                    user_id = User.objects.get(pk=instance.user_id)  # Fetch the user instance
                     # **First Reminder - Partial Amount Handling**
                     if remaining_balance > 0:
                         PaymentReminder.objects.create(
                             project=project,
                             booking=instance,
                             reminder_date=new_reminder_date,
-                            user=instance.user_id,
+                            user=user_id,
                             worked_on=False,
                             created_at=instance.created_at,
                             updated_at=instance.updated_at,
@@ -486,7 +489,6 @@ class BookingSerializer(serializers.ModelSerializer):
                             remarks=f"Custom Installment reminder for booking : {instance.booking_id}, Outstanding custom payment of : {custom_installment_amount - remaining_balance}"
                         )
                         new_reminder_date += relativedelta(months=custom_installment_plan)
-
                     # **Create Full Amount Reminders for Future Payments**
                     while new_reminder_date < booking_completion_date:
                         if new_reminder_date <= booking_completion_date:  # Ensure it's within range
@@ -494,7 +496,7 @@ class BookingSerializer(serializers.ModelSerializer):
                                 project=project,
                                 booking=instance,
                                 reminder_date=new_reminder_date,
-                                user=instance.user_id,
+                                user=user_id,
                                 worked_on=False,
                                 created_at=instance.created_at,
                                 updated_at=instance.updated_at,
