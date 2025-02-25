@@ -19,7 +19,7 @@ class GeneratePaymentReminders(CronJobBase):
         with transaction.atomic():
             logger.info(f"Running payment reminder cron job for {today}")
             day_of_month = today.day
-            bookings = Booking.objects.filter(booking_type="installment_payment", installment_date= day_of_month, status="active")
+            bookings = Booking.objects.filter(booking_type="installment_payment", project_id=6, installment_date= day_of_month, status="active")
             logger.info(f"Found {len(bookings)} active installment bookings")
 
             for booking in bookings:
