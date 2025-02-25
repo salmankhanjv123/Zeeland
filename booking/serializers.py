@@ -152,6 +152,8 @@ class BookingSerializer(serializers.ModelSerializer):
 
                 return booking
         except Exception as e:
+            import traceback
+            traceback.print_exc()  # Print the full error traceback
             raise serializers.ValidationError(f"Error creating booking: {e}")
 
     def create_bank_transactions(self, booking, validated_data):
