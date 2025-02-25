@@ -26,6 +26,8 @@ class Booking(models.Model):
     due_date = models.DateField(blank=True, null=True)
     installment_date = models.IntegerField()
     installment_per_month = models.FloatField()
+    custom_installment_plan = models.FloatField(blank=True, null=True)
+    custom_installment_amount = models.FloatField(blank=True, null=True)
 
     remarks = models.TextField(null=True)
     total_amount = models.FloatField()

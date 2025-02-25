@@ -3,6 +3,7 @@ from projects.models import Projects
 from booking.models import Booking
 from customer.models import Customers
 from plots.models import Plots
+from django.contrib.auth.models import User
 
 
 class Bank(models.Model):
@@ -68,12 +69,13 @@ class IncomingFund(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     installement_month = MonthField(blank=True, null=True)
-    amount = models.FloatField()
     discount_amount = models.FloatField(blank=True, null=True)
+    amount = models.FloatField()
     remarks = models.TextField(blank=True, null=True)
     advance_payment = models.BooleanField(default=False)
     payment_type = models.CharField(max_length=20, default="cash")
     cheque_number = models.CharField(max_length=50, blank=True, null=True)
+    custom_installment = models.BooleanField(default=False)
     bank = models.ForeignKey(
         Bank, related_name="payments", on_delete=models.PROTECT, blank=True, null=True
     )
@@ -149,7 +151,7 @@ class OutgoingFundDocuments(models.Model):
         OutgoingFund, related_name="files", on_delete=models.CASCADE
     )
     file = models.FileField(upload_to="media/dealer_files")
-    description = models.TextField(max_length=3000, blank=True, null=True)
+    description = models.TextField()
     type = models.CharField(max_length=20)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -173,10 +175,30 @@ class PaymentReminder(models.Model):
     booking = models.ForeignKey(Booking, on_delete=models.PROTECT)
     remarks = models.TextField(blank=True, null=True)
     reminder_date = models.DateField()
+    parent_reminder = models.ForeignKey(
+        "self", on_delete=models.PROTECT, blank=True, null=True
+    )
+    user= models.ForeignKey(User, on_delete=models.PROTECT)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_at=models.DateTimeField(auto_now_add=True, null=True)
+    worked_on=models.BooleanField(default=False)
+    contact = models.CharField(max_length=40, blank=True, null=True)
 
     class Meta:
         db_table = "payments_reminder"
 
+class PaymentReminderDocuments(models.Model):
+    reminder = models.ForeignKey(
+        PaymentReminder, related_name="files", on_delete=models.CASCADE
+    )
+    file = models.FileField(upload_to="media/reminder_files")
+    description = models.TextField()
+    type = models.CharField(max_length=20)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "payments_reminder_documents"
 
 class BankDeposit(models.Model):
     project = models.ForeignKey(Projects, on_delete=models.PROTECT)

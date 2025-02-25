@@ -2,11 +2,12 @@ from rest_framework import serializers
 from django.db import transaction
 from .models import Booking, BookingDocuments, Token, PlotResale, TokenDocuments
 from plots.models import Plots
-from payments.models import IncomingFund, Bank, BankTransaction
+from payments.models import IncomingFund, Bank, BankTransaction, PaymentReminder
 from customer.serializers import CustomersInfoSerializer
 from plots.serializers import PlotsSerializer
 from django.db.models import Sum, Q, Case, Value, F, When, FloatField
-import datetime
+from datetime import datetime
+from dateutil.relativedelta import relativedelta
 
 
 class PlotsSerializer(serializers.ModelSerializer):
@@ -69,7 +70,10 @@ class BookingSerializer(serializers.ModelSerializer):
         project = validated_data.get("project")
         token = validated_data.get("token")
         booking_date = validated_data.get("booking_date")
-        installement_month = datetime.datetime(
+        custom_installment_plan=validated_data.get("custom_installment_plan",0)
+        custom_installment_amount= validated_data.get("custom_installment_amount", 0)
+        booking_completion_date=validated_data.get("due_date")
+        installement_month = datetime(
             booking_date.year, booking_date.month, 1
         ).date()
         try:
@@ -129,6 +133,23 @@ class BookingSerializer(serializers.ModelSerializer):
                         discount_amount=0
                     )
                 self.create_bank_transactions(booking, validated_data)
+
+                if custom_installment_plan > 0 and custom_installment_amount > 0:
+
+                    today = booking_date
+                    while today < booking_completion_date:
+                        custom_reminder = today + relativedelta(months=custom_installment_plan)
+                        
+                        if custom_reminder <= booking_completion_date:
+                            PaymentReminder.objects.create(
+                                project=project,
+                                booking=booking,
+                                reminder_date=custom_reminder,
+                                remarks=f"Custom Installment reminder for booking: {booking.booking_id}, Outstanding custom payment of: {custom_installment_amount}"
+                            )
+
+                        today = custom_reminder
+
                 return booking
         except Exception as e:
             raise serializers.ValidationError(f"Error creating booking: {e}")
@@ -279,12 +300,15 @@ class BookingSerializer(serializers.ModelSerializer):
         project= validated_data.get("project", instance.project)
         token_amount = token.amount if token else 0
         booking_date = validated_data.get("booking_date", instance.booking_date)
-        installement_month = datetime.datetime(
+        installement_month = datetime(
             booking_date.year, booking_date.month, 1
         ).date()
-
         if validated_data.get("installment_plan") == 0:
-          validated_data["installment_per_month"] = 0
+            validated_data["installment_per_month"] = 0
+        custom_installment_plan = validated_data.get("custom_installment_plan", instance.custom_installment_plan)
+        custom_installment_amount = validated_data.get("custom_installment_amount", instance.custom_installment_amount)
+        booking_completion_date = validated_data.get("due_date", instance.due_date)
+
         try:
             with transaction.atomic():
                 self.update_bank_transactions(instance, validated_data)
@@ -419,6 +443,51 @@ class BookingSerializer(serializers.ModelSerializer):
                         file.save()
                     else:
                         BookingDocuments.objects.create(booking=instance, **file_data)
+
+                # **Delete Previously Created Custom Installment Reminders**
+                PaymentReminder.objects.filter(
+                    booking=instance,
+                    remarks__startswith=f"Custom Installment reminder for booking : {instance.booking_id}"
+                ).delete()
+
+                # **Create New Custom Installment Reminders**
+                if custom_installment_plan > 0 and custom_installment_amount > 0:
+                    today = booking_date  # Start from booking date
+                    total_paid = (
+                        IncomingFund.objects.filter(booking=instance, reference="payment")
+                        .aggregate(total_paid=Sum("amount"))
+                        .get("total_paid", 0) or 0
+                    )
+
+                    # Determine how many full installments have been covered
+                    num_paid_installments = total_paid // custom_installment_amount
+
+                    # Calculate the remaining balance after full installments
+                    remaining_balance = total_paid % custom_installment_amount
+
+                    # Adjust the start date based on paid installments
+                    new_reminder_date = today + relativedelta(months=num_paid_installments * custom_installment_plan)
+
+                    # **First Reminder - Partial Amount Handling**
+                    if remaining_balance > 0:
+                        PaymentReminder.objects.create(
+                            project=project,
+                            booking=instance,
+                            reminder_date=new_reminder_date,
+                            remarks=f"Custom Installment reminder for booking : {instance.booking_id}, Outstanding custom payment of : {custom_installment_amount - remaining_balance}"
+                        )
+                        new_reminder_date += relativedelta(months=custom_installment_plan)
+
+                    # **Create Full Amount Reminders for Future Payments**
+                    while new_reminder_date < booking_completion_date:
+                        if new_reminder_date <= booking_completion_date:  # Ensure it's within range
+                            PaymentReminder.objects.create(
+                                project=project,
+                                booking=instance,
+                                reminder_date=new_reminder_date,
+                                remarks=f"Custom Installment reminder for booking : {instance.booking_id}, Outstanding custom payment of : {custom_installment_amount}"
+                            )
+                        new_reminder_date += relativedelta(months=custom_installment_plan)
 
                 return instance
         except Exception as e:
@@ -1064,6 +1133,7 @@ class PlotResaleSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         print("Validated data:", validated_data)
         closingType = validated_data.get("closingType")
+        print(closingType)
         if closingType=="Auto Close":
             self.update_bank_transactions(instance, validated_data)
         else:

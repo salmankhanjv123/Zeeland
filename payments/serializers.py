@@ -13,6 +13,7 @@ from .models import (
     JournalVoucher,
     PaymentReminder,
     ExpensePerson,
+    PaymentReminderDocuments,
     Bank,
     BankTransaction,
     BankDeposit,
@@ -31,6 +32,7 @@ from .models import (
     ChequeClearanceDocuments,
 )
 import datetime
+import re
 from django.db import transaction
 from django.db.models import Sum, ProtectedError
 from rest_framework.exceptions import ValidationError
@@ -240,7 +242,7 @@ class CustomersSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Customers
-        fields = ["name", "father_name", "contact", "cnic"]
+        fields = ["id","name", "father_name", "contact", "cnic"]
 
 
 class IncomingFundDocumentsSerializer(serializers.ModelSerializer):
@@ -279,6 +281,7 @@ class IncomingFundSerializer(serializers.ModelSerializer):
         reference = validated_data.get("reference")
         booking = validated_data.get("booking")
         amount = validated_data.get("amount")
+        custom_installment=validated_data.get("custom_installment", False)
         if(validated_data.get("previous_serial_num")):
             validated_data["previous_serial_num"] = str(int(validated_data["previous_serial_num"]) - 1)
 
@@ -338,6 +341,80 @@ class IncomingFundSerializer(serializers.ModelSerializer):
                 validated_data["previous_serial_num"] = validated_data["document_number"]
             discount = IncomingFund.objects.create(**validated_data)
             self.create_discount_transaction(discount, validated_data)
+
+        if custom_installment:
+            if amount > booking.installment_per_month:
+                # installment_reminder = PaymentReminder.objects.filter(
+                #     booking=booking, remarks__startswith="Payment not recieved for booking"
+                # ).first()  # Get the first matching instance
+                # if installment_reminder:
+                #     match = re.search(r"outstanding amount: ([\d.]+)", installment_reminder.remarks)
+                    
+                #     if match:
+                #         outstanding_amount = float(match.group(1))  # Extract and convert to float
+                #         if outstanding_amount > booking.installment_per_month:
+                #             new_balance = outstanding_amount - booking.installment_per_month
+                #             installment_reminder.remarks = (
+                #                 f"Payment not recieved for booking: {booking.booking_id}, "
+                #                 f"outstanding amount: {new_balance}"
+                #             )
+                #             installment_reminder.save()
+                #         else:
+                #             installment_reminder.delete()
+                amount-= booking.installment_per_month
+                reminders = PaymentReminder.objects.filter(
+                    booking=booking,remarks__startswith="Custom Installment reminder for booking:").order_by('reminder_date')
+                for reminder in reminders:
+                    if amount <= 0:
+                        break
+                    match = re.search(r"Outstanding custom payment of: ([\d.]+)", reminder.remarks)
+                    if match:
+                        remaining_amount = float(match.group(1))
+                        if amount >= remaining_amount:
+                            amount -= remaining_amount
+                            reminder.delete()
+                        else:
+                            new_balance = remaining_amount - amount
+                            reminder.remarks = f"Custom Installment reminder for booking: {booking.booking_id}, Outstanding custom payment of: {new_balance}"
+                            reminder.save()
+                            amount = 0
+        #     else:
+        #         installment_reminder = PaymentReminder.objects.filter(
+        #             booking=booking, remarks__startswith="Payment not recieved for booking"
+        #         ).first()  # Get the first matching instance
+        #         print(installment_reminder.remarks)
+        #         if installment_reminder:
+        #             match = re.search(r"outstanding amount: ([\d.]+)", installment_reminder.remarks)
+        #             print(match)
+        #             if match:
+        #                 outstanding_amount = float(match.group(1))  # Extract and convert to float
+        #                 new_balance = outstanding_amount - amount
+        #                 installment_reminder.remarks = (
+        #                     f"Payment not recieved for booking: {booking.booking_id}, "
+        #                     f"outstanding amount: {new_balance}"
+        #                 )
+        #                 installment_reminder.save()
+        # else:
+        #     installment_reminder = PaymentReminder.objects.filter(
+        #         booking=booking, remarks__startswith="Payment not recieved for booking"
+        #     ).first()  # Get the first matching instance
+        #     print(installment_reminder.remarks)
+        #     if installment_reminder:
+        #         match = re.search(r"outstanding amount: ([\d.]+)", installment_reminder.remarks)
+        #         print(match)
+        #         if match:
+        #             outstanding_amount = float(match.group(1))  # Extract and convert to float
+        #             if outstanding_amount > amount:
+        #                 new_balance = outstanding_amount - amount
+        #                 installment_reminder.remarks = (
+        #                     f"Payment not recieved for booking: {booking.booking_id}, "
+        #                     f"outstanding amount: {new_balance}"
+        #                 )
+        #                 installment_reminder.save()
+        #             else:
+        #                 installment_reminder.delete()
+           
+                  
         return incoming_fund
 
     def create_discount_transaction(self, payment, validated_data):
@@ -929,9 +1006,22 @@ class JournalVoucherSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
+class PaymentReminderDocumentsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PaymentReminderDocuments
+        exclude = ["reminder"]
+
+    def to_internal_value(self, data):
+        validated_data = super().to_internal_value(data)
+        validated_data["id"] = data.get("id")
+        return validated_data
+
+
 class PaymentReminderSerializer(serializers.ModelSerializer):
+    files = PaymentReminderDocumentsSerializer(many=True, required=False)
     plot_info = serializers.SerializerMethodField(read_only=True)
     customer_info = CustomersSerializer(source="booking.customer", read_only=True)
+    parent_reminder = serializers.PrimaryKeyRelatedField(queryset=PaymentReminder.objects.all(), read_only=False)
 
     def get_plot_info(self, instance):
         plots = instance.booking.plots.all()
@@ -944,6 +1034,39 @@ class PaymentReminderSerializer(serializers.ModelSerializer):
     class Meta:
         model = PaymentReminder
         fields = "__all__"
+
+    def create(self, validated_data):
+        files_data = validated_data.pop("files", [])
+        payment_reminder = PaymentReminder.objects.create(**validated_data)
+        
+        for file_data in files_data:
+            PaymentReminderDocuments.objects.create(
+                reminder=payment_reminder, **file_data
+            )
+        
+        return payment_reminder
+
+    def update(self, instance, validated_data):
+        files_data = validated_data.pop("files", [])
+        
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+
+        for file_data in files_data:
+            file_id = file_data.get("id", None)
+            if file_id:
+                file = PaymentReminderDocuments.objects.get(id=file_id, reminder=instance)
+                file.description = file_data.get("description", file.description)
+                file.type = file_data.get("type", file.type)
+                if "file" in file_data:
+                    file.file = file_data.get("file", file.file)
+                file.save()
+            else:
+                PaymentReminderDocuments.objects.create(reminder=instance, **file_data)
+
+        return instance
+
 
 
 class ExpensePersonSerializer(serializers.ModelSerializer):

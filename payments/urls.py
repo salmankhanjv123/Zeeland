@@ -22,6 +22,8 @@ from rest_framework import routers
 
 router = routers.DefaultRouter()
 router.register(r"payments", IncomingFundViewSet, basename="payments")
+
+
 router.register(r"expenses", OutgoingFundViewSet, basename="expenses")
 router.register(r"journal-voucher", JournalVoucherViewSet, basename="journal-voucher")
 router.register(r"expense-type", ExpenseTypeViewSet, basename="expense-type")

@@ -12,6 +12,7 @@ from payments.models import (
 )
 from customer.models import Customers, CustomerMessages, Dealers
 from plots.models import Plots
+from payments.models import PaymentReminder,PaymentReminderDocuments
 from booking.models import Booking, Token, PlotResale
 from .serializers import (
     IncomingFundReportSerializer,
@@ -774,7 +775,42 @@ class CustomerLedgerView(APIView):
             }
             for message in customer_messages
         ]
+        payment_reminder_data = []
+        for booking in booking_data:
+            payment_reminders = PaymentReminder.objects.filter(
+                booking_id=booking["id"]
+            )
 
+            for reminder in payment_reminders:
+                payment_reminder_files = PaymentReminderDocuments.objects.filter(
+                    reminder_id=reminder.id
+                )
+
+                payment_reminder_data.append(
+                    {
+                        "id": reminder.id,
+                        "user": reminder.user_id,
+                        "booking": reminder.booking_id,
+                        "date": reminder.reminder_date,
+                        "created_at": reminder.created_at,
+                        "updated_at": reminder.updated_at,
+                        "remarks": reminder.remarks,
+                        "parent_reminder_id": reminder.parent_reminder_id,
+                        "worked_on": reminder.worked_on,
+                        "files": [
+                            {
+                                "id": file.id,
+                                "file": file.file.url,
+                                "description": file.description,
+                                "type": file.type,
+                                "created_at": file.created_at,
+                                "updated_at": file.updated_at,
+                                "reminder_id": file.reminder_id
+                            }
+                            for file in payment_reminder_files
+                        ],
+                    }
+                )
         booking_amount = (
             Booking.objects.filter(customer_id=customer_id).aggregate(
                 total_amount=Coalesce(
@@ -814,6 +850,7 @@ class CustomerLedgerView(APIView):
             "plot_data": plot_serializer.data,
             "dealer_data": list(dealers),
             "customer_messages": customer_messages_data,
+            "payment_reminders": payment_reminder_data,
             "opening_balance": opening_balance,
             "total_amount": total_amount,
             "remaining_amount": remaining_amount,

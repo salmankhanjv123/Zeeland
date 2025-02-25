@@ -122,7 +122,6 @@ class CustomerMessagesSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         files_data = validated_data.pop("files",[])
         date = validated_data.get("date")
-        follow_up=validated_data.get("follow_up")
         follow_up_message = validated_data.get("follow_up_message")
         customer_message = CustomerMessages.objects.create(**validated_data)
         for file_data in files_data:
@@ -130,7 +129,7 @@ class CustomerMessagesSerializer(serializers.ModelSerializer):
                 message=customer_message, **file_data
             )
         CustomerMessagesReminder.objects.create(
-            message=customer_message, date=follow_up, follow_up_message=follow_up_message
+            message=customer_message, date=date, follow_up_message=follow_up_message
         )
         return customer_message
 

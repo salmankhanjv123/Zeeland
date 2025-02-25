@@ -1,9 +1,10 @@
 from django.db.models import Max
 from django.db.models import Q, Sum,Prefetch,FloatField
 from django.db.models.functions import Coalesce,Cast
-from django.shortcuts import get_object_or_404
-import datetime
 import math
+from django.shortcuts import get_object_or_404
+from rest_framework.decorators import action
+import datetime
 from datetime import date, timedelta
 from decimal import Decimal
 from rest_framework import viewsets, status
@@ -24,12 +25,15 @@ from .serializers import (
     BankTransferSerializer,
     ChequeClearanceSerializer,
 )
+from django.utils import timezone
+from django.conf import settings
 from .models import (
     IncomingFund,
     OutgoingFund,
     ExpenseType,
     JournalVoucher,
     PaymentReminder,
+    PaymentReminderDocuments,
     ExpensePerson,
     Bank,
     BankTransaction,
@@ -48,8 +52,7 @@ from rest_framework.exceptions import ValidationError
 from datetime import date
 from booking.models import Booking, Token
 from customer.models import Customers
-
-
+import os
 class BankViewSet(viewsets.ModelViewSet):
     """
     API endpoint that allows Banks to be viewed or edited.
@@ -378,12 +381,31 @@ class ExpensePersonViewSet(viewsets.ModelViewSet):
         return queryset
 
 
+# class PaymentReminderViewSet(viewsets.ModelViewSet):
+#     """
+#     API endpoint that allows payments reminders to be viewed or edited.
+#     """
+
+#     serializer_class = PaymentReminderSerializer
+
+#     def get_queryset(self):
+#         queryset = PaymentReminder.objects.all()
+#         project_id = self.request.query_params.get("project")
+#         if project_id:
+#             queryset = queryset.filter(project_id=project_id)
+#         return queryset
+
+
+from rest_framework import viewsets, status
+from rest_framework.parsers import MultiPartParser, FormParser
+from django.shortcuts import get_object_or_404
+
 class PaymentReminderViewSet(viewsets.ModelViewSet):
     """
     API endpoint that allows payments reminders to be viewed or edited.
     """
-
     serializer_class = PaymentReminderSerializer
+    parser_classes = (MultiPartParser, FormParser)
 
     def get_queryset(self):
         queryset = PaymentReminder.objects.all()
@@ -393,13 +415,119 @@ class PaymentReminderViewSet(viewsets.ModelViewSet):
         return queryset
 
 
-def get_plot_info(booking):
-    return [
-        f"{plot.plot_number} || {plot.get_type_display()} || {plot.get_plot_size()}"
-        for plot in booking.plots.all()
-    ]
+    # @action(detail=False, methods=["patch"], url_path="update-by-phone-number", parser_classes=[MultiPartParser, FormParser])
+    # def update_by_phone_number(self, request, *args, **kwargs):
+    #     phone_number = str(request.query_params.get("phone", "")).strip()  # Ensure it's a string and remove spaces
 
+    #     if not phone_number:
+    #         return Response({"error": "Phone number is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+    #     try:
+    #         instance = PaymentReminder.objects.get(contact=phone_number)  # Retrieve reminder by phone number
+    #     except PaymentReminder.DoesNotExist:
+    #         return Response({"error": f"No reminder found for this phone number {phone_number}"}, status=status.HTTP_404_NOT_FOUND)
+
+    #     # Update worked_on status if provided
+    #     worked_on = request.data.get("worked_on", None)
+    #     if worked_on is not None:
+    #         instance.worked_on = str(worked_on).lower() == "true"  # Convert to boolean safely
+    #         instance.save()
+
+    #     # Handle file uploads (correctly parsing nested file data)
+    #     files_data = request.FILES
+    #     for key in files_data:
+    #         if key.startswith("files[") and key.endswith("]file"):
+    #             index = key[key.find("[") + 1 : key.find("]")]
+    #             file = files_data[key]
+
+    #             description = request.data.get(f"files[{index}]description", "")
+    #             file_type = request.data.get(f"files[{index}]type", "")
+
+    #             # Create document entry
+    #             PaymentReminderDocuments.objects.create(
+    #                 reminder=instance, file=file, description=description, type=file_type
+    #             )
+
+    #     serializer = self.get_serializer(instance)
+    #     return Response(serializer.data, status=status.HTTP_200_OK)
+
+    # def update_by_phone_number(self, request, *args, **kwargs):
+    #     phone_number = request.query_params.get("phone", "").strip()
+
+    #     if not phone_number:
+    #         return Response({"error": "Phone number is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+    #     try:
+    #         instance = PaymentReminder.objects.get(contact=phone_number)
+    #     except PaymentReminder.DoesNotExist:
+    #         return Response({"error": "No reminder found for this phone number"}, status=status.HTTP_404_NOT_FOUND)
+
+    #     # Read the raw audio file from request body
+    #     file_data = request.body
+
+    #     print("TESTING FILE DATA : ", file_data[:20])  # Print only first 20 bytes to check data
+
+    #     if not file_data:
+    #         return Response({"error": "No file received"}, status=status.HTTP_400_BAD_REQUEST)
+
+    #     # Save the file
+    #     file_name = f"{phone_number}_{timezone.now().strftime('%Y%m%d%H%M%S')}.mp3"
+    #     file_path = os.path.join(settings.MEDIA_ROOT, "recordings", file_name)
+
+    #     with open(file_path, "wb") as f:
+    #         f.write(file_data)
+
+    #     # Save file reference in database
+    #     PaymentReminderDocuments.objects.create(
+    #         reminder=instance, file=f"recordings/{file_name}", description="Call Recording", type="audio"
+    #     )
+
+    #     return Response({"success": "Audio file saved successfully"}, status=status.HTTP_200_OK)
+
+
+
+    @action(detail=False, methods=["patch"], url_path="update-by-phone-number")
+    def update_by_phone_number(self, request, *args, **kwargs):
+        phone_number = request.query_params.get("phone", "").strip()
+
+        if not phone_number:
+            return Response({"error": "Phone number is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            instance = PaymentReminder.objects.filter(contact=phone_number).latest('reminder_date')
+        except PaymentReminder.DoesNotExist:
+            return Response({"error": "No reminder found for this phone number"}, status=status.HTTP_404_NOT_FOUND)
+
+        # Read the raw audio file from request body
+        file_data = request.body
+
+        if not file_data:
+            return Response({"error": "No file received"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Ensure the folder exists
+        save_directory = os.path.join(settings.MEDIA_ROOT, "media/reminder_files")
+        os.makedirs(save_directory, exist_ok=True)  # Create folder if it doesn't exist
+
+        # Save the file
+        file_name = f"{phone_number}_{timezone.now().strftime('%Y%m%d%H%M%S')}.mp3"
+        file_path = os.path.join(save_directory, file_name)
+
+        with open(file_path, "wb") as f:
+            f.write(file_data)
+
+        # Save file reference in database
+        PaymentReminderDocuments.objects.create(
+            reminder=instance, file=f"media/reminder_files/{file_name}", description="Call Recording", type="audio"
+        )
+
+        return Response({"success": "Audio file saved successfully"}, status=status.HTTP_200_OK)
+def get_plot_info(booking):
+        return [
+            f"{plot.plot_number} || {plot.get_type_display()} || {plot.get_plot_size()}"
+            for plot in booking.plots.all()
+        ]
 class DuePaymentsView(APIView):
+
     def get(self, request):
         project_id = request.query_params.get("project")
         current_month = date.today().replace(day=1)
@@ -464,7 +592,7 @@ class DuePaymentsView(APIView):
                 if booking.installment_per_month != 0:
                     months_diff = math.ceil(short_fall_amount / booking.installment_per_month)
                 else:
-                    months_diff = ""
+                    months_diff = 0
             else:
                 months_diff=0
 
@@ -477,6 +605,7 @@ class DuePaymentsView(APIView):
                     "booking_id": booking.booking_id,
                     "plot_info": plot_info,
                     "customer_name": customer.name,
+                    "customer_id": customer.id,
                     "customer_contact": customer.contact,
                     "due_date": booking.installment_date,
                     "total_remaining_amount": booking.total_amount - received_amount_total,
