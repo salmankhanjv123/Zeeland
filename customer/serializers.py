@@ -9,6 +9,7 @@ from .models import (
     DealersDocuments,
     Department,
 )
+from payments.models import PaymentReminder
 from booking.models import Booking
 
 
@@ -52,6 +53,12 @@ class CustomersSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         files_data = validated_data.pop("files", [])
+        contact = validated_data.get("contact")
+        if instance.contact != contact:
+            all_customer_reminders= PaymentReminder.objects.filter(contact= instance.contact)
+            for reminder in all_customer_reminders:
+                reminder.contact=contact
+                reminder.save()
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
