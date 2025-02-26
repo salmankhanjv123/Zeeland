@@ -46,8 +46,9 @@ class GeneratePaymentReminders(CronJobBase):
                 booking_received_amount = installment_received_amount + token_amount_received - refunded_amount
                 reminder_date = today.date()  # Store a proper date
                 booking_date=booking.booking_date
+                due_date=booking.due_date
 
-                booking_months_count = (today.year - booking_date.year) * 12 + (today.month - booking_date.month)
+                booking_months_count = (due_date.year - booking_date.year) * 12 + (due_date.month - booking_date.month)
                 booking_payments_total= booking_months_count * booking.installment_per_month + token_amount_received
                 logger.info(f"Processing booking_payments_total {booking_payments_total}")
                 logger.info(f"Processing booking_received_amount {booking_received_amount}")
