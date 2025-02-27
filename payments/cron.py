@@ -47,14 +47,17 @@ class GeneratePaymentReminders(CronJobBase):
                 reminder_date = today.date()  # Store a proper date
                 booking_date=booking.booking_date
                 due_date=booking.due_date
-                if today.year > due_date.year and today.month > due_date.month:
-                    due_date=today.date()
-
+                if today.year < due_date.year or (today.year == due_date.year and today.month < due_date.month):
+                    due_date = today.date()
                 booking_months_count = (due_date.year - booking_date.year) * 12 + (due_date.month - booking_date.month)
-                booking_payments_total= booking_months_count * booking.installment_per_month + token_amount_received
+                logger.info(f"Processing due_date {booking_months_count}")
+
+                booking_payments_total= booking_months_count * booking.installment_per_month + token_amount_received + booking.advance
                 logger.info(f"Processing booking_payments_total {booking_payments_total}")
                 logger.info(f"Processing booking_received_amount {booking_received_amount}")
                 short_fall_amount=round(booking_payments_total-booking_received_amount)
+                logger.info(f"Processing short_fall_amount {short_fall_amount}")
+
 
                 if booking_payments_total > booking_received_amount:
                     # deleted_count, _ = PaymentReminder.objects.filter(
