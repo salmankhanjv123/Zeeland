@@ -75,6 +75,8 @@ class BookingSerializer(serializers.ModelSerializer):
         custom_installment_plan=validated_data.get("custom_installment_plan",0)
         custom_installment_amount= validated_data.get("custom_installment_amount", 0)
         booking_completion_date=validated_data.get("due_date")
+        if validated_data.get("installment_plan") == 0:
+            validated_data["installment_per_month"] = 0
         installement_month = datetime(
             booking_date.year, booking_date.month, 1
         ).date()
