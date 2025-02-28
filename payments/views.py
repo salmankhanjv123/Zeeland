@@ -499,11 +499,17 @@ class DuePaymentsView(APIView):
 
             # Ensure reminder_date is not None before comparing
             if reminder_date and date.today().day < reminder_date:
-                # If today's date is less than the reminder date, use the previous month
-                current_month = (date.today().replace(day=1) - timedelta(days=1)).replace(day=1)
+                if booking.due_date <= date.today():
+                    current_month=(booking.due_date.replace(day=1)- timedelta(days=1)).replace(day=1)
+                else:
+                    # If today's date is less than the reminder date, use the previous month
+                    current_month = (date.today().replace(day=1) - timedelta(days=1)).replace(day=1)
             else:
-                # Otherwise, use the current month
-                current_month = date.today().replace(day=1)
+                if booking.due_date <= date.today():
+                    current_month=booking.due_date.replace(day=1)
+                else:
+                    # Otherwise, use the current month
+                    current_month = date.today().replace(day=1)
 
             # Get the booking date's first day of the month
             booking_month = booking.booking_date.replace(day=1)
@@ -518,7 +524,7 @@ class DuePaymentsView(APIView):
             if booking_payments_total == 0:
                 performance = 0  # or another appropriate value
             else:
-                performance = round(100-((received_amount_total / booking_payments_total) * 100), 3)
+                performance = round(((received_amount_total / booking_payments_total) * 100), 3)
             # Calculate the remaining months difference
             if short_fall_amount > 0:
                 if booking.installment_per_month != 0:
@@ -547,6 +553,7 @@ class DuePaymentsView(APIView):
                 })
 
         return Response({"due_payments": due_payments})
+
 
 
 
