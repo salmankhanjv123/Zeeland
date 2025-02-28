@@ -414,87 +414,19 @@ class PaymentReminderViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(project_id=project_id)
         return queryset
 
-
-    # @action(detail=False, methods=["patch"], url_path="update-by-phone-number", parser_classes=[MultiPartParser, FormParser])
-    # def update_by_phone_number(self, request, *args, **kwargs):
-    #     phone_number = str(request.query_params.get("phone", "")).strip()  # Ensure it's a string and remove spaces
-
-    #     if not phone_number:
-    #         return Response({"error": "Phone number is required"}, status=status.HTTP_400_BAD_REQUEST)
-
-    #     try:
-    #         instance = PaymentReminder.objects.get(contact=phone_number)  # Retrieve reminder by phone number
-    #     except PaymentReminder.DoesNotExist:
-    #         return Response({"error": f"No reminder found for this phone number {phone_number}"}, status=status.HTTP_404_NOT_FOUND)
-
-    #     # Update worked_on status if provided
-    #     worked_on = request.data.get("worked_on", None)
-    #     if worked_on is not None:
-    #         instance.worked_on = str(worked_on).lower() == "true"  # Convert to boolean safely
-    #         instance.save()
-
-    #     # Handle file uploads (correctly parsing nested file data)
-    #     files_data = request.FILES
-    #     for key in files_data:
-    #         if key.startswith("files[") and key.endswith("]file"):
-    #             index = key[key.find("[") + 1 : key.find("]")]
-    #             file = files_data[key]
-
-    #             description = request.data.get(f"files[{index}]description", "")
-    #             file_type = request.data.get(f"files[{index}]type", "")
-
-    #             # Create document entry
-    #             PaymentReminderDocuments.objects.create(
-    #                 reminder=instance, file=file, description=description, type=file_type
-    #             )
-
-    #     serializer = self.get_serializer(instance)
-    #     return Response(serializer.data, status=status.HTTP_200_OK)
-
-    # def update_by_phone_number(self, request, *args, **kwargs):
-    #     phone_number = request.query_params.get("phone", "").strip()
-
-    #     if not phone_number:
-    #         return Response({"error": "Phone number is required"}, status=status.HTTP_400_BAD_REQUEST)
-
-    #     try:
-    #         instance = PaymentReminder.objects.get(contact=phone_number)
-    #     except PaymentReminder.DoesNotExist:
-    #         return Response({"error": "No reminder found for this phone number"}, status=status.HTTP_404_NOT_FOUND)
-
-    #     # Read the raw audio file from request body
-    #     file_data = request.body
-
-    #     print("TESTING FILE DATA : ", file_data[:20])  # Print only first 20 bytes to check data
-
-    #     if not file_data:
-    #         return Response({"error": "No file received"}, status=status.HTTP_400_BAD_REQUEST)
-
-    #     # Save the file
-    #     file_name = f"{phone_number}_{timezone.now().strftime('%Y%m%d%H%M%S')}.mp3"
-    #     file_path = os.path.join(settings.MEDIA_ROOT, "recordings", file_name)
-
-    #     with open(file_path, "wb") as f:
-    #         f.write(file_data)
-
-    #     # Save file reference in database
-    #     PaymentReminderDocuments.objects.create(
-    #         reminder=instance, file=f"recordings/{file_name}", description="Call Recording", type="audio"
-    #     )
-
-    #     return Response({"success": "Audio file saved successfully"}, status=status.HTTP_200_OK)
-
-
-
     @action(detail=False, methods=["patch"], url_path="update-by-phone-number")
     def update_by_phone_number(self, request, *args, **kwargs):
         phone_number = request.query_params.get("phone", "").strip()
+        file_name_post = request.query_params.get("file_name", "").strip()
 
         if not phone_number:
             return Response({"error": "Phone number is required"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             instance = PaymentReminder.objects.filter(contact=phone_number).latest('reminder_date')
+            instance_file = PaymentReminderDocuments.objects.filter(reminder=instance, file=f"media/reminder_files/{file_name_post}")
+            if instance_file:
+                return Response({"error": "file already exist for this reminder"}, status=status.HTTP_200_OK) 
         except PaymentReminder.DoesNotExist:
             return Response({"error": "No reminder found for this phone number"}, status=status.HTTP_404_NOT_FOUND)
 
@@ -509,15 +441,15 @@ class PaymentReminderViewSet(viewsets.ModelViewSet):
         os.makedirs(save_directory, exist_ok=True)  # Create folder if it doesn't exist
 
         # Save the file
-        file_name = f"{phone_number}_{timezone.now().strftime('%Y%m%d%H%M%S')}.mp3"
-        file_path = os.path.join(save_directory, file_name)
+        # file_name = f"{phone_number}_{timezone.now().strftime('%Y%m%d%H%M%S')}.mp3"
+        file_path = os.path.join(save_directory, file_name_post)
 
         with open(file_path, "wb") as f:
             f.write(file_data)
 
         # Save file reference in database
         PaymentReminderDocuments.objects.create(
-            reminder=instance, file=f"media/reminder_files/{file_name}", description="Call Recording", type="audio"
+            reminder=instance, file=f"media/reminder_files/{file_name_post}", description="Call Recording", type="audio"
         )
 
         return Response({"success": "Audio file saved successfully"}, status=status.HTTP_200_OK)
