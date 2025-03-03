@@ -60,12 +60,6 @@ class GeneratePaymentReminders(CronJobBase):
 
 
                 if booking_payments_total > booking_received_amount:
-                    # deleted_count, _ = PaymentReminder.objects.filter(
-                    #     booking=booking,
-                    #     remarks__startswith=f"Payment not recieved for booking {booking.booking_id}"
-                    # ).delete()
-                    
-                    # logger.info(f"Deleted {deleted_count} old payment reminders for booking {booking.booking_id}")
                     admin_user = User.objects.get(pk=1)  # Fetch the user instance
                     PaymentReminder.objects.create(
                         project=booking.project,

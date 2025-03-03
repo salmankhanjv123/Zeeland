@@ -25,6 +25,7 @@ from .serializers import (
     BankTransferSerializer,
     ChequeClearanceSerializer,
 )
+from django.contrib.auth.models import User
 from django.utils import timezone
 from django.conf import settings
 from .models import (
@@ -422,13 +423,44 @@ class PaymentReminderViewSet(viewsets.ModelViewSet):
         if not phone_number:
             return Response({"error": "Phone number is required"}, status=status.HTTP_400_BAD_REQUEST)
 
+        # try:
+        #     instance = PaymentReminder.objects.filter(contact=phone_number).latest('reminder_date')
+        #     instance_file = PaymentReminderDocuments.objects.filter(reminder=instance, file=f"media/reminder_files/{file_name_post}")
+        #     if instance_file:
+        #         return Response({"error": "file already exist for this reminder"}, status=status.HTTP_200_OK) 
+        # except PaymentReminder.DoesNotExist:
+        #     return Response({"error": "No reminder found for this phone number"}, status=status.HTTP_404_NOT_FOUND)
+
+
         try:
             instance = PaymentReminder.objects.filter(contact=phone_number).latest('reminder_date')
             instance_file = PaymentReminderDocuments.objects.filter(reminder=instance, file=f"media/reminder_files/{file_name_post}")
             if instance_file:
                 return Response({"error": "file already exist for this reminder"}, status=status.HTTP_200_OK) 
         except PaymentReminder.DoesNotExist:
-            return Response({"error": "No reminder found for this phone number"}, status=status.HTTP_404_NOT_FOUND)
+            # Fetch the customer with the same phone number
+            customer = Customers.objects.filter(contact=phone_number).first()
+            if not customer:
+                return Response({"error": "No customer found with this phone number"}, status=status.HTTP_404_NOT_FOUND)
+            # Get all bookings for the customer
+            booking = Booking.objects.filter(customer=customer).latest("created_at")
+            if not booking.exists():
+                return Response({"error": "No bookings found for this customer"}, status=status.HTTP_404_NOT_FOUND)
+            # Create a Payment Reminder for the latest created booking
+            user_id = User.objects.get(pk=1)
+            instance = PaymentReminder.objects.create(
+                project=booking.project,
+                booking=booking,
+                reminder_date=date.today(),
+                user=user_id,
+                worked_on=True,
+                created_at=timezone.now(),
+                updated_at=timezone.now(), 
+                contact=customer.contact,
+                remarks=f"Auto reminder for booking : {booking}"
+            )
+            
+
 
         # Read the raw audio file from request body
         file_data = request.body
@@ -453,6 +485,7 @@ class PaymentReminderViewSet(viewsets.ModelViewSet):
         )
 
         return Response({"success": "Audio file saved successfully"}, status=status.HTTP_200_OK)
+    
 def get_plot_info(booking):
         return [
             f"{plot.plot_number} || {plot.get_type_display()} || {plot.get_plot_size()}"
