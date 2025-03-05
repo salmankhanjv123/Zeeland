@@ -59,7 +59,7 @@ class MonthField(models.DateField):
 
 
 class IncomingFund(models.Model):
-    project = models.ForeignKey(Projects, on_delete=models.CASCADE)
+    project = models.ForeignKey(Projects, on_delete=models.PROTECT)
     document_number = models.CharField(max_length=20, blank=True, null=True)
     previous_serial_num=models.CharField(max_length=10, blank=True, null=True)
     reference = models.CharField(max_length=10, default="payment")
@@ -172,8 +172,7 @@ class JournalVoucher(models.Model):
 
 class PaymentReminder(models.Model):
     project = models.ForeignKey(Projects, on_delete=models.PROTECT)
-    # booking = models.ForeignKey(Booking, on_delete=models.PROTECT)
-    booking = models.ForeignKey(Booking, on_delete=models.CASCADE)
+    booking = models.ForeignKey(Booking, on_delete=models.PROTECT)
     remarks = models.TextField(blank=True, null=True)
     reminder_date = models.DateField()
     parent_reminder = models.ForeignKey(
