@@ -172,7 +172,8 @@ class JournalVoucher(models.Model):
 
 class PaymentReminder(models.Model):
     project = models.ForeignKey(Projects, on_delete=models.PROTECT)
-    booking = models.ForeignKey(Booking, on_delete=models.PROTECT)
+    # booking = models.ForeignKey(Booking, on_delete=models.PROTECT)
+    booking = models.ForeignKey(Booking, on_delete=models.CASCADE)
     remarks = models.TextField(blank=True, null=True)
     reminder_date = models.DateField()
     parent_reminder = models.ForeignKey(
